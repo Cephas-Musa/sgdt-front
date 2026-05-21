@@ -1,9 +1,17 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate, Outlet, useMatchRoute } from "@tanstack/react-router";
 import {
-  Search, FolderKanban, Calendar, Hash, Loader2,
-  FileText, Truck, ArrowRight,
+  Search,
+  FolderKanban,
+  Calendar,
+  Hash,
+  Loader2,
+  FileText,
+  Truck,
+  ArrowRight,
+  Building2,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/PageHeader";
@@ -11,12 +19,21 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { DOSSIERS, type Dossier } from "@/lib/mock";
+import { DOSSIERS, BUREAUX_REPR, ALERTS, type Dossier } from "@/lib/mock";
 import { toast } from "sonner";
 import {
-  DirectForm, TransbordementForm, VracForm, LotForm,
-  PetrolierForm, DechargementForm, TraficForm, ExportForm, AutresForm, PaiementModule,
+  DirectForm,
+  TransbordementForm,
+  VracForm,
+  LotForm,
+  PetrolierForm,
+  DechargementForm,
+  TraficForm,
+  ExportForm,
+  AutresForm,
+  PaiementModule,
 } from "@/dashboards/inspecteur/DossierForms";
+import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 
 export const Route = createFileRoute("/app/dossiers")({
   component: DossiersLayout,
@@ -38,10 +55,12 @@ function DossiersLayout() {
 
 /* ── Rôles autorisés selon le cahier de charges ── */
 const ALLOWED_ROLES = [
-  "directeur",              // Directeur Général
-  "directeur_provincial",   // Directeur Provincial
-  "agent_controle",         // Agent de Cellule de Contrôle
-  "inspecteur_chef",        // Inspecteur
+  "directeur", // Directeur Général
+  "directeur_provincial", // Directeur Provincial
+  "agent_controle", // Agent de Cellule de Contrôle
+  "inspecteur_chef", // Inspecteur
+  "secretaire_inspecteur", // Secrétaire Inspecteur
+  "chef_bureau_repr", // Chef Bureau Représentation
 ] as const;
 
 /* ── Validation : on vérifie que la partie après RD- contient 1-4 chiffres ── */
@@ -55,16 +74,24 @@ function DossiersPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // L'utilisateur ne saisit que la partie numérique (le préfixe RD- est fixe)
+  // Filtres
   const [searchRefNumber, setSearchRefNumber] = useState("");
-  const [searchDate, setSearchDate] = useState("");
+  const [searchDra, setSearchDra] = useState("");
+  const [searchBureau, setSearchBureau] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   const [activeReference, setActiveReference] = useState("");
-  const [activeDate, setActiveDate] = useState("");
+  const [activeDra, setActiveDra] = useState("");
+  const [activeBureau, setActiveBureau] = useState("");
+  const [activeStartDate, setActiveStartDate] = useState("");
+  const [activeEndDate, setActiveEndDate] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
   const refError = searchRefNumber.length > 0 && !isValidRefNumber(searchRefNumber);
-  const isAllowed = ALLOWED_ROLES.includes(user?.role as any);
+  const isAllowed = user?.role ? (ALLOWED_ROLES as readonly string[]).includes(user.role) : false;
 
   /* ── Filtrage des dossiers ── */
   const getFilteredDossiers = (): Dossier[] => {
@@ -79,11 +106,23 @@ function DossiersPage() {
     // Filtrage par référence complète (RD-XXXX)
     if (activeReference) {
       dossiers = dossiers.filter((d) =>
-        d.reference.toLowerCase().includes(activeReference.toLowerCase())
+        d.reference.toLowerCase().includes(activeReference.toLowerCase()),
       );
     }
-    if (activeDate) {
-      dossiers = dossiers.filter((d) => d.date.includes(activeDate));
+    // Filtrage par DRA
+    if (activeDra) {
+      dossiers = dossiers.filter((d) => d.dra.toLowerCase().includes(activeDra.toLowerCase()));
+    }
+    // Filtrage par Bureau
+    if (activeBureau) {
+      dossiers = dossiers.filter((d) => d.bureauRepr === activeBureau);
+    }
+    // Filtrage par intervalle de dates
+    if (activeStartDate) {
+      dossiers = dossiers.filter((d) => d.date >= activeStartDate);
+    }
+    if (activeEndDate) {
+      dossiers = dossiers.filter((d) => d.date <= activeEndDate);
     }
 
     return dossiers;
@@ -106,16 +145,25 @@ function DossiersPage() {
     // Simuler un état de chargement (en prod : appel API)
     setTimeout(() => {
       setActiveReference(fullRef);
-      setActiveDate(searchDate.trim());
+      setActiveDra(searchDra.trim());
+      setActiveBureau(searchBureau);
+      setActiveStartDate(startDate);
+      setActiveEndDate(endDate);
       setIsLoading(false);
     }, 600);
   };
 
   const handleReset = () => {
     setSearchRefNumber("");
-    setSearchDate("");
+    setSearchDra("");
+    setSearchBureau("");
+    setStartDate("");
+    setEndDate("");
     setActiveReference("");
-    setActiveDate("");
+    setActiveDra("");
+    setActiveBureau("");
+    setActiveStartDate("");
+    setActiveEndDate("");
     setHasSearched(false);
   };
 
@@ -130,12 +178,22 @@ function DossiersPage() {
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-6">
           <h2 className="text-lg font-semibold text-destructive">Accès restreint</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Vous n'avez pas les droits nécessaires pour consulter le module DOSSIERS.
-            Contactez votre administrateur si vous pensez qu'il s'agit d'une erreur.
+            Vous n'avez pas les droits nécessaires pour consulter le module DOSSIERS. Contactez
+            votre administrateur si vous pensez qu'il s'agit d'une erreur.
           </p>
         </div>
       </div>
     );
+  }
+
+  /* ── Vue dédiée : Secrétaire Inspecteur ── */
+  if (user?.role === "secretaire_inspecteur") {
+    return <SecretaireDossiersView />;
+  }
+
+  /* ── Vue dédiée : Chef Bureau Représentation ── */
+  if (user?.role === "chef_bureau_repr") {
+    return <ChefReprDossiersView />;
   }
 
   /* ── Colonnes du tableau ── */
@@ -153,61 +211,76 @@ function DossiersPage() {
       key: "importateur",
       header: "Importateur",
       render: (r) => (
-        <div>
-          <div className="font-medium">{r.importateur}</div>
-          <div className="text-xs text-muted-foreground">{r.declarant}</div>
+        <div className="min-w-[120px]">
+          <div className="font-semibold text-xs">{r.importateur}</div>
+          <div className="text-[10px] text-muted-foreground uppercase">{r.declarant}</div>
         </div>
       ),
     },
     {
-      key: "type",
-      header: "Type de dossier",
-      render: (r) => (
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-muted/60 px-2 py-0.5 text-xs font-medium capitalize">
-          <FileText className="h-3 w-3 text-muted-foreground" />
-          {t(`type.${r.type}`)}
-        </span>
-      ),
+      key: "nif",
+      header: "NIF",
+      render: (r) => <span className="font-mono text-[10px]">{r.nif}</span>,
+    },
+    {
+      key: "dra",
+      header: "Référence DRA",
+      render: (r) => <span className="font-mono text-xs font-bold text-accent">{r.dra}</span>,
+    },
+    {
+      key: "reference",
+      header: "Appel",
+      render: (r) => <span className="font-mono text-xs text-muted-foreground">{r.reference}</span>,
     },
     {
       key: "vehicule",
       header: "Véhicule",
       render: (r) => (
-        <div className="flex items-center gap-1.5">
-          <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-sm">{r.vehicule}</span>
+        <div className="flex flex-col">
+          <span className="text-xs font-medium">{r.vehicule}</span>
+          <span className="text-[10px] text-muted-foreground font-mono">{r.plaque}</span>
         </div>
       ),
     },
     {
-      key: "dra",
-      header: "Référence DRA",
-      render: (r) => <span className="font-mono text-xs font-medium text-accent">{r.dra}</span>,
-    },
-    {
-      key: "t1",
-      header: "Référence T1",
-      render: (r) => <span className="font-mono text-xs">{r.t1}</span>,
+      key: "colis",
+      header: "Nombre colis",
+      render: (r) => <span className="font-medium">{r.colis}</span>,
     },
     {
       key: "status",
       header: "Statut",
-      render: (r) => <StatusBadge status={r.status} />,
+      render: (r) => {
+        const hasAlert = ALERTS.some(
+          (a) => a.title.includes(r.reference) || a.codeBureau === r.bureauRepr,
+        );
+        return (
+          <div className="flex items-center gap-2">
+            <StatusBadge status={r.status} />
+            {hasAlert && (
+              <span
+                className="flex h-2 w-2 rounded-full bg-destructive animate-pulse"
+                title="Alerte active"
+              />
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "actions",
-      header: "Actions",
+      header: "Afficher",
       render: (r: Dossier) => (
         <Button
           size="sm"
-          className="h-8 gap-1.5 bg-accent text-accent-foreground shadow-sm hover:bg-accent/90 transition-all duration-200"
+          variant="outline"
+          className="h-8 border-accent/20 text-accent hover:bg-accent hover:text-white transition-all duration-200"
           onClick={(event) => {
             event.stopPropagation();
             navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: r.id } });
           }}
         >
-          AFFICHER
-          <ArrowRight className="h-3.5 w-3.5" />
+          Afficher
         </Button>
       ),
     },
@@ -217,7 +290,7 @@ function DossiersPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("nav.dossiers")}
-        description="Consultation, recherche et suivi des dossiers douaniers."
+        description={user?.role === 'directeur_provincial' ? "Supervision provinciale des dossiers douaniers." : "Consultation, recherche et suivi des dossiers douaniers."}
       />
 
       {/* ── CRÉATION DE DOSSIERS (Inspecteur uniquement) ── */}
@@ -245,25 +318,27 @@ function DossiersPage() {
         </div>
       )}
 
-      {/* ── SECTION RECHERCHE ── */}
+      {/* ── SECTION RECHERCHE / FILTRES PROVINCIAUX ── */}
       <div className="rounded-xl border border-border bg-gradient-to-br from-card via-card to-accent/[0.03] p-6 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10">
             <Search className="h-4 w-4 text-accent" />
           </div>
           <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground/80">
-            Recherche de dossier
+            {user?.role === 'directeur_provincial' ? "Filtres de supervision provinciale" : "Recherche de dossier"}
           </h2>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto]">
-          {/* Référence dossier — préfixe RD- fixe */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {/* Référence dossier */}
           <div>
             <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Hash className="h-3 w-3" />
               Référence dossier
             </label>
-            <div className={`flex items-center rounded-md border transition-colors ${refError ? "border-destructive ring-destructive/20 ring-2" : "border-input focus-within:ring-accent/20 focus-within:ring-2 focus-within:border-accent/40"}`}>
+            <div
+              className={`flex items-center rounded-md border transition-colors ${refError ? "border-destructive ring-destructive/20 ring-2" : "border-input focus-within:ring-accent/20 focus-within:ring-2 focus-within:border-accent/40"}`}
+            >
               <span className="flex h-9 items-center rounded-l-md border-r border-input bg-muted/60 px-3 text-sm font-semibold text-foreground select-none">
                 RD-
               </span>
@@ -273,7 +348,6 @@ function DossiersPage() {
                 inputMode="numeric"
                 value={searchRefNumber}
                 onChange={(e) => {
-                  // N'accepter que des chiffres (max 4)
                   const val = e.target.value.replace(/\D/g, "").slice(0, 4);
                   setSearchRefNumber(val);
                 }}
@@ -282,51 +356,73 @@ function DossiersPage() {
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               />
             </div>
-            {refError && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-destructive animate-in fade-in slide-in-from-top-1 duration-200">
-                <span className="inline-block h-1 w-1 rounded-full bg-destructive" />
-                Entrez 1 à 4 chiffres après RD-
-              </p>
-            )}
           </div>
 
-          {/* Année / Date */}
+          {/* Bureau Douanier */}
+          <div>
+            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Building2 className="h-3 w-3" />
+              Bureau Douanier
+            </label>
+            <select
+              value={searchBureau}
+              onChange={(e) => setSearchBureau(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="">Tous les bureaux</option>
+              {BUREAUX_REPR.map((b) => (
+                <option key={b.id} value={b.denomination}>
+                  {b.denomination}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Début */}
           <div>
             <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Calendar className="h-3 w-3" />
-              Année / Date
+              Date Début
             </label>
             <Input
-              id="search-date"
-              value={searchDate}
-              onChange={(e) => setSearchDate(e.target.value)}
-              placeholder="2025 ou 2025-10-01"
-              className="focus:ring-accent/20 focus:ring-2 focus:border-accent/40 transition-colors"
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="h-9"
+            />
+          </div>
+
+          {/* Date Fin */}
+          <div>
+            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Calendar className="h-3 w-3" />
+              Date Fin
+            </label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="h-9"
             />
           </div>
 
           {/* Boutons */}
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 lg:col-span-1">
             <Button
               onClick={handleSearch}
               disabled={isLoading}
-              className="gap-2 bg-accent text-accent-foreground shadow-sm hover:bg-accent/90 transition-all duration-200 h-9"
+              className="w-full gap-2 bg-accent text-accent-foreground shadow-sm hover:bg-accent/90 transition-all duration-200 h-9 font-bold uppercase"
             >
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Search className="h-4 w-4" />
               )}
-              Rechercher
+              Appliquer
             </Button>
             {hasSearched && (
-              <Button
-                variant="outline"
-                onClick={handleReset}
-                className="h-9 transition-all duration-200"
-              >
-                Réinitialiser
+              <Button variant="outline" onClick={handleReset} className="h-9">
+                Reset
               </Button>
             )}
           </div>
@@ -334,21 +430,17 @@ function DossiersPage() {
       </div>
 
       {/* ── BARRE DE RÉSULTATS ── */}
-      <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between shadow-sm">
         <div className="flex items-center gap-2">
           <FolderKanban className="h-4 w-4 text-accent" />
-          <span className="font-medium">{filteredDossiers.length} dossier{filteredDossiers.length !== 1 ? "s" : ""} trouvé{filteredDossiers.length !== 1 ? "s" : ""}</span>
+          <span className="font-bold uppercase text-[11px] tracking-tight text-muted-foreground">
+            {filteredDossiers.length} dossier{filteredDossiers.length !== 1 ? "s" : ""} rattaché{filteredDossiers.length !== 1 ? "s" : ""}
+          </span>
         </div>
-        <div className="flex gap-3 text-xs text-muted-foreground">
-          <span>Réf : <strong className="text-foreground">{activeReference || "Toutes"}</strong></span>
+        <div className="flex gap-3 text-[10px] font-bold uppercase text-muted-foreground">
+          <span>Bureau : <strong className="text-foreground">{activeBureau || "TOUS"}</strong></span>
           <span className="text-border">|</span>
-          <span>Date : <strong className="text-foreground">{activeDate || "Toutes"}</strong></span>
-          {user?.role === "directeur_provincial" && (
-            <>
-              <span className="text-border">|</span>
-              <span>Province : <strong className="text-foreground">NORD-KIVU</strong></span>
-            </>
-          )}
+          <span>Période : <strong className="text-foreground">{activeStartDate || "Début"} → {activeEndDate || "Maintenant"}</strong></span>
         </div>
       </div>
 
@@ -357,20 +449,420 @@ function DossiersPage() {
         <div className="rounded-lg border border-border bg-card p-12">
           <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-accent" />
-            <p className="text-sm">Recherche en cours…</p>
+            <p className="text-sm">Mise à jour des données provinciales…</p>
           </div>
         </div>
       ) : (
-        <DataTable
-          data={filteredDossiers}
-          columns={columns}
-          searchable={false}
-          empty="Aucun dossier ne correspond aux critères de recherche."
-          onRowClick={(dossier) =>
-            navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: dossier.id } })
-          }
-        />
+        <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-left text-[10px] font-bold uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-4">Bureau</th>
+                <th className="px-4 py-4">Dossier</th>
+                <th className="px-4 py-4">Importateur</th>
+                <th className="px-4 py-4 text-center">Véhicules</th>
+                <th className="px-4 py-4">Date</th>
+                <th className="px-4 py-4">Montant</th>
+                <th className="px-4 py-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filteredDossiers.slice(0, 20).map((d) => (
+                <tr key={d.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-4"><Badge variant="outline" className="text-[10px] font-bold text-accent">{d.bureauRepr || "BOMA"}</Badge></td>
+                  <td className="px-4 py-4 font-mono text-xs font-bold">{d.reference}</td>
+                  <td className="px-4 py-4 font-medium">{d.importateur}</td>
+                  <td className="px-4 py-4 text-center">
+                    <span className="inline-flex h-6 w-10 items-center justify-center rounded bg-muted text-[10px] font-bold">12</span>
+                  </td>
+                  <td className="px-4 py-4 text-xs">{d.date}</td>
+                  <td className="px-4 py-4 font-bold text-success">${d.montant}</td>
+                  <td className="px-4 py-4 text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={() => navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: d.id } })}
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+    </div>
+  );
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   Vue dédiée Secrétaire Inspecteur — Dossiers
+   Sections 1→4 du cahier des charges
+════════════════════════════════════════════════════════════ */
+function SecretaireDossiersView() {
+  const { t } = useI18n();
+
+  /* ── Recherche ── */
+  const [searchRD, setSearchRD] = useState("");
+  const [searchYear, setSearchYear] = useState(new Date().getFullYear().toString());
+  const [results, setResults] = useState<Dossier[]>([]);
+  const [searched, setSearched] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  /* ── Formulaire "Ajouter information" par dossier ── */
+  const [infoTarget, setInfoTarget] = useState<Dossier | null>(null);
+  const [infoRefTitre, setInfoRefTitre] = useState("");
+  const [infoDateTitre, setInfoDateTitre] = useState("");
+  const [infoTA, setInfoTA] = useState("");
+  const [infoDateTA, setInfoDateTA] = useState("");
+  const [infoImportateur, setInfoImportateur] = useState("");
+
+  const handleSearch = () => {
+    setIsLoading(true);
+    setSearched(true);
+    setTimeout(() => {
+      const rd = searchRD.trim().toUpperCase();
+      const year = searchYear.trim();
+      const found = DOSSIERS.filter((d) => {
+        const matchRD = rd ? d.reference.toUpperCase().includes(rd) : true;
+        const matchYear = year ? d.date.startsWith(year) : true;
+        return matchRD && matchYear;
+      });
+      setResults(found);
+      setIsLoading(false);
+      if (found.length === 0) toast.error("Aucun dossier trouvé.");
+      else toast.success(`${found.length} dossier(s) trouvé(s).`);
+    }, 500);
+  };
+
+  const openInfoForm = (d: Dossier) => {
+    setInfoTarget(d);
+    setInfoRefTitre("");
+    setInfoDateTitre("");
+    setInfoTA("");
+    setInfoDateTA("");
+    setInfoImportateur(d.importateur);
+  };
+
+  const handleAddInfo = () => {
+    toast.success(`Informations ajoutées pour ${infoTarget?.reference} ✓`);
+    setInfoTarget(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={t("nav.dossiers")}
+        description="Recherche et complétion des informations de dossier."
+      />
+
+      {/* ── RECHERCHE ── */}
+      <div className="rounded-xl border border-border bg-gradient-to-br from-card via-card to-accent/[0.03] p-6 shadow-sm">
+        <div className="mb-4 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10">
+            <Search className="h-4 w-4 text-accent" />
+          </div>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground/80">
+            Recherche de dossier
+          </h2>
+        </div>
+        <div className="flex flex-wrap gap-4 items-end">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              Référence dossier (RD)
+            </label>
+            <div className="flex items-center rounded-md border border-input focus-within:ring-2 focus-within:ring-accent/20 focus-within:border-accent/40">
+              <span className="flex h-9 items-center rounded-l-md border-r border-input bg-muted/60 px-3 text-sm font-semibold select-none">
+                RD-
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={searchRD.replace(/^RD-/i, "")}
+                onChange={(e) => setSearchRD(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="0001"
+                className="h-9 w-32 flex-1 rounded-r-md bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/50"
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              Année
+            </label>
+            <Input
+              type="number"
+              value={searchYear}
+              onChange={(e) => setSearchYear(e.target.value)}
+              placeholder="2026"
+              className="w-28 h-9"
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            />
+          </div>
+          <Button onClick={handleSearch} disabled={isLoading} className="gap-2 h-9">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            Rechercher
+          </Button>
+          {searched && (
+            <Button variant="outline" className="h-9" onClick={() => { setResults([]); setSearched(false); setSearchRD(""); setSearchYear(new Date().getFullYear().toString()); }}>
+              Réinitialiser
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* ── FORMULAIRE AJOUTER INFORMATION (inline panel) ── */}
+      {infoTarget && (
+        <div className="rounded-xl border border-accent/30 bg-accent/5 p-5 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <ArrowRight className="h-4 w-4 text-accent" />
+              Ajouter information — <span className="font-mono text-accent">{infoTarget.reference}</span>
+            </h3>
+            <Button size="sm" variant="ghost" onClick={() => setInfoTarget(null)} className="h-7 w-7 p-0 text-muted-foreground">✕</Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Référence titre</label>
+              <Input placeholder="T1-XXXXX" value={infoRefTitre} onChange={(e) => setInfoRefTitre(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Date (titre)</label>
+              <Input type="date" value={infoDateTitre} onChange={(e) => setInfoDateTitre(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">T1</label>
+              <Input placeholder="T1-001" value={infoTA} onChange={(e) => setInfoTA(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Date (T1)</label>
+              <Input type="date" value={infoDateTA} onChange={(e) => setInfoDateTA(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Importateur</label>
+              <Input value={infoImportateur} onChange={(e) => setInfoImportateur(e.target.value)} />
+            </div>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Button onClick={handleAddInfo} className="gap-2">
+              <FolderKanban className="h-4 w-4" />
+              Ajouter
+            </Button>
+            <Button variant="outline" onClick={() => setInfoTarget(null)}>Annuler</Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── TABLEAU RÉSULTATS ── */}
+      {searched && !isLoading && (
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-border px-4 py-3 bg-muted/30">
+            <FolderKanban className="h-4 w-4 text-accent" />
+            <span className="text-sm font-medium">{results.length} dossier(s) trouvé(s)</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
+                <tr>
+                  <th className="px-3 py-2 w-10">N°</th>
+                  <th className="px-3 py-2">Importateur</th>
+                  <th className="px-3 py-2">Référence dossier</th>
+                  <th className="px-3 py-2 text-center">Nombre titre</th>
+                  <th className="px-3 py-2">Référence titre</th>
+                  <th className="px-3 py-2 text-center">Nombre déclarations</th>
+                  <th className="px-3 py-2">Type dossier</th>
+                  <th className="px-3 py-2 text-center">Direct</th>
+                  <th className="px-3 py-2">Ajouter information</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
+                      Aucun dossier ne correspond aux critères.
+                    </td>
+                  </tr>
+                ) : (
+                  results.map((d, idx) => (
+                    <tr key={d.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                      <td className="px-3 py-2">
+                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent/10 font-mono text-xs font-semibold text-accent">
+                          {idx + 1}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 font-medium text-xs">{d.importateur}</td>
+                      <td className="px-3 py-2 font-mono text-xs font-bold text-accent">{d.reference}</td>
+                      <td className="px-3 py-2 text-center text-xs">{d.nbTitres ?? "—"}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{d.t1 || "—"}</td>
+                      <td className="px-3 py-2 text-center text-xs">{d.nbDeclarations ?? d.nombreDeclarations}</td>
+                      <td className="px-3 py-2">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs capitalize">{d.type}</span>
+                      </td>
+                      <td className="px-3 py-2 text-center text-xs">
+                        {d.type === "direct" ? (
+                          <span className="rounded-full bg-success/15 text-success px-2 py-0.5 text-xs">Oui</span>
+                        ) : (
+                          <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-xs">Non</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 gap-1.5 text-xs border-accent/30 text-accent hover:bg-accent hover:text-white"
+                          onClick={() => openInfoForm(d)}
+                        >
+                          <Building2 className="h-3.5 w-3.5" />
+                          Ajouter info
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════
+   Vue dédiée Chef Bureau Représentation — Dossiers
+   (Sections 1.1 à 1.6 du cahier des charges)
+   ════════════════════════════════════════════════════════════ */
+function ChefReprDossiersView() {
+  const { user } = useAuth();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateRange, setDateRange] = useState({ start: "", end: "" });
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const filteredDossiers = DOSSIERS.filter(d => {
+    const matchesRef = d.reference.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDate = (!dateRange.start || d.date >= dateRange.start) && (!dateRange.end || d.date <= dateRange.end);
+    return matchesRef && matchesDate;
+  });
+
+  return (
+    <div className="h-full flex flex-col gap-4 overflow-hidden animate-in fade-in duration-500 max-w-[1400px] mx-auto w-full">
+      <PageHeader 
+        title="Gestion des Dossiers (Bureau)" 
+        description="Supervision, alertes et consultation des dossiers douaniers." 
+      />
+
+      <div className="flex flex-wrap gap-3 items-end bg-card/50 p-4 rounded-xl border shrink-0">
+        <div className="w-48">
+          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">Recherche par dossier</label>
+          <div className="flex items-center rounded-lg border bg-background h-9 focus-within:ring-2 focus-within:ring-accent/20">
+            <Search className="ml-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <input 
+              className="flex-1 bg-transparent px-2 text-xs outline-none" 
+              placeholder="RD-..." 
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="w-36">
+          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">Date Début</label>
+          <input type="date" className="w-full h-9 rounded-lg border bg-background px-2 text-xs" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
+        </div>
+        <div className="w-36">
+          <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">Date Fin</label>
+          <input type="date" className="w-full h-9 rounded-lg border bg-background px-2 text-xs" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
+        </div>
+        <Button size="sm" className="h-9 px-4 font-black uppercase tracking-widest text-[10px]" onClick={() => { setHasSearched(true); toast.success("Filtres appliqués"); }}>Rechercher</Button>
+        {hasSearched && <Button variant="ghost" size="sm" className="h-9 px-4 text-[10px]" onClick={() => { setSearchTerm(""); setDateRange({start: "", end: ""}); setHasSearched(false); }}>Reset</Button>}
+      </div>
+
+      <div className="flex-1 min-h-0 bg-card rounded-xl border overflow-hidden shadow-sm">
+        <div className="h-full overflow-y-auto scrollbar-hide">
+          <table className="w-full text-xs text-left">
+            <thead className="sticky top-0 bg-muted/80 backdrop-blur-md border-b text-[9px] font-black uppercase tracking-widest text-muted-foreground z-10">
+              <tr>
+                <th className="py-4 px-3">N°</th>
+                <th className="py-4 px-3">Importateur</th>
+                <th className="py-4 px-3">DRA Réf</th>
+                <th className="py-4 px-3">Date</th>
+                <th className="py-4 px-3">T1 Réf</th>
+                <th className="py-4 px-3">Date</th>
+                <th className="py-4 px-3">Véhicule</th>
+                <th className="py-4 px-3">Action</th>
+                <th className="py-4 px-3">Statut</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {filteredDossiers.map((d, i) => (
+                <tr key={d.id} className="hover:bg-muted/30 transition-colors group">
+                  <td className="py-3 px-3 text-muted-foreground">{i + 1}</td>
+                  <td className="py-3 px-3 font-bold">{d.importateur}</td>
+                  <td className="py-3 px-3 font-mono font-bold text-accent">{d.dra || "E-0000"}</td>
+                  <td className="py-3 px-3 font-mono text-[10px]">{d.date}</td>
+                  <td className="py-3 px-3 font-mono">{d.t1 || "—"}</td>
+                  <td className="py-3 px-3 font-mono text-[10px]">{d.date}</td>
+                  <td className="py-3 px-3 text-muted-foreground">{d.vehicule}</td>
+                  <td className="py-3 px-3">
+                    <div className="flex gap-1">
+                      <FormDialog
+                        trigger={<Button variant="ghost" size="sm" className="h-7 px-2 text-[9px] font-black uppercase tracking-widest text-accent hover:bg-accent/10">Afficher</Button>}
+                        title={`Détails Articles — ${d.reference}`}
+                      >
+                        <div className="space-y-4">
+                          <table className="w-full text-[11px] border-collapse">
+                            <thead>
+                              <tr className="border-b text-muted-foreground uppercase font-black text-[9px] tracking-widest">
+                                <th className="py-2 text-left">Article</th>
+                                <th className="py-2 text-right">Poids (kg)</th>
+                                <th className="py-2 text-right">Quantité</th>
+                                <th className="py-2 text-right">FOB ($)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {d.articles?.map(art => (
+                                <tr key={art.id}>
+                                  <td className="py-2 font-bold">{art.designation}</td>
+                                  <td className="py-2 text-right font-mono">{art.poids}</td>
+                                  <td className="py-2 text-right">{art.quantite}</td>
+                                  <td className="py-2 text-right font-black text-success">{art.fob?.toLocaleString()}</td>
+                                </tr>
+                              )) || (
+                                <tr><td colSpan={4} className="py-8 text-center text-muted-foreground italic">Aucun article listé</td></tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </FormDialog>
+                      <FormDialog
+                        trigger={<Button variant="ghost" size="sm" className="h-7 px-2 text-[9px] font-black uppercase tracking-widest text-destructive hover:bg-destructive/10">Alerter</Button>}
+                        title="Activer une Alerte de Sécurité"
+                        onSubmit={() => toast.success("Alerte activée")}
+                      >
+                        <div className="space-y-4">
+                          <Field label="Description de l'alerte" required>
+                            <textarea className="w-full min-h-[100px] rounded-lg border bg-background p-3 text-xs outline-none focus:ring-1 focus:ring-destructive/30" placeholder="Motif de l'alerte..." />
+                          </Field>
+                          <Button className="w-full h-11 bg-destructive hover:bg-destructive/90 text-white font-black uppercase tracking-widest text-[10px]">Activer Alerte</Button>
+                        </div>
+                      </FormDialog>
+                    </div>
+                  </td>
+                  <td className="py-3 px-3">
+                     {i % 7 === 0 ? (
+                       <Badge variant="destructive" className="text-[8px] font-black uppercase py-0 px-2 animate-pulse">Alerte</Badge>
+                     ) : (
+                       <Badge variant="outline" className="text-[8px] font-black uppercase py-0 px-2 text-success border-success/30">Normal</Badge>
+                     )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

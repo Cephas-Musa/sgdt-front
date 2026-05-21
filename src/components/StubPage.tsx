@@ -2,7 +2,15 @@ import type { ReactNode } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Construction } from "lucide-react";
 
-export function StubPage({ title, description, children }: { title: string; description?: string; children?: ReactNode }) {
+export function StubPage({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children?: ReactNode;
+}) {
   return (
     <div>
       <PageHeader title={title} description={description} />
@@ -13,7 +21,8 @@ export function StubPage({ title, description, children }: { title: string; desc
           </div>
           <h3 className="mt-4 font-medium">Module en construction</h3>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            Cette page fait partie du squelette complet. Les écrans détaillés seront enrichis dans les prochaines itérations.
+            Cette page fait partie du squelette complet. Les écrans détaillés seront enrichis dans
+            les prochaines itérations.
           </p>
         </div>
       )}

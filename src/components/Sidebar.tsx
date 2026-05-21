@@ -1,8 +1,22 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard, FolderKanban, Shield, Warehouse, FileText, Search, Building2,
-  Users, Settings, MessageSquare, Bell, FileCheck, ListChecks, MapPin,
-  ParkingSquare, UserCircle, Briefcase,
+  LayoutDashboard,
+  FolderKanban,
+  Shield,
+  Warehouse,
+  FileText,
+  Search,
+  Building2,
+  Users,
+  Settings,
+  MessageSquare,
+  Bell,
+  FileCheck,
+  ListChecks,
+  MapPin,
+  ParkingSquare,
+  UserCircle,
+  Briefcase,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -12,10 +26,7 @@ import { cn } from "@/lib/utils";
 const ROUTES: Record<NavKey, { to: string; icon: any; labelKey: string }> = {
   dashboard: { to: "/app", icon: LayoutDashboard, labelKey: "nav.dashboard" },
   dossiers: { to: "/app/dossiers", icon: FolderKanban, labelKey: "nav.dossiers" },
-  barrieres: { to: "/app/barrieres", icon: Shield, labelKey: "nav.barrieres" },
   entrepots: { to: "/app/entrepots", icon: Warehouse, labelKey: "nav.entrepots" },
-  manifest: { to: "/app/manifest", icon: FileText, labelKey: "nav.manifest" },
-  verification: { to: "/app/verification", icon: FileCheck, labelKey: "nav.verification" },
   recherche: { to: "/app/recherche", icon: Search, labelKey: "nav.recherche" },
   representation: { to: "/app/representation", icon: Building2, labelKey: "nav.representation" },
   secretariat: { to: "/app/secretariat", icon: Briefcase, labelKey: "nav.secretariat" },
@@ -38,7 +49,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   if (!user) return null;
   const items = ROLE_NAV[user.role];
 
-  const isActive = (to: string) => to === "/app" ? pathname === "/app" : pathname.startsWith(to);
+  const isActive = (to: string) => (to === "/app" ? pathname === "/app" : pathname.startsWith(to));
 
   return (
     <>

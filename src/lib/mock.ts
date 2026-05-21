@@ -99,6 +99,8 @@ export interface Dossier {
     emplacement: string;
     statutFinal: string;
   };
+  operateurSaisie?: string;
+  articles?: Article[];
   // Nouveaux champs pour Trafic et Export
   trafic?: {
     moyenTransport: "velo" | "tricycle" | "voiture" | "humain" | "autres";
@@ -111,6 +113,18 @@ export interface Dossier {
     modeDeclaration: string;
     docsJoints: { designation: string; reference: string; date: string }[];
   };
+  createdAt: string;
+}
+
+export interface ITEntry {
+  id: string;
+  reference: string;
+  chassis: string;
+  consignee: string;
+  vehicleMark: string;
+  manifestYear: number;
+  color: string;
+  date: string;
 }
 
 const importateurs = [
@@ -123,7 +137,15 @@ const importateurs = [
 ];
 const pays = ["RDC", "OUG", "RWA", "BDI", "TZA", "KEN"];
 const devises = ["USD", "EUR", "CDF"];
-const types: DossierType[] = ["direct", "transbordement", "vrac", "lot", "petrolier", "trafic", "export"];
+const types: DossierType[] = [
+  "direct",
+  "transbordement",
+  "vrac",
+  "lot",
+  "petrolier",
+  "trafic",
+  "export",
+];
 const statuses: DossierStatus[] = [
   "brouillon",
   "attente_paiement",
@@ -164,13 +186,13 @@ export const DOSSIERS: Dossier[] = Array.from({ length: 64 }).map((_, i) => {
 
   return {
     id: `D-${pad(i + 1)}`,
+    type: i === 7 ? "lot" : type,
     reference: `RD-${pad(i + 1)}`,
     referenceDouane: `E-${pad(i + 1, 3)}`,
     importateur,
     exportateur: type === "export" ? "Congo Trading SARL" : undefined,
     declarant: `Agence ${rand(["Transit", "Rapid", "Customs", "Expert"])}`,
     nif: `NIF-${pad(i * 321, 8)}`,
-    type,
     dra: `E-${pad(i + 5, 3)}`,
     t1: `T1-${pad(i + 10, 5)}`,
     vehicule: `Camion ${rand(["Volvo", "Mercedes", "Scania", "Iveco"])}`,
@@ -192,29 +214,98 @@ export const DOSSIERS: Dossier[] = Array.from({ length: 64 }).map((_, i) => {
     nbTitres: (i % 5) + 1,
     nbDeclarations: (i % 3) + 1,
     modeDeclaration: rand(modesDeclaration),
-    barriereEtranger: { entree: "OUI", traversee: "VALIDÉ", validation: "OK", transport: "CONFORME" },
-    barrierePays: { entree: "ARRIVÉ", posteDouanier: "KASINDI", validation: "EN ATTENTE", mouvementsInternes: "AUCUN" },
-    donneesRepresentation: { bureau: rand(reprBureaux), importateur, referenceDra: `DRA-${pad(i, 5)}`, referenceT1: `T1-${pad(i, 5)}`, typeDossier: type },
-    rapportColisage: { colis: (i % 20) + 5, denombrement: "VÉRIFIÉ", pointage: "FAIT", quantites: "CONFORMES" },
-    verificationRapport: { resultat: "CONFORME", observations: "Aucune", anomalies: "Néant", commentaires: "Dossier en règle" },
-    sortie: { autorisation: "OUI", bonSortie: `BS-${pad(i, 4)}`, dateSortie: "2026-05-15", destinationFinale: "Goma" },
-    rapportDechargement: { entrepot: "ENTREPÔT KASINDI 1", dechargement: "TERMINÉ", emplacement: "QUAI 4", statutFinal: "APURÉ" },
-    trafic: type === "trafic" ? {
-      moyenTransport: rand(["velo", "tricycle", "voiture", "humain"]),
-      lieuEntreposage: "Plein air",
-      entrepot: "Entrepôt Kasindi 1",
-      evaluateurs: ["Inspecteur K.", "Agent M."]
-    } : undefined,
-    export: type === "export" ? {
-      exportateur: "Congo Trading SARL",
-      modeDeclaration: rand(modesDeclaration),
-      docsJoints: [
-        { designation: "Facture", reference: `INV-${pad(i)}`, date: "2026-05-01" },
-        { designation: "Certificat", reference: `CERT-${pad(i)}`, date: "2026-05-02" }
-      ]
-    } : undefined
+    barriereEtranger: {
+      entree: "OUI",
+      traversee: "VALIDÉ",
+      validation: "OK",
+      transport: "CONFORME",
+    },
+    barrierePays: {
+      entree: "ARRIVÉ",
+      posteDouanier: "KASINDI",
+      validation: "EN ATTENTE",
+      mouvementsInternes: "AUCUN",
+    },
+    donneesRepresentation: {
+      bureau: rand(reprBureaux),
+      importateur,
+      referenceDra: `DRA-${pad(i, 5)}`,
+      referenceT1: `T1-${pad(i, 5)}`,
+      typeDossier: type,
+    },
+    rapportColisage: {
+      colis: (i % 20) + 5,
+      denombrement: "VÉRIFIÉ",
+      pointage: "FAIT",
+      quantites: "CONFORMES",
+    },
+    verificationRapport: {
+      resultat: "CONFORME",
+      observations: "Aucune",
+      anomalies: "Néant",
+      commentaires: "Dossier en règle",
+    },
+    sortie: {
+      autorisation: "OUI",
+      bonSortie: `BS-${pad(i, 4)}`,
+      dateSortie: "2026-05-15",
+      destinationFinale: "Goma",
+    },
+    rapportDechargement: {
+      entrepot: "ENTREPÔT KASINDI 1",
+      dechargement: "TERMINÉ",
+      emplacement: "QUAI 4",
+      statutFinal: "APURÉ",
+    },
+    operateurSaisie: rand(["Jean M.", "Marie K.", "Paul T.", "Lucie B."]),
+    articles: Array.from({ length: (i % 4) + 1 }).map((_, j) => ({
+      id: `ART-${i}-${j}`,
+      designation: rand([
+        "Farine de Froment",
+        "Sucre Roux",
+        "Huile Végétale",
+        "Ciment Gris",
+        "Pneus",
+      ]),
+      position: `760${j}00`,
+      quantite: (j + 1) * 10,
+      poids: (j + 1) * 100,
+      fob: (j + 1) * 500,
+    })),
+    trafic:
+      type === "trafic"
+        ? {
+            moyenTransport: rand(["velo", "tricycle", "voiture", "humain"]),
+            lieuEntreposage: "Plein air",
+            entrepot: "Entrepôt Kasindi 1",
+            evaluateurs: ["Inspecteur K.", "Agent M."],
+          }
+        : undefined,
+    export:
+      type === "export"
+        ? {
+            exportateur: "Congo Trading SARL",
+            modeDeclaration: rand(modesDeclaration),
+            docsJoints: [
+              { designation: "Facture", reference: `INV-${pad(i)}`, date: "2026-05-01" },
+              { designation: "Certificat", reference: `CERT-${pad(i)}`, date: "2026-05-02" },
+            ],
+          }
+        : undefined,
+    createdAt: i < 5 ? new Date().toISOString() : `2026-05-${pad((i % 30) + 1, 2)}T10:00:00Z`,
   };
 });
+
+export const IT_ENTRIES: ITEntry[] = Array.from({ length: 15 }).map((_, i) => ({
+  id: `IT-${pad(i + 1, 3)}`,
+  reference: `IT/2026/${pad(100 + i)}`,
+  chassis: `CHAS-${pad(i * 1234, 6)}`,
+  consignee: rand(importateurs),
+  vehicleMark: rand(["Toyota", "Mercedes", "Volvo", "Scania"]),
+  manifestYear: 2025 + (i % 2),
+  color: rand(["Blanc", "Bleu", "Gris", "Noir", "Rouge"]),
+  date: `2026-05-${pad((i % 30) + 1, 2)}`,
+}));
 
 export const TARIFS_DOSSIER = TARIF;
 
@@ -231,6 +322,8 @@ export interface Account {
   province?: string;
   creePar?: string;
   dateCreation: string;
+  borderCommission?: number;
+  accessibleOfficeId?: string;
 }
 
 export const ACCOUNTS: Account[] = [
@@ -389,6 +482,39 @@ export const ACCOUNTS: Account[] = [
     creePar: "Chef Barrière Ouganda",
     dateCreation: "2025-09-05",
   },
+  {
+    id: "u13",
+    username: "m.lunda",
+    fullName: "M. Lunda",
+    role: "operateur_saisie",
+    phone: "+243 99 100 1013",
+    status: "actif",
+    matricule: "MAT-013",
+    bureau: "KASINDI",
+    dateCreation: "2026-01-10",
+  },
+  {
+    id: "u14",
+    username: "j.ngoy",
+    fullName: "J. Ngoy",
+    role: "operateur_saisie",
+    phone: "+243 99 100 1014",
+    status: "désactivé",
+    matricule: "MAT-014",
+    bureau: "GOMA VILLE",
+    dateCreation: "2026-02-15",
+  },
+  {
+    id: "u15",
+    username: "s.kabila",
+    fullName: "S. Kabila",
+    role: "operateur_saisie",
+    phone: "+243 99 100 1015",
+    status: "actif",
+    matricule: "MAT-015",
+    bureau: "KASINDI",
+    dateCreation: "2026-03-20",
+  },
 ];
 
 // ============== Alertes ==============
@@ -398,6 +524,8 @@ export interface AlertItem {
   level: "urgent" | "important" | "info";
   type: "fraude" | "incoherence" | "paiement" | "retard";
   date: string;
+  codeBureau?: string;
+  nomBureau?: string;
 }
 
 export const ALERTS: AlertItem[] = [
@@ -407,6 +535,8 @@ export const ALERTS: AlertItem[] = [
     level: "urgent",
     type: "incoherence",
     date: "2025-10-28",
+    codeBureau: "617B",
+    nomBureau: "KASINDI",
   },
   {
     id: "A2",
@@ -414,6 +544,8 @@ export const ALERTS: AlertItem[] = [
     level: "important",
     type: "paiement",
     date: "2025-10-27",
+    codeBureau: "UGMPO",
+    nomBureau: "MPONDWE",
   },
   {
     id: "A3",
@@ -421,6 +553,8 @@ export const ALERTS: AlertItem[] = [
     level: "important",
     type: "retard",
     date: "2025-10-27",
+    codeBureau: "UGKLA",
+    nomBureau: "KAMPALA",
   },
   {
     id: "A4",
@@ -428,6 +562,8 @@ export const ALERTS: AlertItem[] = [
     level: "urgent",
     type: "fraude",
     date: "2025-10-26",
+    codeBureau: "617B",
+    nomBureau: "KASINDI",
   },
   {
     id: "A5",
@@ -435,6 +571,35 @@ export const ALERTS: AlertItem[] = [
     level: "info",
     type: "incoherence",
     date: "2025-10-25",
+    codeBureau: "BRU",
+    nomBureau: "BRUXELLES",
+  },
+  {
+    id: "A6",
+    title: "Alerte Sortie + Pays",
+    level: "urgent",
+    type: "incoherence",
+    date: "Aujourd'hui",
+    codeBureau: "UGMPO",
+    nomBureau: "MPONDWE",
+  },
+  {
+    id: "A7",
+    title: "Alerte Entrée sur Territoire National",
+    level: "important",
+    type: "incoherence",
+    date: "Aujourd'hui",
+    codeBureau: "617B",
+    nomBureau: "KASINDI",
+  },
+  {
+    id: "A8",
+    title: "Dossier Apuré",
+    level: "info",
+    type: "incoherence",
+    date: "Hier",
+    codeBureau: "603B",
+    nomBureau: "GOMA VILLE",
   },
 ];
 
@@ -541,21 +706,37 @@ export interface BureauDouanier {
   denomination: string;
   icb?: string;
   province?: string;
+  manifestPrice: number;
 }
 
 export const BUREAUX_DOUANIERS: BureauDouanier[] = [
-  { id: "bd1", code: "617B", denomination: "KASINDI", icb: "ICB Nord-Kivu", province: "NORD-KIVU" },
+  {
+    id: "bd1",
+    code: "617B",
+    denomination: "KASINDI",
+    icb: "ICB Nord-Kivu",
+    province: "NORD-KIVU",
+    manifestPrice: 25,
+  },
   {
     id: "bd2",
     code: "603B",
     denomination: "GOMA VILLE",
     icb: "ICB Nord-Kivu",
     province: "NORD-KIVU",
+    manifestPrice: 20,
   },
-  { id: "bd3", code: "BD-021", denomination: "BUKAVU", icb: "ICB Sud-Kivu", province: "SUD-KIVU" },
-  { id: "bd4", code: "BD-105", denomination: "KISANGANI", province: "TSHOPO" },
-  { id: "bd5", code: "BD-201", denomination: "BUNIA", province: "ITURI" },
-  { id: "bd6", code: "BD-202", denomination: "MAHAGI", province: "ITURI" },
+  {
+    id: "bd3",
+    code: "BD-021",
+    denomination: "BUKAVU",
+    icb: "ICB Sud-Kivu",
+    province: "SUD-KIVU",
+    manifestPrice: 15,
+  },
+  { id: "bd4", code: "BD-105", denomination: "KISANGANI", province: "TSHOPO", manifestPrice: 10 },
+  { id: "bd5", code: "BD-201", denomination: "BUNIA", province: "ITURI", manifestPrice: 30 },
+  { id: "bd6", code: "BD-202", denomination: "MAHAGI", province: "ITURI", manifestPrice: 25 },
 ];
 
 // ============== Directions provinciales ==============
@@ -619,13 +800,66 @@ export interface BureauRepresentation {
   code: string;
   denomination: string;
   type: "sortie" | "entree";
+  ville: string;
+  pays: string;
+  status: "actif" | "désactivé";
 }
 
 export const BUREAUX_REPR: BureauRepresentation[] = [
-  { id: "br1", code: "UGMPO", denomination: "MPONDWE", type: "sortie" },
-  { id: "br2", code: "UGCYKA", denomination: "CHANIKA", type: "sortie" },
-  { id: "br3", code: "617B", denomination: "KASINDI", type: "entree" },
-  { id: "br4", code: "603B", denomination: "GOMA VILLE", type: "entree" },
+  {
+    id: "br1",
+    code: "UGMPO",
+    denomination: "MPONDWE",
+    type: "sortie",
+    ville: "Mpondwe",
+    pays: "OUGANDA",
+    status: "actif",
+  },
+  {
+    id: "br2",
+    code: "UGCYKA",
+    denomination: "CHANIKA",
+    type: "sortie",
+    ville: "Chanika",
+    pays: "OUGANDA",
+    status: "actif",
+  },
+  {
+    id: "br3",
+    code: "617B",
+    denomination: "KASINDI",
+    type: "entree",
+    ville: "Kasindi",
+    pays: "RDC",
+    status: "actif",
+  },
+  {
+    id: "br4",
+    code: "603B",
+    denomination: "GOMA VILLE",
+    type: "entree",
+    ville: "Goma",
+    pays: "RDC",
+    status: "actif",
+  },
+  {
+    id: "br5",
+    code: "UGKLA",
+    denomination: "KAMPALA",
+    type: "sortie",
+    ville: "Kampala",
+    pays: "OUGANDA",
+    status: "actif",
+  },
+  {
+    id: "br6",
+    code: "BRU",
+    denomination: "BRUXELLES",
+    type: "sortie",
+    ville: "Bruxelles",
+    pays: "BELGIQUE",
+    status: "actif",
+  },
 ];
 
 // ============== Locode / Pays / Devises ==============
@@ -690,41 +924,6 @@ export const ENTREPOTS: Entrepot[] = [
   { id: "e3", code: "ENT-03", nom: "Entrepôt Goma", bureau: "GOMA VILLE", capacite: 300 },
 ];
 
-// ============== Notifications ==============
-export interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  date: string;
-  read: boolean;
-  source: "subordonne" | "systeme" | "alerte";
-}
-export const NOTIFICATIONS: Notification[] = [
-  {
-    id: "n1",
-    title: "Nouveau compte créé",
-    message: "Inspecteur de bureau créé par direction Nord-Kivu",
-    date: "2025-10-29",
-    read: false,
-    source: "subordonne",
-  },
-  {
-    id: "n2",
-    title: "Alerte douane",
-    message: "Tentative de fraude détectée à Kasindi",
-    date: "2025-10-28",
-    read: false,
-    source: "alerte",
-  },
-  {
-    id: "n3",
-    title: "Paiement reçu",
-    message: "Dossier DSR/2025/1011 payé",
-    date: "2025-10-27",
-    read: true,
-    source: "systeme",
-  },
-];
 
 // ============== Articles dossier ==============
 export interface Article {
@@ -1015,6 +1214,7 @@ export interface Partenaire {
   contact: string;
   telephone: string;
   email?: string;
+  password?: string;
   bureaux: PartenaireBureau[];
   status: "actif" | "suspendu";
   dateCreation: string;
@@ -2214,5 +2414,65 @@ export const APUREMENT_SUBMISSIONS: ApurementSubmission[] = [
     status: "soumis",
     importateur: "Global Cargo Ltd",
     type: "vrac",
+  },
+];
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  date: string;
+  read: boolean;
+  category: "système" | "sécurité" | "opération" | "subordonné" | "alerte";
+}
+
+export const NOTIFICATIONS: NotificationItem[] = [
+  {
+    id: "n1",
+    title: "Nouveau compte créé",
+    message: "Inspecteur de bureau créé par direction Nord-Kivu",
+    date: "2025-10-29",
+    read: false,
+    category: "subordonné",
+  },
+  {
+    id: "n2",
+    title: "Alerte douane",
+    message: "Tentative de fraude détectée à Kasindi",
+    date: "2025-10-28",
+    read: false,
+    category: "alerte",
+  },
+  {
+    id: "N1",
+    title: "Mise à jour système",
+    message: "Le module de gestion des lots a été mis à jour pour supporter l'ajout multiple de véhicules.",
+    date: "2025-10-29 10:00",
+    read: false,
+    category: "système",
+  },
+  {
+    id: "N2",
+    title: "Nouvelle connexion détectée",
+    message: "Une connexion à votre compte a été détectée depuis un nouvel appareil à Goma.",
+    date: "2025-10-28 15:45",
+    read: true,
+    category: "sécurité",
+  },
+  {
+    id: "N3",
+    title: "Dossier validé par l'Inspecteur",
+    message: "Le dossier RD-0008 a été validé et est prêt pour l'apurement.",
+    date: "2025-10-28 09:30",
+    read: false,
+    category: "opération",
+  },
+  {
+    id: "N4",
+    title: "Maintenance planifiée",
+    message: "Une maintenance du serveur est prévue pour ce dimanche à 02:00 du matin.",
+    date: "2025-10-27 18:00",
+    read: true,
+    category: "système",
   },
 ];

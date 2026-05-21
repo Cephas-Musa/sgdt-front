@@ -21,7 +21,9 @@ export type Role =
   | "brigadier_entrepot"
   | "agent_pointage"
   | "barriere_controle"
-  | "partenaire";
+  | "manager_entrepot"
+  | "partenaire"
+  | "receveur";
 
 export const ROLE_LABELS: Record<Role, { fr: string; en: string }> = {
   super_admin: { fr: "Super Admin", en: "Super Admin" },
@@ -31,7 +33,7 @@ export const ROLE_LABELS: Record<Role, { fr: string; en: string }> = {
   agent_controle: { fr: "Agent Cellule Contrôle", en: "Control Cell Agent" },
   chef_bureau_repr: { fr: "Chef Bureau Représentation", en: "Representation Office Head" },
   operateur_saisie: { fr: "Opérateur Saisie", en: "Data Entry Operator" },
-  chef_barriere: { fr: "Chef Barrière Ouganda", en: "Uganda Border Post Head" },
+  chef_barriere: { fr: "Chef Barrière Étranger", en: "Foreign Border Post Head" },
   typing_operator: { fr: "Typing Operator", en: "Typing Operator" },
   brigadier_barriere: { fr: "Brigadier Barrière", en: "Border Brigadier" },
   secretaire_inspecteur: { fr: "Secrétaire Inspecteur", en: "Inspector Secretary" },
@@ -46,16 +48,15 @@ export const ROLE_LABELS: Record<Role, { fr: string; en: string }> = {
   brigadier_entrepot: { fr: "Brigadier Entrepôt", en: "Warehouse Brigadier" },
   agent_pointage: { fr: "Agent Pointage", en: "Tally Agent" },
   barriere_controle: { fr: "Barrière Contrôle", en: "Control Barrier" },
+  manager_entrepot: { fr: "Manager Entrepôt", en: "Warehouse Manager" },
   partenaire: { fr: "Partenaire", en: "Partner" },
+  receveur: { fr: "Receveur", en: "Collector" },
 };
 
 export type NavKey =
   | "dashboard"
   | "dossiers"
-  | "barrieres"
   | "entrepots"
-  | "manifest"
-  | "verification"
   | "recherche"
   | "representation"
   | "secretariat"
@@ -70,13 +71,14 @@ export type NavKey =
   | "profil";
 
 export const ROLE_NAV: Record<Role, NavKey[]> = {
-  super_admin: ["dashboard", "dossiers", "comptes", "manifest", "chat", "alertes", "profil"],
+  super_admin: ["dashboard", "dossiers", "comptes", "chat", "alertes", "profil"],
   directeur: ["dashboard", "dossiers", "alertes", "comptes", "chat", "profil"],
   directeur_provincial: [
     "dashboard",
     "dossiers",
-    "barrieres",
     "entrepots",
+    "representation",
+    "recherche",
     "comptes",
     "alertes",
     "chat",
@@ -89,51 +91,44 @@ export const ROLE_NAV: Record<Role, NavKey[]> = {
     "localisation",
     "entrepots",
     "secretariat",
-    "manifest",
-    "verification",
     "alertes",
     "comptes",
     "representation",
     "chat",
     "profil",
   ],
-  agent_controle: ["dashboard", "dossiers", "verification", "alertes", "chat", "profil"],
-  chef_bureau_repr: ["dashboard", "chat", "profil"],
+  agent_controle: ["dashboard", "dossiers", "alertes", "chat", "profil"],
+  chef_bureau_repr: ["dashboard", "dossiers", "comptes", "representation", "alertes", "chat", "profil"],
   operateur_saisie: ["dashboard", "alertes", "chat", "profil"],
-  chef_barriere: ["dashboard", "barrieres", "manifest", "comptes", "chat", "profil"],
-  typing_operator: ["dashboard", "barrieres", "chat", "profil"],
-  brigadier_barriere: ["dashboard", "barrieres", "manifest", "chat", "profil"],
+  chef_barriere: ["dashboard", "comptes", "chat", "profil"],
+  typing_operator: ["dashboard", "chat", "profil"],
+  brigadier_barriere: ["dashboard", "chat", "profil"],
   secretaire_inspecteur: [
     "dashboard",
-    "secretariat",
-    "appurement",
-    "localisation",
-    "parking",
-    "entrepots",
+    "dossiers",
     "alertes",
-    "comptes",
-    "representation",
-    "chat",
     "profil",
   ],
   verificateur: ["dashboard", "chat", "profil"],
-  cb_verification: ["dashboard", "verification", "appurement", "comptes", "chat", "profil"],
+  cb_verification: ["dashboard", "appurement", "comptes", "chat", "profil"],
   chef_recherche: ["dashboard", "recherche", "appurement", "chat", "profil"],
-  chef_manifest: ["dashboard", "manifest", "comptes", "configuration", "chat", "profil"],
-  agent_empty_manifest: ["dashboard", "manifest", "barrieres", "chat", "profil"],
-  percepteur: ["dashboard", "manifest", "chat", "profil"],
+  chef_manifest: ["dashboard", "comptes", "configuration", "chat", "profil"],
+  agent_empty_manifest: ["dashboard", "chat", "profil"],
+  percepteur: ["dashboard", "chat", "profil"],
   chef_entrepot_log: ["dashboard", "entrepots", "comptes", "chat", "profil"],
   chef_entrepot_douane: [
     "dashboard",
     "entrepots",
-    "appurement",
+    "colisage",
     "alertes",
     "comptes",
     "chat",
     "profil",
   ],
   brigadier_entrepot: ["dashboard", "entrepots", "chat", "profil"],
-  agent_pointage: ["dashboard", "entrepots", "colisage", "chat", "profil"],
-  barriere_controle: ["dashboard", "dossiers", "manifest", "chat", "profil"],
+  agent_pointage: ["dashboard", "colisage", "chat", "profil"],
+  barriere_controle: ["dashboard", "dossiers", "chat", "profil"],
+  manager_entrepot: ["dashboard", "entrepots", "localisation", "chat", "profil"],
   partenaire: ["dashboard", "profil"],
+  receveur: ["dashboard", "profil"],
 };

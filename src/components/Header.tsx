@@ -1,13 +1,26 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Bell, MessageSquare, Menu, Sun, Moon, Globe, LogOut, User as UserIcon } from "lucide-react";
+import {
+  Bell,
+  MessageSquare,
+  Menu,
+  Sun,
+  Moon,
+  Globe,
+  LogOut,
+  User as UserIcon,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 import { ROLE_LABELS } from "@/lib/roles";
 import { ALERTS, CHATS } from "@/lib/mock";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
 export function Header({ onMenu }: { onMenu: () => void }) {
@@ -44,15 +57,15 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         {lang.toUpperCase()}
       </button>
 
-      <button
-        onClick={toggle}
-        className="rounded-md p-2 hover:bg-muted"
-        aria-label="Toggle theme"
-      >
+      <button onClick={toggle} className="rounded-md p-2 hover:bg-muted" aria-label="Toggle theme">
         {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
       </button>
 
-      <Link to="/app/chat" className="relative rounded-md p-2 hover:bg-muted" aria-label={t("nav.chat")}>
+      <Link
+        to="/app/chat"
+        className="relative rounded-md p-2 hover:bg-muted"
+        aria-label={t("nav.chat")}
+      >
         <MessageSquare className="h-4 w-4" />
         {unreadChats > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-foreground">
@@ -61,7 +74,11 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         )}
       </Link>
 
-      <Link to="/app/alertes" className="relative rounded-md p-2 hover:bg-muted" aria-label={t("nav.alertes")}>
+      <Link
+        to="/app/alertes"
+        className="relative rounded-md p-2 hover:bg-muted"
+        aria-label={t("nav.alertes")}
+      >
         <Bell className="h-4 w-4" />
         {unreadAlerts > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
@@ -81,17 +98,23 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           )}
           <div className="hidden text-left sm:block">
             <div className="text-xs font-medium leading-tight">{user?.fullName}</div>
-            <p className="text-xs text-muted-foreground">{user?.role ? (ROLE_LABELS[user.role]?.[lang] ?? user.role) : ""}</p>
+            <p className="text-xs text-muted-foreground">
+              {user?.role ? (ROLE_LABELS[user.role]?.[lang] ?? user.role) : ""}
+            </p>
           </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>{user?.fullName}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link to="/app/profil"><UserIcon className="mr-2 h-4 w-4" />{t("nav.profil")}</Link>
+            <Link to="/app/profil">
+              <UserIcon className="mr-2 h-4 w-4" />
+              {t("nav.profil")}
+            </Link>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />{t("auth.logout")}
+            <LogOut className="mr-2 h-4 w-4" />
+            {t("auth.logout")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

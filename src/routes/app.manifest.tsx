@@ -3,10 +3,16 @@ import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 import { EMPTY_MANIFESTS } from "@/lib/mock";
-import { Plus, Search, Filter, Edit, Trash2, DollarSign } from "lucide-react";
+import { Plus, Search, Filter, Edit, Trash2, DollarSign, Building2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -19,10 +25,19 @@ function ManifestPage() {
   const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterBureau, setFilterBureau] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-  const filtered = EMPTY_MANIFESTS.filter(m =>
-    (filterStatus === "all" || m.status === filterStatus) &&
-    (!search || m.reference.toLowerCase().includes(search.toLowerCase()) || m.declarant.toLowerCase().includes(search.toLowerCase()))
+  const filtered = EMPTY_MANIFESTS.filter(
+    (m) =>
+      (filterStatus === "all" || m.status === filterStatus) &&
+      (filterBureau === "all" || m.barriereSortie.toLowerCase() === filterBureau.toLowerCase()) &&
+      (!startDate || m.date >= startDate) &&
+      (!endDate || m.date <= endDate) &&
+      (!search ||
+        m.reference.toLowerCase().includes(search.toLowerCase()) ||
+        m.declarant.toLowerCase().includes(search.toLowerCase())),
   );
 
   const canSeeAmount = user?.role === "super_admin";
@@ -31,22 +46,48 @@ function ManifestPage() {
   return (
     <div>
       <PageHeader
-        title="Manifests"
-        description="Gestion complète des manifests — CRUD, revenus, filtrage"
+        title="Empty Manifest"
+        description="Gestion complète des manifests vides — revenus, filtrage par bureau et date"
         actions={
-          <FormDialog trigger={<Button><Plus className="mr-1.5 h-4 w-4" />Nouveau manifest</Button>} title="Créer un manifest" onSubmit={() => toast.success("Manifest créé")}>
-            <FormGrid>
-              <Field label="Référence" required><Input placeholder="MAN-…" /></Field>
-              <Field label="Déclarant" required><Input /></Field>
-              <Field label="Véhicule / Plaque" required><Input /></Field>
-              <Field label="Marque"><Input /></Field>
-              <Field label="Type véhicule"><Input /></Field>
-              <Field label="Destination" required><Input /></Field>
-              {canSeeAmount && <Field label="Montant ($)" required><Input type="number" /></Field>}
-              <Field label="Barrière entrée"><Input /></Field>
-              <Field label="Barrière sortie"><Input /></Field>
-            </FormGrid>
-          </FormDialog>
+          user?.role !== "super_admin" && (
+            <FormDialog
+              trigger={
+                <Button>
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  Nouveau manifest
+                </Button>
+              }
+              title="Créer un manifest"
+              onSubmit={() => toast.success("Manifest créé")}
+            >
+              <FormGrid>
+                <Field label="Référence" required>
+                  <Input placeholder="MAN-…" />
+                </Field>
+                <Field label="Déclarant" required>
+                  <Input />
+                </Field>
+                <Field label="Véhicule / Plaque" required>
+                  <Input />
+                </Field>
+                <Field label="Marque">
+                  <Input />
+                </Field>
+                <Field label="Type véhicule">
+                  <Input />
+                </Field>
+                <Field label="Destination" required>
+                  <Input />
+                </Field>
+                <Field label="Barrière entrée">
+                  <Input />
+                </Field>
+                <Field label="Barrière sortie">
+                  <Input />
+                </Field>
+              </FormGrid>
+            </FormDialog>
+          )
         }
       />
 
@@ -70,16 +111,67 @@ function ManifestPage() {
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Référence ou déclarant…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+          <Input
+            placeholder="Référence ou déclarant…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[160px]"><Filter className="mr-1 h-4 w-4" /><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[140px]">
+            <Filter className="mr-1 h-4 w-4" />
+            <SelectValue placeholder="Statut" />
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous</SelectItem>
+            <SelectItem value="all">Tous les statuts</SelectItem>
             <SelectItem value="payé">Payé</SelectItem>
             <SelectItem value="en_attente">En attente</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={filterBureau} onValueChange={setFilterBureau}>
+          <SelectTrigger className="w-[180px]">
+            <Building2 className="mr-1 h-4 w-4" />
+            <SelectValue placeholder="Par bureau" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les bureaux</SelectItem>
+            <SelectItem value="Kasindi">Kasindi</SelectItem>
+            <SelectItem value="Goma ville">Goma ville</SelectItem>
+            <SelectItem value="Mpondwe">Mpondwe</SelectItem>
+            <SelectItem value="Chanika">Chanika</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-[140px]"
+          />
+          <span className="text-muted-foreground text-xs">au</span>
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-[140px]"
+          />
+        </div>
+        {(search || filterStatus !== "all" || filterBureau !== "all" || startDate || endDate) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearch("");
+              setFilterStatus("all");
+              setFilterBureau("all");
+              setStartDate("");
+              setEndDate("");
+            }}
+          >
+            Réinitialiser
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -94,37 +186,45 @@ function ManifestPage() {
               <th className="px-3 py-2">Montant</th>
               <th className="px-3 py-2">Statut</th>
               <th className="px-3 py-2">Date</th>
-              <th className="px-3 py-2 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map(m => (
+            {filtered.map((m) => (
               <tr key={m.id} className="border-t border-border hover:bg-muted/30 transition-colors">
-                <td className="px-3 py-2"><Link to="/app/manifest/$manifestId" params={{ manifestId: m.id }} className="text-accent hover:underline font-mono text-xs">{m.reference}</Link></td>
+                <td className="px-3 py-2">
+                  <Link
+                    to="/app/manifest/$manifestId"
+                    params={{ manifestId: m.id }}
+                    className="text-accent hover:underline font-mono text-xs"
+                  >
+                    {m.reference}
+                  </Link>
+                </td>
                 <td className="px-3 py-2">{m.declarant}</td>
                 <td className="px-3 py-2">{m.vehicule}</td>
                 <td className="px-3 py-2">{m.marque}</td>
-                <td className="px-3 py-2 font-semibold">{canSeeAmount ? `$${m.montant}` : <span className="text-muted-foreground">Confidentiel</span>}</td>
-                <td className="px-3 py-2"><span className={`rounded-full px-2 py-0.5 text-xs ${m.status === "payé" ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}>{m.status}</span></td>
-                <td className="px-3 py-2 text-muted-foreground">{m.date}</td>
-                <td className="px-3 py-2 text-right">
-                  <div className="flex gap-1 justify-end">
-                    <FormDialog trigger={<Button size="sm" variant="ghost"><Edit className="h-3.5 w-3.5" /></Button>} title={`Modifier — ${m.reference}`} onSubmit={() => toast.success("Manifest modifié")}>
-                      <FormGrid>
-                        <Field label="Référence"><Input defaultValue={m.reference} /></Field>
-                        <Field label="Déclarant"><Input defaultValue={m.declarant} /></Field>
-                        <Field label="Véhicule"><Input defaultValue={m.vehicule} /></Field>
-                        {canSeeAmount && <Field label="Montant ($)"><Input type="number" defaultValue={m.montant} /></Field>}
-                      </FormGrid>
-                    </FormDialog>
-                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => toast.success("Manifest supprimé")}><Trash2 className="h-3.5 w-3.5" /></Button>
-                  </div>
+                <td className="px-3 py-2 font-semibold">
+                  {canSeeAmount ? (
+                    `$${m.montant}`
+                  ) : (
+                    <span className="text-muted-foreground">Confidentiel</span>
+                  )}
                 </td>
+                <td className="px-3 py-2">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs ${m.status === "payé" ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}
+                  >
+                    {m.status}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">{m.date}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {filtered.length === 0 && <div className="p-8 text-center text-sm text-muted-foreground">Aucun manifest trouvé</div>}
+        {filtered.length === 0 && (
+          <div className="p-8 text-center text-sm text-muted-foreground">Aucun manifest trouvé</div>
+        )}
       </div>
     </div>
   );

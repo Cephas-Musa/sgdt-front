@@ -14,9 +14,11 @@ export const Route = createFileRoute("/app/appurement")({
 });
 
 const statusColor = (s: string) =>
-  s === "validé" || s === "apure" ? "bg-success/15 text-success"
-  : s === "rejeté" ? "bg-destructive/15 text-destructive"
-  : "bg-warning/15 text-warning";
+  s === "validé" || s === "apure"
+    ? "bg-success/15 text-success"
+    : s === "rejeté"
+      ? "bg-destructive/15 text-destructive"
+      : "bg-warning/15 text-warning";
 
 function ApurementPage() {
   const { user } = useAuth();
@@ -26,26 +28,38 @@ function ApurementPage() {
   const [filter, setFilter] = useState<"all" | "soumis" | "validé" | "rejeté">("all");
   const [searchRef, setSearchRef] = useState("");
 
-  const submissions = APUREMENT_SUBMISSIONS.filter(a => {
+  const submissions = APUREMENT_SUBMISSIONS.filter((a) => {
     if (filter !== "all" && a.status !== filter) return false;
     if (searchRef && !a.dossierRef.toLowerCase().includes(searchRef.toLowerCase())) return false;
     return true;
   });
 
-  const soumisCount = APUREMENT_SUBMISSIONS.filter(a => a.status === "soumis").length;
-  const valideCount = APUREMENT_SUBMISSIONS.filter(a => a.status === "validé").length;
-  const rejeteCount = APUREMENT_SUBMISSIONS.filter(a => a.status === "rejeté").length;
+  const soumisCount = APUREMENT_SUBMISSIONS.filter((a) => a.status === "soumis").length;
+  const valideCount = APUREMENT_SUBMISSIONS.filter((a) => a.status === "validé").length;
+  const rejeteCount = APUREMENT_SUBMISSIONS.filter((a) => a.status === "rejeté").length;
 
   /* Apurement search (secrétaire) */
   const [secSearchRef, setSecSearchRef] = useState("");
   const [secSearchYear, setSecSearchYear] = useState("");
-  const [foundDossier, setFoundDossier] = useState<typeof DOSSIERS[0] | null>(null);
+  const [foundDossier, setFoundDossier] = useState<(typeof DOSSIERS)[0] | null>(null);
+  const [showApurForm, setShowApurForm] = useState(false);
+  const [apurE, setApurE] = useState("");
+  const [apurNumero, setApurNumero] = useState("");
+  const [apurDate, setApurDate] = useState("");
 
   const handleSecSearch = () => {
-    const found = DOSSIERS.find(d => d.reference.toLowerCase().includes(secSearchRef.toLowerCase()));
-    if (!found) { toast.error("Aucun dossier trouvé."); setFoundDossier(null); return; }
+    const found = DOSSIERS.find((d) =>
+      d.reference.toLowerCase().includes(secSearchRef.toLowerCase()),
+    );
+    if (!found) {
+      toast.error("Aucun dossier trouvé.");
+      setFoundDossier(null);
+      return;
+    }
     if (found.status === "attente_paiement" || found.status === "brouillon") {
-      toast.error("Ce dossier doit être payé et vérifié avant apurement."); setFoundDossier(null); return;
+      toast.error("Ce dossier doit être payé et vérifié avant apurement.");
+      setFoundDossier(null);
+      return;
     }
     setFoundDossier(found);
   };
@@ -54,9 +68,10 @@ function ApurementPage() {
     <div>
       <PageHeader
         title="Apurement"
-        description={isInspecteur
-          ? "Supervision des apurements soumis par vos secrétaires"
-          : "Recherche et soumission d'apurements"
+        description={
+          isInspecteur
+            ? "Supervision des apurements soumis par vos secrétaires"
+            : "Recherche et soumission d'apurements"
         }
       />
 
@@ -85,11 +100,21 @@ function ApurementPage() {
               Apurements soumis ({submissions.length})
             </h2>
             <div className="flex gap-2 items-center">
-              <Input placeholder="Recherche réf…" value={searchRef} onChange={e => setSearchRef(e.target.value)} className="w-48" />
+              <Input
+                placeholder="Recherche réf…"
+                value={searchRef}
+                onChange={(e) => setSearchRef(e.target.value)}
+                className="w-48"
+              />
               <div className="flex gap-1">
-                {(["all", "soumis", "validé", "rejeté"] as const).map(f => (
-                  <Button key={f} size="sm" variant={filter === f ? "default" : "outline"}
-                    onClick={() => setFilter(f)} className="text-xs capitalize">
+                {(["all", "soumis", "validé", "rejeté"] as const).map((f) => (
+                  <Button
+                    key={f}
+                    size="sm"
+                    variant={filter === f ? "default" : "outline"}
+                    onClick={() => setFilter(f)}
+                    className="text-xs capitalize"
+                  >
                     {f === "all" ? "Tous" : f}
                   </Button>
                 ))}
@@ -111,8 +136,11 @@ function ApurementPage() {
                 </tr>
               </thead>
               <tbody>
-                {submissions.map(ap => (
-                  <tr key={ap.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                {submissions.map((ap) => (
+                  <tr
+                    key={ap.id}
+                    className="border-t border-border hover:bg-muted/30 transition-colors"
+                  >
                     <td className="px-3 py-2 font-mono text-xs font-medium">{ap.dossierRef}</td>
                     <td className="px-3 py-2">{ap.importateur}</td>
                     <td className="px-3 py-2 capitalize">{ap.type}</td>
@@ -120,22 +148,37 @@ function ApurementPage() {
                     <td className="px-3 py-2">{ap.secretaireNom}</td>
                     <td className="px-3 py-2 text-xs">{ap.dateSoumission}</td>
                     <td className="px-3 py-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${statusColor(ap.status)}`}>{ap.status}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs ${statusColor(ap.status)}`}
+                      >
+                        {ap.status}
+                      </span>
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex gap-1">
                         <Link to="/app/dossiers/$dossierId" params={{ dossierId: ap.dossierId }}>
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0"><Eye className="h-3.5 w-3.5" /></Button>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
                         </Link>
                         {ap.status === "soumis" && (
                           <>
-                            <Button size="sm" className="h-7 gap-1 px-2 bg-success hover:bg-success/90 text-success-foreground"
-                              onClick={() => toast.success(`Apurement ${ap.dossierRef} validé ✓`)}>
-                              <CheckCircle2 className="h-3.5 w-3.5" />Valider
+                            <Button
+                              size="sm"
+                              className="h-7 gap-1 px-2 bg-success hover:bg-success/90 text-success-foreground"
+                              onClick={() => toast.success(`Apurement ${ap.dossierRef} validé ✓`)}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Valider
                             </Button>
-                            <Button size="sm" variant="destructive" className="h-7 gap-1 px-2"
-                              onClick={() => toast.error(`Apurement ${ap.dossierRef} rejeté`)}>
-                              <XCircle className="h-3.5 w-3.5" />Rejeter
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-7 gap-1 px-2"
+                              onClick={() => toast.error(`Apurement ${ap.dossierRef} rejeté`)}
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                              Rejeter
                             </Button>
                           </>
                         )}
@@ -144,7 +187,11 @@ function ApurementPage() {
                   </tr>
                 ))}
                 {submissions.length === 0 && (
-                  <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Aucun apurement trouvé</td></tr>
+                  <tr>
+                    <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
+                      Aucun apurement trouvé
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -152,51 +199,145 @@ function ApurementPage() {
         </div>
       )}
 
-      {/* ── SECRÉTAIRE: Recherche + Soumission ── */}
+      {/* ── SECRÉTAIRE: Recherche + Apurement ── */}
       {isSecretaire && (
         <div className="space-y-4">
+          {/* Recherche dossier pour apurement */}
           <div className="rounded-lg border border-border bg-card p-4">
-            <h3 className="font-medium mb-3 flex items-center gap-2"><Search className="h-4 w-4 text-accent" />Recherche dossier</h3>
+            <h3 className="font-medium mb-3 flex items-center gap-2">
+              <Search className="h-4 w-4 text-accent" />
+              Recherche dossier pour apurement
+            </h3>
             <div className="flex flex-wrap gap-3 items-end">
               <div className="space-y-1">
-                <label className="text-xs font-medium">Référence dossier</label>
-                <Input placeholder="DSR/2025/…" value={secSearchRef} onChange={e => setSecSearchRef(e.target.value)} className="w-56" />
+                <label className="text-xs font-medium">Référence dossier (RD)</label>
+                <Input
+                  placeholder="DSR/2025/…"
+                  value={secSearchRef}
+                  onChange={(e) => setSecSearchRef(e.target.value)}
+                  className="w-56"
+                />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium">Année</label>
-                <Input placeholder="2025" value={secSearchYear} onChange={e => setSecSearchYear(e.target.value)} className="w-28" />
+                <Input
+                  placeholder="2026"
+                  value={secSearchYear}
+                  onChange={(e) => setSecSearchYear(e.target.value)}
+                  className="w-28"
+                />
               </div>
-              <Button onClick={handleSecSearch} className="gap-1.5"><Search className="h-4 w-4" />Rechercher</Button>
+              <Button onClick={handleSecSearch} className="gap-1.5">
+                <Search className="h-4 w-4" />
+                Rechercher
+              </Button>
             </div>
-
-            {foundDossier && (
-              <div className="mt-4 rounded-lg border border-accent/30 bg-accent/5 p-4">
-                <h4 className="font-medium mb-3">Dossier — {foundDossier.reference}</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-sm">
-                  <div><span className="text-muted-foreground">Importateur:</span><br /><strong>{foundDossier.importateur}</strong></div>
-                  <div><span className="text-muted-foreground">Type:</span><br /><strong className="capitalize">{foundDossier.type}</strong></div>
-                  <div><span className="text-muted-foreground">Statut:</span><br /><strong className="capitalize">{foundDossier.status.replace("_", " ")}</strong></div>
-                  <div><span className="text-muted-foreground">Date:</span><br /><strong>{foundDossier.date}</strong></div>
-                </div>
-                <div className="rounded-lg border border-border bg-card p-4">
-                  <h5 className="text-sm font-medium mb-3">Formulaire d'apurement</h5>
-                  <FormGrid>
-                    <Field label="Réf. douane (E-XXX)" required><Input placeholder="E-001" /></Field>
-                    <Field label="Date" required><Input type="date" /></Field>
-                  </FormGrid>
-                  <Button className="mt-3" onClick={() => {
-                    toast.success("Apurement soumis. En attente de validation.");
-                    setFoundDossier(null); setSecSearchRef("");
-                  }}>Soumettre apurement</Button>
-                </div>
-                <p className="mt-3 text-xs text-muted-foreground">⚠ Le dossier doit être payé et vérifié avant soumission.</p>
-              </div>
-            )}
           </div>
 
-          {/* Historique */}
+          {/* Tableau résultats apurement */}
+          {foundDossier && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <div className="border-b border-border px-4 py-3 bg-muted/30">
+                  <h4 className="font-medium text-sm">Résultats — {foundDossier.reference}</h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
+                      <tr>
+                        <th className="px-3 py-2 w-10">N°</th>
+                        <th className="px-3 py-2">Importateur</th>
+                        <th className="px-3 py-2">Référence dossier</th>
+                        <th className="px-3 py-2">Référence RD (Douane)</th>
+                        <th className="px-3 py-2">Apurer dossier</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t border-border hover:bg-muted/30 transition-colors">
+                        <td className="px-3 py-2">
+                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent/10 font-mono text-xs font-semibold text-accent">1</span>
+                        </td>
+                        <td className="px-3 py-2 font-medium text-xs">{foundDossier.importateur}</td>
+                        <td className="px-3 py-2 font-mono text-xs font-bold text-accent">{foundDossier.reference}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{foundDossier.refDouane || "E-0000"}</td>
+                        <td className="px-3 py-2">
+                          <Button
+                            size="sm"
+                            className="h-7 gap-1.5 text-xs bg-accent hover:bg-accent/90 text-white"
+                            onClick={() => setShowApurForm(true)}
+                          >
+                            <FileCheck className="h-3.5 w-3.5" />
+                            Apurer dossier
+                          </Button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Formulaire d'apurement */}
+              {showApurForm && (
+                <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 animate-in fade-in duration-200">
+                  <h5 className="font-medium mb-3 flex items-center gap-2">
+                    <FileCheck className="h-4 w-4 text-accent" />
+                    Formulaire d'apurement — {foundDossier.reference}
+                  </h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">E</label>
+                      <Input
+                        placeholder="E-001"
+                        value={apurE}
+                        onChange={(e) => setApurE(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Numéro</label>
+                      <Input
+                        type="number"
+                        placeholder="4345"
+                        value={apurNumero}
+                        onChange={(e) => setApurNumero(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Date</label>
+                      <Input
+                        type="date"
+                        value={apurDate}
+                        onChange={(e) => setApurDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        toast.success("Apurement ajouté avec succès ✓");
+                        setFoundDossier(null);
+                        setSecSearchRef("");
+                        setShowApurForm(false);
+                        setApurE("");
+                        setApurNumero("");
+                        setApurDate("");
+                      }}
+                      className="gap-1.5"
+                    >
+                      <FileCheck className="h-4 w-4" />
+                      Ajouter
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowApurForm(false)}>Annuler</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Historique soumissions */}
           <div className="rounded-lg border border-border bg-card">
-            <div className="border-b border-border p-4"><h3 className="font-medium">Mes soumissions</h3></div>
+            <div className="border-b border-border p-4">
+              <h3 className="font-medium">Mes soumissions</h3>
+            </div>
             <div className="p-3 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
@@ -209,13 +350,19 @@ function ApurementPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {APUREMENT_SUBMISSIONS.map(ap => (
+                  {APUREMENT_SUBMISSIONS.map((ap) => (
                     <tr key={ap.id} className="border-t border-border hover:bg-muted/30">
                       <td className="px-3 py-2 font-mono text-xs">{ap.dossierRef}</td>
                       <td className="px-3 py-2">{ap.importateur}</td>
                       <td className="px-3 py-2 font-mono text-xs">{ap.refDouane}</td>
                       <td className="px-3 py-2 text-xs">{ap.dateSoumission}</td>
-                      <td className="px-3 py-2"><span className={`rounded-full px-2 py-0.5 text-xs ${statusColor(ap.status)}`}>{ap.status}</span></td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs ${statusColor(ap.status)}`}
+                        >
+                          {ap.status}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -228,21 +375,30 @@ function ApurementPage() {
       {/* ── Autres rôles: vue basique ── */}
       {!isInspecteur && !isSecretaire && (
         <div className="rounded-lg border border-border bg-card">
-          <div className="border-b border-border p-4"><h2 className="font-medium">Dossiers apurés récemment</h2></div>
+          <div className="border-b border-border p-4">
+            <h2 className="font-medium">Dossiers apurés récemment</h2>
+          </div>
           <div className="p-3 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
-                <tr><th className="px-3 py-2">Réf.</th><th className="px-3 py-2">Importateur</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Date</th></tr>
+                <tr>
+                  <th className="px-3 py-2">Réf.</th>
+                  <th className="px-3 py-2">Importateur</th>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Date</th>
+                </tr>
               </thead>
               <tbody>
-                {DOSSIERS.filter(d => d.status === "apure").slice(0, 12).map(d => (
-                  <tr key={d.id} className="border-t border-border hover:bg-muted/30">
-                    <td className="px-3 py-2 font-mono text-xs">{d.reference}</td>
-                    <td className="px-3 py-2">{d.importateur}</td>
-                    <td className="px-3 py-2 capitalize">{d.type}</td>
-                    <td className="px-3 py-2 text-xs">{d.date}</td>
-                  </tr>
-                ))}
+                {DOSSIERS.filter((d) => d.status === "apure")
+                  .slice(0, 12)
+                  .map((d) => (
+                    <tr key={d.id} className="border-t border-border hover:bg-muted/30">
+                      <td className="px-3 py-2 font-mono text-xs">{d.reference}</td>
+                      <td className="px-3 py-2">{d.importateur}</td>
+                      <td className="px-3 py-2 capitalize">{d.type}</td>
+                      <td className="px-3 py-2 text-xs">{d.date}</td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

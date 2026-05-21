@@ -21,20 +21,22 @@ function BureauDetailPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold">Bureau non trouvé</h1>
           <Button className="mt-4" onClick={() => router.history.back()}>
-            <ArrowLeft className="mr-2 h-4 w-4" />Retour
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Retour
           </Button>
         </div>
       </div>
     );
   }
 
-  const agents = ACCOUNTS.filter(a => a.bureau === bureau.denomination);
+  const agents = ACCOUNTS.filter((a) => a.bureau === bureau.denomination);
 
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
         <Button variant="outline" size="sm" onClick={() => router.history.back()}>
-          <ArrowLeft className="mr-2 h-4 w-4" />Retour
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Retour
         </Button>
       </div>
 
@@ -57,15 +59,21 @@ function BureauDetailPage() {
                 <div className="font-mono font-medium">{bureau.code}</div>
               </div>
               <div className="space-y-1">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide">Dénomination</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                  Dénomination
+                </div>
                 <div className="font-medium">{bureau.denomination}</div>
               </div>
               <div className="space-y-1">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Shield className="h-3 w-3" /> ICB</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <Shield className="h-3 w-3" /> ICB
+                </div>
                 <div className="text-sm">{bureau.icb ?? "Non attribué"}</div>
               </div>
               <div className="space-y-1">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1"><MapPin className="h-3 w-3" /> Province</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <MapPin className="h-3 w-3" /> Province
+                </div>
                 <div className="text-sm">{bureau.province ?? "—"}</div>
               </div>
             </div>
@@ -73,7 +81,9 @@ function BureauDetailPage() {
 
           {/* Agents rattachés */}
           <div className="rounded-lg border border-border bg-card p-6">
-            <h2 className="mb-4 font-semibold text-lg flex items-center gap-2"><Users className="h-5 w-5" /> Agents rattachés ({agents.length})</h2>
+            <h2 className="mb-4 font-semibold text-lg flex items-center gap-2">
+              <Users className="h-5 w-5" /> Agents rattachés ({agents.length})
+            </h2>
             {agents.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -88,15 +98,28 @@ function BureauDetailPage() {
                   </thead>
                   <tbody>
                     {agents.map((a) => (
-                      <tr key={a.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                      <tr
+                        key={a.id}
+                        className="border-t border-border hover:bg-muted/30 transition-colors"
+                      >
                         <td className="px-3 py-2">
-                          <Link to="/app/comptes/$compteId" params={{ compteId: a.id }} className="text-accent hover:underline font-medium">{a.fullName}</Link>
+                          <Link
+                            to="/app/comptes/$compteId"
+                            params={{ compteId: a.id }}
+                            className="text-accent hover:underline font-medium"
+                          >
+                            {a.fullName}
+                          </Link>
                         </td>
                         <td className="px-3 py-2">{ROLE_LABELS[a.role]?.fr ?? a.role}</td>
                         <td className="px-3 py-2 font-mono text-xs">{a.matricule}</td>
                         <td className="px-3 py-2">{a.phone}</td>
                         <td className="px-3 py-2">
-                          <span className={`rounded-full px-2 py-0.5 text-xs ${a.status === "actif" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>{a.status}</span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs ${a.status === "actif" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
+                          >
+                            {a.status}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -104,7 +127,9 @@ function BureauDetailPage() {
                 </table>
               </div>
             ) : (
-              <div className="py-4 text-center text-sm text-muted-foreground">Aucun agent rattaché à ce bureau</div>
+              <div className="py-4 text-center text-sm text-muted-foreground">
+                Aucun agent rattaché à ce bureau
+              </div>
             )}
           </div>
         </div>
@@ -120,11 +145,15 @@ function BureauDetailPage() {
               </div>
               <div className="flex items-center justify-between rounded-md bg-muted/30 p-3">
                 <span className="text-sm">Agents actifs</span>
-                <span className="font-semibold text-success">{agents.filter(a => a.status === "actif").length}</span>
+                <span className="font-semibold text-success">
+                  {agents.filter((a) => a.status === "actif").length}
+                </span>
               </div>
               <div className="flex items-center justify-between rounded-md bg-muted/30 p-3">
                 <span className="text-sm">Agents désactivés</span>
-                <span className="font-semibold text-destructive">{agents.filter(a => a.status === "désactivé").length}</span>
+                <span className="font-semibold text-destructive">
+                  {agents.filter((a) => a.status === "désactivé").length}
+                </span>
               </div>
             </div>
           </div>

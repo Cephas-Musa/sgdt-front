@@ -1,7 +1,14 @@
 import { useState } from "react";
-import { 
-  FolderKanban, FileText, Search, Plus, 
-  ArrowRight, Truck, Calendar, Hash, CheckCircle2
+import {
+  FolderKanban,
+  FileText,
+  Search,
+  Plus,
+  ArrowRight,
+  Truck,
+  Calendar,
+  Hash,
+  CheckCircle2,
 } from "lucide-react";
 import { DashHeader, StatCard, Panel } from "./_shared";
 import { Button } from "@/components/ui/button";
@@ -17,19 +24,23 @@ export default function BarriereControleDash() {
   const [dossierSearch, setDossierSearch] = useState("");
   const [manifestSearch, setManifestSearch] = useState("");
 
-  const filteredDossiers = (DOSSIERS || []).filter(d => 
-    !dossierSearch || 
-    d.reference?.toLowerCase().includes(`rd-${dossierSearch}`.toLowerCase()) ||
-    d.importateur?.toLowerCase().includes(dossierSearch.toLowerCase())
+  const filteredDossiers = (DOSSIERS || []).filter(
+    (d) =>
+      !dossierSearch ||
+      d.reference?.toLowerCase().includes(`rd-${dossierSearch}`.toLowerCase()) ||
+      d.importateur?.toLowerCase().includes(dossierSearch.toLowerCase()),
   );
 
-  const filteredManifests = (EMPTY_MANIFESTS || []).filter(m => 
-    !manifestSearch || 
-    m.reference?.toLowerCase().includes(manifestSearch.toLowerCase())
+  const filteredManifests = (EMPTY_MANIFESTS || []).filter(
+    (m) => !manifestSearch || m.reference?.toLowerCase().includes(manifestSearch.toLowerCase()),
   );
 
   const dossierColumns: Column<any>[] = [
-    { key: "reference", header: "Référence", render: (r) => <span className="font-mono font-medium text-accent">{r.reference}</span> },
+    {
+      key: "reference",
+      header: "Référence",
+      render: (r) => <span className="font-mono font-medium text-accent">{r.reference}</span>,
+    },
     { key: "importateur", header: "Importateur" },
     { key: "plaque", header: "Plaque" },
     { key: "typeMarchandises", header: "Marchandises" },
@@ -38,7 +49,11 @@ export default function BarriereControleDash() {
   ];
 
   const manifestColumns: Column<any>[] = [
-    { key: "reference", header: "Nº Manifeste", render: (r) => <span className="font-mono font-medium">{r.reference}</span> },
+    {
+      key: "reference",
+      header: "Nº Manifeste",
+      render: (r) => <span className="font-mono font-medium">{r.reference}</span>,
+    },
     { key: "vehicule", header: "Immatriculation" },
     { key: "marque", header: "Marque" },
     { key: "typeVehicule", header: "Type" },
@@ -46,15 +61,20 @@ export default function BarriereControleDash() {
     { key: "receveur", header: "Receveur" },
     { key: "barriereEntree", header: "Barrière entrée" },
     { key: "barriereSortie", header: "Barrière sortie" },
-    { 
-      key: "actions", 
-      header: "Actions", 
+    {
+      key: "actions",
+      header: "Actions",
       render: (r) => (
-        <Button size="sm" variant="outline" className="h-8 gap-1 border-accent/30 text-accent hover:bg-accent/10" onClick={() => toast.success(`Manifeste ${r.reference} passé avec succès`)}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1 border-accent/30 text-accent hover:bg-accent/10"
+          onClick={() => toast.success(`Manifeste ${r.reference} passé avec succès`)}
+        >
           Passer
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
-      ) 
+      ),
     },
   ];
 
@@ -92,56 +112,72 @@ export default function BarriereControleDash() {
                 <Search className="h-4 w-4 text-muted-foreground" />
               </div>
             </div>
-            
-            <FormDialog 
+
+            <FormDialog
               trigger={
                 <Button className="gap-2 bg-accent hover:bg-accent/90">
                   <Plus className="h-4 w-4" />
                   Nouveau Dossier
                 </Button>
-              } 
-              title="Créer un nouveau dossier" 
+              }
+              title="Créer un nouveau dossier"
               onSubmit={() => toast.success("Dossier créé avec succès")}
             >
               <FormGrid>
-                <Field label="Importateur" required><Input placeholder="Nom de l'importateur" /></Field>
-                <Field label="Plaque" required><Input placeholder="ABC-1234" /></Field>
-                <Field label="Description marchandises" required><Input placeholder="Nature des biens" /></Field>
-                <Field label="Destination finale" required><Input placeholder="Ville / Entrepôt" /></Field>
-                
+                <Field label="Importateur" required>
+                  <Input placeholder="Nom de l'importateur" />
+                </Field>
+                <Field label="Plaque" required>
+                  <Input placeholder="ABC-1234" />
+                </Field>
+                <Field label="Description marchandises" required>
+                  <Input placeholder="Nature des biens" />
+                </Field>
+                <Field label="Destination finale" required>
+                  <Input placeholder="Ville / Entrepôt" />
+                </Field>
+
                 <div className="col-span-2 grid grid-cols-2 gap-4">
                   <Field label="Référence dossier" required>
                     <div className="flex">
-                      <span className="flex items-center rounded-l-md border border-r-0 bg-muted px-3 text-xs font-mono">RD-</span>
+                      <span className="flex items-center rounded-l-md border border-r-0 bg-muted px-3 text-xs font-mono">
+                        RD-
+                      </span>
                       <Input className="rounded-l-none" placeholder="0001" />
                     </div>
                   </Field>
-                  <Field label="Date réf dossier" required><Input type="date" /></Field>
+                  <Field label="Date réf dossier" required>
+                    <Input type="date" />
+                  </Field>
                 </div>
                 <div className="col-span-2 grid grid-cols-2 gap-4">
                   <Field label="Référence douane (E-XXX)" required>
                     <div className="flex">
-                      <span className="flex items-center rounded-l-md border border-r-0 bg-muted px-3 text-xs font-mono">E-</span>
+                      <span className="flex items-center rounded-l-md border border-r-0 bg-muted px-3 text-xs font-mono">
+                        E-
+                      </span>
                       <Input className="rounded-l-none" placeholder="123" />
                     </div>
                   </Field>
-                  <Field label="Sa date" required><Input type="date" /></Field>
+                  <Field label="Sa date" required>
+                    <Input type="date" />
+                  </Field>
                 </div>
 
                 <div className="col-span-2 grid grid-cols-2 gap-4">
-                  <Field label="Référence bon de sortie" required><Input placeholder="BS-456" /></Field>
-                  <Field label="Sa date" required><Input type="date" /></Field>
+                  <Field label="Référence bon de sortie" required>
+                    <Input placeholder="BS-456" />
+                  </Field>
+                  <Field label="Sa date" required>
+                    <Input type="date" />
+                  </Field>
                 </div>
               </FormGrid>
             </FormDialog>
           </div>
 
           <Panel title={`Liste des dossiers (${filteredDossiers.length})`}>
-            <DataTable 
-              columns={dossierColumns} 
-              data={filteredDossiers} 
-              searchable={false}
-            />
+            <DataTable columns={dossierColumns} data={filteredDossiers} searchable={false} />
           </Panel>
         </TabsContent>
 
@@ -149,8 +185,8 @@ export default function BarriereControleDash() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative max-w-sm flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input 
-                placeholder="Rechercher par référence manifest…" 
+              <Input
+                placeholder="Rechercher par référence manifest…"
                 className="pl-9"
                 value={manifestSearch}
                 onChange={(e) => setManifestSearch(e.target.value)}
@@ -159,11 +195,7 @@ export default function BarriereControleDash() {
           </div>
 
           <Panel title={`Manifestes vides (${filteredManifests.length})`}>
-            <DataTable 
-              columns={manifestColumns} 
-              data={filteredManifests} 
-              searchable={false}
-            />
+            <DataTable columns={manifestColumns} data={filteredManifests} searchable={false} />
           </Panel>
         </TabsContent>
       </Tabs>

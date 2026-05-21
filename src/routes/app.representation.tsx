@@ -1,90 +1,338 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { useState, useEffect } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { 
+  Plus, 
+  Globe, 
+  Coins, 
+  MapPin, 
+  Search, 
+  Edit2, 
+  FolderKanban, 
+  Bell, 
+  AlertTriangle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { LOCODES, PAYS, DEVISES } from "@/lib/mock";
+import { LOCODES, PAYS, DEVISES, DOSSIERS, NOTIFICATIONS } from "@/lib/mock";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
+import { Badge } from "@/components/ui/badge";
+import { Panel } from "@/dashboards/_shared";
 
 export const Route = createFileRoute("/app/representation")({
   component: ReprPage,
 });
 
 function ReprPage() {
+  const { user } = useAuth();
+  const isChefRepr = user?.role === "chef_bureau_repr";
+
+  // Search & Filter States
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateRange, setDateRange] = useState({ start: "", end: "" });
+
+  // Reference Data States
+  const [newLocode, setNewLocode] = useState({ code: "", designation: "", codePays: "", denomination: "" });
+  const [newDevise, setNewDevise] = useState({ codePays: "", codeDevise: "", denominationPays: "", denominationDevise: "" });
+  const [editingItem, setEditingItem] = useState<any>(null);
+
+  // Auto-fill logic for country codes
+  useEffect(() => {
+    if (newLocode.codePays) {
+      const found = PAYS.find(p => p.code.toUpperCase() === newLocode.codePays.toUpperCase());
+      setNewLocode(prev => ({ ...prev, denomination: found?.designation || "" }));
+    }
+  }, [newLocode.codePays]);
+
+  useEffect(() => {
+    if (newDevise.codePays) {
+      const found = PAYS.find(p => p.code.toUpperCase() === newDevise.codePays.toUpperCase());
+      setNewDevise(prev => ({ ...prev, denominationPays: found?.designation || "" }));
+    }
+  }, [newDevise.codePays]);
+
+  const filteredDossiers = DOSSIERS.filter(d => {
+    const matchesRef = d.reference.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDate = (!dateRange.start || d.date >= dateRange.start) && (!dateRange.end || d.date <= dateRange.end);
+    return matchesRef && matchesDate;
+  });
+
   return (
-    <div>
-      <PageHeader title="Bureau Représentation" description="Locode · Pays · Devises" />
-      <Tabs defaultValue="locode">
-        <TabsList>
-          <TabsTrigger value="locode">Locode</TabsTrigger>
-          <TabsTrigger value="pays">Pays</TabsTrigger>
-          <TabsTrigger value="devise">Devises</TabsTrigger>
+    <div className="h-full flex flex-col gap-4 overflow-hidden animate-in fade-in duration-500 max-w-[1400px] mx-auto w-full text-foreground">
+      <PageHeader 
+        title="Bureau de Représentation" 
+        description="Gestion opérationnelle et supervision des dossiers de référence" 
+      />
+      
+      <Tabs defaultValue="dossiers" className="flex-1 flex flex-col min-h-0">
+        <TabsList className="bg-muted/50 p-1 shrink-0">
+          <TabsTrigger value="dossiers" className="gap-2 text-[10px] font-black uppercase tracking-widest">
+            <FolderKanban className="h-4 w-4" />
+            Dossiers
+          </TabsTrigger>
+          <TabsTrigger value="locode" className="gap-2 text-[10px] font-black uppercase tracking-widest">
+            <MapPin className="h-4 w-4" />
+            Locodes
+          </TabsTrigger>
+          <TabsTrigger value="pays" className="gap-2 text-[10px] font-black uppercase tracking-widest">
+            <Globe className="h-4 w-4" />
+            Pays
+          </TabsTrigger>
+          <TabsTrigger value="devise" className="gap-2 text-[10px] font-black uppercase tracking-widest">
+            <Coins className="h-4 w-4" />
+            Devises
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="gap-2 text-[10px] font-black uppercase tracking-widest">
+            <Bell className="h-4 w-4" />
+            Notifications
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="locode" className="space-y-3 pt-3">
-          <div className="flex justify-end">
-            <FormDialog
-              trigger={<Button size="sm"><Plus className="mr-1.5 h-4 w-4" />Ajouter</Button>}
-              title="Nouveau locode"
-              onSubmit={() => toast.success("Locode ajouté")}
-            >
-              <FormGrid>
-                <Field label="Code"><Input placeholder="UGKLA" /></Field>
-                <Field label="Désignation"><Input placeholder="Kampala" /></Field>
-                <Field label="Code pays"><Input placeholder="UG" /></Field>
-                <Field label="Dénomination"><Input placeholder="OUGANDA" /></Field>
-              </FormGrid>
-            </FormDialog>
+        {/* --- TAB: DOSSIERS --- */}
+        <TabsContent value="dossiers" className="flex-1 mt-4 min-h-0">
+          <div className="flex flex-col h-full gap-4">
+            <div className="flex flex-wrap gap-3 items-end bg-card/50 p-4 rounded-xl border shrink-0">
+              <div className="w-48">
+                <label className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground mb-1 block">Réf. Dossier</label>
+                <div className="flex items-center rounded-lg border bg-background h-9">
+                  <Search className="ml-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <input 
+                    className="flex-1 bg-transparent px-2 text-xs outline-none" 
+                    placeholder="RD-..." 
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="w-40">
+                <label className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground mb-1 block">Du</label>
+                <input type="date" className="w-full h-9 rounded-lg border bg-background px-2 text-xs" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
+              </div>
+              <div className="w-40">
+                <label className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground mb-1 block">Au</label>
+                <input type="date" className="w-full h-9 rounded-lg border bg-background px-2 text-xs" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
+              </div>
+              <Button size="sm" className="h-9 px-4 font-black uppercase tracking-widest text-[9px]" onClick={() => toast.success("Données filtrées")}>Filtrer</Button>
+            </div>
+
+            <Panel title="Suivi des Dossiers" className="flex-1 min-h-0">
+              <div className="h-full overflow-y-auto scrollbar-hide">
+                <table className="w-full text-xs text-left">
+                  <thead className="sticky top-0 bg-card border-b text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                    <tr>
+                      <th className="py-3 px-2">N°</th>
+                      <th className="py-3 px-2">Importateur</th>
+                      <th className="py-3 px-2">DRA Réf</th>
+                      <th className="py-3 px-2">Date</th>
+                      <th className="py-3 px-2">T1 Réf</th>
+                      <th className="py-3 px-2">Date</th>
+                      <th className="py-3 px-2">Véhicule</th>
+                      <th className="py-3 px-2">Action</th>
+                      <th className="py-3 px-2">Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {filteredDossiers.map((d, i) => (
+                      <tr key={d.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="py-3 px-2 text-muted-foreground">{i + 1}</td>
+                        <td className="py-3 px-2 font-bold">{d.importateur}</td>
+                        <td className="py-3 px-2 font-mono font-bold text-accent">{d.dra || "E-0000"}</td>
+                        <td className="py-3 px-2 font-mono text-[10px]">{d.date}</td>
+                        <td className="py-3 px-2 font-mono">{d.t1 || "—"}</td>
+                        <td className="py-3 px-2 font-mono text-[10px]">{d.date}</td>
+                        <td className="py-3 px-2 text-muted-foreground">{d.vehicule}</td>
+                        <td className="py-3 px-2">
+                          <div className="flex gap-1">
+                            <FormDialog
+                              trigger={<Button variant="ghost" size="sm" className="h-7 px-2 text-[9px] font-black uppercase text-accent">Afficher</Button>}
+                              title={`Consultation Dossier — ${d.reference}`}
+                            >
+                              <div className="space-y-4">
+                                <div className="p-4 rounded-xl bg-accent/5 border border-accent/10 grid grid-cols-2 gap-4 mb-4">
+                                   <div><p className="text-[10px] uppercase font-black opacity-50">DRA</p><p className="font-bold">{d.dra || "E-2026"}</p></div>
+                                   <div><p className="text-[10px] uppercase font-black opacity-50">T1</p><p className="font-bold">{d.t1 || "T1-XXXX"}</p></div>
+                                </div>
+                                <table className="w-full text-[11px]">
+                                  <thead>
+                                    <tr className="border-b text-[9px] uppercase font-black tracking-widest text-muted-foreground">
+                                      <th className="py-2 text-left">Article</th>
+                                      <th className="py-2 text-right">Poids (kg)</th>
+                                      <th className="py-2 text-right">Qté</th>
+                                      <th className="py-2 text-right">FOB ($)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y">
+                                    <tr>
+                                      <td className="py-2 font-bold uppercase">Marchandises Diverses</td>
+                                      <td className="py-2 text-right font-mono">14,200</td>
+                                      <td className="py-2 text-right">1</td>
+                                      <td className="py-2 text-right font-black text-success">52,300.00</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </FormDialog>
+                            <FormDialog
+                              trigger={<Button variant="ghost" size="sm" className="h-7 px-2 text-[9px] font-black uppercase text-destructive">Alerter</Button>}
+                              title="Déclencher une Alerte"
+                              onSubmit={() => toast.success("Alerte de sécurité activée")}
+                            >
+                              <div className="space-y-4">
+                                <Field label="Description de l'alerte" required>
+                                  <textarea className="w-full min-h-[100px] rounded-lg border bg-background p-3 text-xs outline-none" placeholder="Motif détaillé..." />
+                                </Field>
+                                <Button className="w-full h-11 bg-destructive hover:bg-destructive/90 text-white font-black uppercase text-[10px]">Activer Alerte</Button>
+                              </div>
+                            </FormDialog>
+                          </div>
+                        </td>
+                        <td className="py-3 px-2">
+                           <Badge variant={i % 5 === 0 ? "destructive" : "outline"} className="text-[8px] font-black uppercase py-0 px-2">
+                             {i % 5 === 0 ? "Alerte" : "Normal"}
+                           </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
           </div>
-          <DataTable data={LOCODES} columns={[
-            { key: "code", header: "Code" },
-            { key: "designation", header: "Désignation" },
-            { key: "codePays", header: "Code pays" },
-            { key: "denomination", header: "Pays" },
-          ]} />
         </TabsContent>
 
-        <TabsContent value="pays" className="space-y-3 pt-3">
-          <div className="flex justify-end">
-            <FormDialog
-              trigger={<Button size="sm"><Plus className="mr-1.5 h-4 w-4" />Ajouter</Button>}
-              title="Nouveau pays"
-              onSubmit={() => toast.success("Pays ajouté")}
-            >
-              <FormGrid>
-                <Field label="Code pays"><Input /></Field>
-                <Field label="Désignation pays"><Input /></Field>
-              </FormGrid>
-            </FormDialog>
+        {/* --- TAB: LOCODE --- */}
+        <TabsContent value="locode" className="flex-1 mt-4 min-h-0">
+          <div className="flex flex-col h-full gap-4">
+            <div className="flex justify-between items-center bg-card/50 p-4 rounded-xl border shrink-0">
+              <div className="relative w-64">
+                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                 <Input placeholder="Chercher Locode..." className="pl-9 h-9 text-xs" />
+              </div>
+              <FormDialog
+                trigger={<Button size="sm" className="gap-2 bg-accent text-[10px] font-black uppercase h-9 px-4" onClick={() => { setEditingItem(null); setNewLocode({ code: "", designation: "", codePays: "", denomination: "" }); }}><Plus className="h-4 w-4" />Nouveau Locode</Button>}
+                title={editingItem ? "Editer Locode" : "Ajouter Locode"}
+                onSubmit={() => toast.success("Enregistré")}
+              >
+                <FormGrid>
+                  <Field label="Code Locode"><Input placeholder="UGKLA" value={newLocode.code} onChange={e => setNewLocode({...newLocode, code: e.target.value.toUpperCase()})} /></Field>
+                  <Field label="Désignation"><Input value={newLocode.designation} onChange={e => setNewLocode({...newLocode, designation: e.target.value})} /></Field>
+                  <Field label="Code Pays (ISO)"><Input placeholder="UG" value={newLocode.codePays} onChange={e => setNewLocode({...newLocode, codePays: e.target.value.toUpperCase()})} /></Field>
+                  <Field label="Dénomination Pays"><Input disabled className="bg-muted font-bold" value={newLocode.denomination} /></Field>
+                </FormGrid>
+                <Button className="w-full h-11 mt-4 font-black uppercase text-[10px]">{editingItem ? "Mettre à jour" : "Ajouter"}</Button>
+              </FormDialog>
+            </div>
+            <Panel title="Liste des Locodes" className="flex-1 min-h-0">
+              <div className="h-full overflow-y-auto">
+                <DataTable
+                  data={LOCODES}
+                  columns={[
+                    { key: "code", header: "Code", render: (r) => <span className="font-mono font-bold text-accent">{r.code}</span> },
+                    { key: "designation", header: "Désignation" },
+                    { key: "denomination", header: "Pays", render: (r) => <span className="font-bold">{r.denomination}</span> },
+                    { key: "actions", header: "", render: (r) => <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditingItem(r); setNewLocode(r); }}><Edit2 className="h-3.5 w-3.5" /></Button> }
+                  ]}
+                />
+              </div>
+            </Panel>
           </div>
-          <DataTable data={PAYS} columns={[
-            { key: "code", header: "Code" },
-            { key: "designation", header: "Désignation" },
-          ]} />
         </TabsContent>
 
-        <TabsContent value="devise" className="space-y-3 pt-3">
-          <div className="flex justify-end">
-            <FormDialog
-              trigger={<Button size="sm"><Plus className="mr-1.5 h-4 w-4" />Ajouter</Button>}
-              title="Nouvelle devise"
-              onSubmit={() => toast.success("Devise ajoutée")}
-            >
-              <FormGrid>
-                <Field label="Code pays"><Input /></Field>
-                <Field label="Code devise"><Input placeholder="USD" /></Field>
-                <Field label="Dénomination devise"><Input placeholder="Dollar Américain" /></Field>
-              </FormGrid>
-            </FormDialog>
+        {/* --- TAB: PAYS --- */}
+        <TabsContent value="pays" className="flex-1 mt-4 min-h-0">
+          <div className="flex flex-col h-full gap-4">
+             <div className="flex justify-between items-center bg-card/50 p-4 rounded-xl border shrink-0">
+                <div className="relative w-64">
+                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                   <Input placeholder="Filtrer pays..." className="pl-9 h-9 text-xs" />
+                </div>
+                <FormDialog
+                  trigger={<Button size="sm" className="gap-2 h-9 text-[10px] font-black uppercase" onClick={() => setEditingItem(null)}><Plus className="h-4 w-4" />Nouveau Pays</Button>}
+                  title={editingItem ? "Editer Pays" : "Enregistrer un pays"}
+                >
+                   <FormGrid>
+                     <Field label="Code ISO 2"><Input placeholder="UG" defaultValue={editingItem?.code} /></Field>
+                     <Field label="Désignation"><Input placeholder="OUGANDA" defaultValue={editingItem?.designation} /></Field>
+                   </FormGrid>
+                   <Button className="w-full h-11 mt-4 font-black uppercase text-[10px]">{editingItem ? "Mettre à jour" : "Ajouter"}</Button>
+                </FormDialog>
+             </div>
+             <Panel title="Liste des Pays" className="flex-1 min-h-0">
+                <div className="h-full overflow-y-auto">
+                  <DataTable
+                    data={PAYS}
+                    columns={[
+                      { key: "code", header: "ISO", render: (r) => <Badge variant="secondary" className="font-mono">{r.code}</Badge> },
+                      { key: "designation", header: "Dénomination", render: (r) => <span className="font-bold">{r.designation}</span> },
+                      { key: "actions", header: "", render: (r) => <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditingItem(r)}><Edit2 className="h-3.5 w-3.5" /></Button> }
+                    ]}
+                  />
+                </div>
+             </Panel>
           </div>
-          <DataTable data={DEVISES} columns={[
-            { key: "codePays", header: "Code pays" },
-            { key: "codeDevise", header: "Devise" },
-            { key: "denomination", header: "Dénomination" },
-          ]} />
+        </TabsContent>
+
+        {/* --- TAB: DEVISES --- */}
+        <TabsContent value="devise" className="flex-1 mt-4 min-h-0">
+          <div className="flex flex-col h-full gap-4">
+            <div className="flex justify-between items-center bg-card/50 p-4 rounded-xl border shrink-0">
+                <div className="relative w-64">
+                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                   <Input placeholder="Chercher devise..." className="pl-9 h-9 text-xs" />
+                </div>
+                <FormDialog
+                  trigger={<Button size="sm" className="gap-2 h-9 text-[10px] font-black uppercase" onClick={() => { setEditingItem(null); setNewDevise({ codePays: "", codeDevise: "", denominationPays: "", denominationDevise: "" }); }}><Plus className="h-4 w-4" />Nouvelle Devise</Button>}
+                  title={editingItem ? "Editer Devise" : "Ajouter Devise"}
+                >
+                  <FormGrid>
+                    <Field label="Code Pays"><Input placeholder="UG" value={newDevise.codePays} onChange={e => setNewDevise({...newDevise, codePays: e.target.value.toUpperCase()})} /></Field>
+                    <Field label="Dénomination Pays"><Input disabled className="bg-muted font-bold" value={newDevise.denominationPays} /></Field>
+                    <Field label="Code Devise"><Input placeholder="UGX" value={newDevise.codeDevise} onChange={e => setNewDevise({...newDevise, codeDevise: e.target.value.toUpperCase()})} /></Field>
+                    <Field label="Désignation Devise"><Input placeholder="Shilling Ougandais" value={newDevise.denominationDevise} onChange={e => setNewDevise({...newDevise, denominationDevise: e.target.value})} /></Field>
+                  </FormGrid>
+                  <Button className="w-full h-11 mt-4 font-black uppercase text-[10px]">{editingItem ? "Mettre à jour" : "Ajouter"}</Button>
+                </FormDialog>
+            </div>
+            <Panel title="Gestion des Devises" className="flex-1 min-h-0">
+              <div className="h-full overflow-y-auto">
+                <DataTable
+                  data={DEVISES}
+                  columns={[
+                    { key: "codePays", header: "Pays", render: (r) => <Badge variant="outline">{r.codePays}</Badge> },
+                    { key: "codeDevise", header: "Devise", render: (r) => <Badge className="bg-success/10 text-success border-success/30 font-black">{r.codeDevise}</Badge> },
+                    { key: "denomination", header: "Dénomination", render: (r) => <span className="font-bold">{r.denomination}</span> },
+                    { key: "actions", header: "", render: (r) => <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditingItem(r); setNewDevise({ codePays: r.codePays, codeDevise: r.codeDevise, denominationPays: "", denominationDevise: r.denomination }); }}><Edit2 className="h-3.5 w-3.5" /></Button> }
+                  ]}
+                />
+              </div>
+            </Panel>
+          </div>
+        </TabsContent>
+
+        {/* --- TAB: NOTIFICATIONS --- */}
+        <TabsContent value="notifications" className="flex-1 mt-4 min-h-0">
+          <Panel title="Notifications Bureau" actions={<Button variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase">Tout marquer lu</Button>}>
+             <div className="h-full overflow-y-auto space-y-2">
+                {NOTIFICATIONS.slice(0, 15).map(n => (
+                  <div key={n.id} className="p-3 rounded-xl border border-border/50 bg-muted/20 flex items-start gap-4 hover:bg-muted/40 transition-all">
+                     <div className="h-8 w-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                        <Bell className="h-4 w-4" />
+                     </div>
+                     <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start mb-1">
+                           <h5 className="text-[10px] font-black uppercase tracking-tight truncate">{n.title}</h5>
+                           <span className="text-[8px] font-mono text-muted-foreground">{n.time}</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">{n.description}</p>
+                     </div>
+                  </div>
+                ))}
+             </div>
+          </Panel>
         </TabsContent>
       </Tabs>
     </div>

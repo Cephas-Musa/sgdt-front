@@ -13,7 +13,6 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
-import { Route as AppVerificationRouteImport } from './routes/app.verification'
 import { Route as AppSecretariatRouteImport } from './routes/app.secretariat'
 import { Route as AppRepresentationRouteImport } from './routes/app.representation'
 import { Route as AppRechercheRouteImport } from './routes/app.recherche'
@@ -35,6 +34,7 @@ import { Route as AppEntrepotsEntrepotIdRouteImport } from './routes/app.entrepo
 import { Route as AppDossiersDossierIdRouteImport } from './routes/app.dossiers.$dossierId'
 import { Route as AppDirectionsDirectionIdRouteImport } from './routes/app.directions.$directionId'
 import { Route as AppComptesCompteIdRouteImport } from './routes/app.comptes.$compteId'
+import { Route as AppColisageDossierIdRouteImport } from './routes/app.colisage.$dossierId'
 import { Route as AppBureauxBureauIdRouteImport } from './routes/app.bureaux.$bureauId'
 import { Route as AppBarrieresBarriereIdRouteImport } from './routes/app.barrieres.$barriereId'
 import { Route as AppAlertesAlerteIdRouteImport } from './routes/app.alertes.$alerteId'
@@ -57,11 +57,6 @@ const IndexRoute = IndexRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppVerificationRoute = AppVerificationRouteImport.update({
-  id: '/verification',
-  path: '/verification',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSecretariatRoute = AppSecretariatRouteImport.update({
@@ -170,6 +165,11 @@ const AppComptesCompteIdRoute = AppComptesCompteIdRouteImport.update({
   path: '/$compteId',
   getParentRoute: () => AppComptesRoute,
 } as any)
+const AppColisageDossierIdRoute = AppColisageDossierIdRouteImport.update({
+  id: '/$dossierId',
+  path: '/$dossierId',
+  getParentRoute: () => AppColisageRoute,
+} as any)
 const AppBureauxBureauIdRoute = AppBureauxBureauIdRouteImport.update({
   id: '/bureaux/$bureauId',
   path: '/bureaux/$bureauId',
@@ -194,7 +194,7 @@ export interface FileRoutesByFullPath {
   '/app/appurement': typeof AppAppurementRoute
   '/app/barrieres': typeof AppBarrieresRouteWithChildren
   '/app/chat': typeof AppChatRoute
-  '/app/colisage': typeof AppColisageRoute
+  '/app/colisage': typeof AppColisageRouteWithChildren
   '/app/comptes': typeof AppComptesRouteWithChildren
   '/app/configuration': typeof AppConfigurationRoute
   '/app/dossiers': typeof AppDossiersRouteWithChildren
@@ -206,11 +206,11 @@ export interface FileRoutesByFullPath {
   '/app/recherche': typeof AppRechercheRoute
   '/app/representation': typeof AppRepresentationRoute
   '/app/secretariat': typeof AppSecretariatRoute
-  '/app/verification': typeof AppVerificationRoute
   '/app/': typeof AppIndexRoute
   '/app/alertes/$alerteId': typeof AppAlertesAlerteIdRoute
   '/app/barrieres/$barriereId': typeof AppBarrieresBarriereIdRoute
   '/app/bureaux/$bureauId': typeof AppBureauxBureauIdRoute
+  '/app/colisage/$dossierId': typeof AppColisageDossierIdRoute
   '/app/comptes/$compteId': typeof AppComptesCompteIdRoute
   '/app/directions/$directionId': typeof AppDirectionsDirectionIdRoute
   '/app/dossiers/$dossierId': typeof AppDossiersDossierIdRoute
@@ -224,7 +224,7 @@ export interface FileRoutesByTo {
   '/app/appurement': typeof AppAppurementRoute
   '/app/barrieres': typeof AppBarrieresRouteWithChildren
   '/app/chat': typeof AppChatRoute
-  '/app/colisage': typeof AppColisageRoute
+  '/app/colisage': typeof AppColisageRouteWithChildren
   '/app/comptes': typeof AppComptesRouteWithChildren
   '/app/configuration': typeof AppConfigurationRoute
   '/app/dossiers': typeof AppDossiersRouteWithChildren
@@ -236,11 +236,11 @@ export interface FileRoutesByTo {
   '/app/recherche': typeof AppRechercheRoute
   '/app/representation': typeof AppRepresentationRoute
   '/app/secretariat': typeof AppSecretariatRoute
-  '/app/verification': typeof AppVerificationRoute
   '/app': typeof AppIndexRoute
   '/app/alertes/$alerteId': typeof AppAlertesAlerteIdRoute
   '/app/barrieres/$barriereId': typeof AppBarrieresBarriereIdRoute
   '/app/bureaux/$bureauId': typeof AppBureauxBureauIdRoute
+  '/app/colisage/$dossierId': typeof AppColisageDossierIdRoute
   '/app/comptes/$compteId': typeof AppComptesCompteIdRoute
   '/app/directions/$directionId': typeof AppDirectionsDirectionIdRoute
   '/app/dossiers/$dossierId': typeof AppDossiersDossierIdRoute
@@ -256,7 +256,7 @@ export interface FileRoutesById {
   '/app/appurement': typeof AppAppurementRoute
   '/app/barrieres': typeof AppBarrieresRouteWithChildren
   '/app/chat': typeof AppChatRoute
-  '/app/colisage': typeof AppColisageRoute
+  '/app/colisage': typeof AppColisageRouteWithChildren
   '/app/comptes': typeof AppComptesRouteWithChildren
   '/app/configuration': typeof AppConfigurationRoute
   '/app/dossiers': typeof AppDossiersRouteWithChildren
@@ -268,11 +268,11 @@ export interface FileRoutesById {
   '/app/recherche': typeof AppRechercheRoute
   '/app/representation': typeof AppRepresentationRoute
   '/app/secretariat': typeof AppSecretariatRoute
-  '/app/verification': typeof AppVerificationRoute
   '/app/': typeof AppIndexRoute
   '/app/alertes/$alerteId': typeof AppAlertesAlerteIdRoute
   '/app/barrieres/$barriereId': typeof AppBarrieresBarriereIdRoute
   '/app/bureaux/$bureauId': typeof AppBureauxBureauIdRoute
+  '/app/colisage/$dossierId': typeof AppColisageDossierIdRoute
   '/app/comptes/$compteId': typeof AppComptesCompteIdRoute
   '/app/directions/$directionId': typeof AppDirectionsDirectionIdRoute
   '/app/dossiers/$dossierId': typeof AppDossiersDossierIdRoute
@@ -301,11 +301,11 @@ export interface FileRouteTypes {
     | '/app/recherche'
     | '/app/representation'
     | '/app/secretariat'
-    | '/app/verification'
     | '/app/'
     | '/app/alertes/$alerteId'
     | '/app/barrieres/$barriereId'
     | '/app/bureaux/$bureauId'
+    | '/app/colisage/$dossierId'
     | '/app/comptes/$compteId'
     | '/app/directions/$directionId'
     | '/app/dossiers/$dossierId'
@@ -331,11 +331,11 @@ export interface FileRouteTypes {
     | '/app/recherche'
     | '/app/representation'
     | '/app/secretariat'
-    | '/app/verification'
     | '/app'
     | '/app/alertes/$alerteId'
     | '/app/barrieres/$barriereId'
     | '/app/bureaux/$bureauId'
+    | '/app/colisage/$dossierId'
     | '/app/comptes/$compteId'
     | '/app/directions/$directionId'
     | '/app/dossiers/$dossierId'
@@ -362,11 +362,11 @@ export interface FileRouteTypes {
     | '/app/recherche'
     | '/app/representation'
     | '/app/secretariat'
-    | '/app/verification'
     | '/app/'
     | '/app/alertes/$alerteId'
     | '/app/barrieres/$barriereId'
     | '/app/bureaux/$bureauId'
+    | '/app/colisage/$dossierId'
     | '/app/comptes/$compteId'
     | '/app/directions/$directionId'
     | '/app/dossiers/$dossierId'
@@ -408,13 +408,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/app/'
       preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/verification': {
-      id: '/app/verification'
-      path: '/verification'
-      fullPath: '/app/verification'
-      preLoaderRoute: typeof AppVerificationRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/secretariat': {
@@ -564,6 +557,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppComptesCompteIdRouteImport
       parentRoute: typeof AppComptesRoute
     }
+    '/app/colisage/$dossierId': {
+      id: '/app/colisage/$dossierId'
+      path: '/$dossierId'
+      fullPath: '/app/colisage/$dossierId'
+      preLoaderRoute: typeof AppColisageDossierIdRouteImport
+      parentRoute: typeof AppColisageRoute
+    }
     '/app/bureaux/$bureauId': {
       id: '/app/bureaux/$bureauId'
       path: '/bureaux/$bureauId'
@@ -610,6 +610,18 @@ const AppBarrieresRouteChildren: AppBarrieresRouteChildren = {
 
 const AppBarrieresRouteWithChildren = AppBarrieresRoute._addFileChildren(
   AppBarrieresRouteChildren,
+)
+
+interface AppColisageRouteChildren {
+  AppColisageDossierIdRoute: typeof AppColisageDossierIdRoute
+}
+
+const AppColisageRouteChildren: AppColisageRouteChildren = {
+  AppColisageDossierIdRoute: AppColisageDossierIdRoute,
+}
+
+const AppColisageRouteWithChildren = AppColisageRoute._addFileChildren(
+  AppColisageRouteChildren,
 )
 
 interface AppComptesRouteChildren {
@@ -665,7 +677,7 @@ interface AppRouteChildren {
   AppAppurementRoute: typeof AppAppurementRoute
   AppBarrieresRoute: typeof AppBarrieresRouteWithChildren
   AppChatRoute: typeof AppChatRoute
-  AppColisageRoute: typeof AppColisageRoute
+  AppColisageRoute: typeof AppColisageRouteWithChildren
   AppComptesRoute: typeof AppComptesRouteWithChildren
   AppConfigurationRoute: typeof AppConfigurationRoute
   AppDossiersRoute: typeof AppDossiersRouteWithChildren
@@ -677,7 +689,6 @@ interface AppRouteChildren {
   AppRechercheRoute: typeof AppRechercheRoute
   AppRepresentationRoute: typeof AppRepresentationRoute
   AppSecretariatRoute: typeof AppSecretariatRoute
-  AppVerificationRoute: typeof AppVerificationRoute
   AppIndexRoute: typeof AppIndexRoute
   AppBureauxBureauIdRoute: typeof AppBureauxBureauIdRoute
   AppDirectionsDirectionIdRoute: typeof AppDirectionsDirectionIdRoute
@@ -688,7 +699,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAppurementRoute: AppAppurementRoute,
   AppBarrieresRoute: AppBarrieresRouteWithChildren,
   AppChatRoute: AppChatRoute,
-  AppColisageRoute: AppColisageRoute,
+  AppColisageRoute: AppColisageRouteWithChildren,
   AppComptesRoute: AppComptesRouteWithChildren,
   AppConfigurationRoute: AppConfigurationRoute,
   AppDossiersRoute: AppDossiersRouteWithChildren,
@@ -700,7 +711,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppRechercheRoute: AppRechercheRoute,
   AppRepresentationRoute: AppRepresentationRoute,
   AppSecretariatRoute: AppSecretariatRoute,
-  AppVerificationRoute: AppVerificationRoute,
   AppIndexRoute: AppIndexRoute,
   AppBureauxBureauIdRoute: AppBureauxBureauIdRoute,
   AppDirectionsDirectionIdRoute: AppDirectionsDirectionIdRoute,

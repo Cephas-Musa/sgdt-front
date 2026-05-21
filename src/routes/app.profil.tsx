@@ -1,6 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { User, Shield, Phone, Mail, Key, Save, Camera, Trash2, Upload, Eye, EyeOff, Building2, Calendar, Award } from "lucide-react";
+import {
+  User,
+  Shield,
+  Phone,
+  Mail,
+  Key,
+  Save,
+  Camera,
+  Trash2,
+  Upload,
+  Eye,
+  EyeOff,
+  Building2,
+  Calendar,
+  Award,
+} from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,8 +50,14 @@ function ProfilPage() {
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { toast.error("La taille maximale est de 5 Mo"); return; }
-    if (!file.type.startsWith("image/")) { toast.error("Veuillez sélectionner une image"); return; }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("La taille maximale est de 5 Mo");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast.error("Veuillez sélectionner une image");
+      return;
+    }
     setIsUploading(true);
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -64,18 +85,38 @@ function ProfilPage() {
 
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!oldPwd) { toast.error("Veuillez saisir l'ancien mot de passe"); return; }
-    if (newPwd.length < 6) { toast.error("Le mot de passe doit contenir au moins 6 caractères"); return; }
-    if (newPwd !== confirmPwd) { toast.error("Les mots de passe ne correspondent pas"); return; }
+    if (!oldPwd) {
+      toast.error("Veuillez saisir l'ancien mot de passe");
+      return;
+    }
+    if (newPwd.length < 6) {
+      toast.error("Le mot de passe doit contenir au moins 6 caractères");
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      toast.error("Les mots de passe ne correspondent pas");
+      return;
+    }
     toast.success("Mot de passe modifié avec succès");
-    setOldPwd(""); setNewPwd(""); setConfirmPwd("");
+    setOldPwd("");
+    setNewPwd("");
+    setConfirmPwd("");
   };
 
-  const initials = user.fullName?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "U";
+  const initials =
+    user.fullName
+      ?.split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "U";
 
   return (
     <div>
-      <PageHeader title="Mon profil" description="Gestion du profil, informations personnelles et paramètres de sécurité" />
+      <PageHeader
+        title="Mon profil"
+        description="Gestion du profil, informations personnelles et paramètres de sécurité"
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* === Profile Card === */}
@@ -98,21 +139,43 @@ function ProfilPage() {
                     </div>
                   )}
                   {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                  <div
+                    className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
                     <Camera className="h-6 w-6 text-white" />
                   </div>
                 </div>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
               </div>
 
               {/* Photo actions */}
               <div className="flex justify-center gap-2 mt-3">
-                <Button size="sm" variant="outline" className="text-xs h-7 px-2.5" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-                  <Upload className="h-3 w-3 mr-1" />{avatarPreview ? "Modifier" : "Ajouter"}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs h-7 px-2.5"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  <Upload className="h-3 w-3 mr-1" />
+                  {avatarPreview ? "Modifier" : "Ajouter"}
                 </Button>
                 {avatarPreview && (
-                  <Button size="sm" variant="outline" className="text-xs h-7 px-2.5 text-destructive hover:text-destructive" onClick={handleRemoveAvatar}>
-                    <Trash2 className="h-3 w-3 mr-1" />Supprimer
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs h-7 px-2.5 text-destructive hover:text-destructive"
+                    onClick={handleRemoveAvatar}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Supprimer
                   </Button>
                 )}
               </div>
@@ -141,7 +204,14 @@ function ProfilPage() {
                 )}
               </div>
 
-              <Button variant="destructive" className="mt-6 w-full" onClick={() => { logout(); toast.success("Déconnexion réussie"); }}>
+              <Button
+                variant="destructive"
+                className="mt-6 w-full"
+                onClick={() => {
+                  logout();
+                  toast.success("Déconnexion réussie");
+                }}
+              >
                 Se déconnecter
               </Button>
             </div>
@@ -149,7 +219,10 @@ function ProfilPage() {
 
           {/* Quick stats */}
           <div className="rounded-xl border border-border bg-card p-4">
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><Calendar className="h-4 w-4 text-accent" />Informations système</h3>
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-accent" />
+              Informations système
+            </h3>
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Identifiant</span>
@@ -162,7 +235,8 @@ function ProfilPage() {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Statut</span>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
-                  <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />Actif
+                  <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+                  Actif
                 </span>
               </div>
             </div>
@@ -174,29 +248,53 @@ function ProfilPage() {
           {/* Personal info */}
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="flex items-center gap-2 border-b border-border px-6 py-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10"><User className="h-4 w-4 text-accent" /></div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10">
+                <User className="h-4 w-4 text-accent" />
+              </div>
               <div>
                 <h3 className="font-semibold">Informations personnelles</h3>
-                <p className="text-xs text-muted-foreground">Modifiez vos coordonnées et informations de contact</p>
+                <p className="text-xs text-muted-foreground">
+                  Modifiez vos coordonnées et informations de contact
+                </p>
               </div>
             </div>
             <form onSubmit={handleSaveProfile} className="p-6 space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Nom complet</label>
-                  <Input value={nom} onChange={e => setNom(e.target.value)} className="transition-shadow focus:shadow-md" />
+                  <Input
+                    value={nom}
+                    onChange={(e) => setNom(e.target.value)}
+                    className="transition-shadow focus:shadow-md"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-muted-foreground">Identifiant</label>
-                  <Input value={user.username} readOnly className="bg-muted/30 cursor-not-allowed" />
+                  <Input
+                    value={user.username}
+                    readOnly
+                    className="bg-muted/30 cursor-not-allowed"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-1"><Phone className="h-3 w-3 text-accent" /> Téléphone</label>
-                  <Input value={phone} onChange={e => setPhone(e.target.value)} className="transition-shadow focus:shadow-md" />
+                  <label className="text-sm font-medium flex items-center gap-1">
+                    <Phone className="h-3 w-3 text-accent" /> Téléphone
+                  </label>
+                  <Input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="transition-shadow focus:shadow-md"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-1"><Mail className="h-3 w-3 text-accent" /> Email</label>
-                  <Input value={email} onChange={e => setEmail(e.target.value)} className="transition-shadow focus:shadow-md" />
+                  <label className="text-sm font-medium flex items-center gap-1">
+                    <Mail className="h-3 w-3 text-accent" /> Email
+                  </label>
+                  <Input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="transition-shadow focus:shadow-md"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-muted-foreground">Rôle</label>
@@ -204,12 +302,17 @@ function ProfilPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-muted-foreground">Bureau</label>
-                  <Input value={user.bureau ?? "—"} readOnly className="bg-muted/30 cursor-not-allowed" />
+                  <Input
+                    value={user.bureau ?? "—"}
+                    readOnly
+                    className="bg-muted/30 cursor-not-allowed"
+                  />
                 </div>
               </div>
               <div className="flex justify-end pt-2">
                 <Button type="submit" className="shadow-sm hover:shadow-md transition-shadow">
-                  <Save className="mr-1.5 h-4 w-4" />Enregistrer les modifications
+                  <Save className="mr-1.5 h-4 w-4" />
+                  Enregistrer les modifications
                 </Button>
               </div>
             </form>
@@ -218,10 +321,14 @@ function ProfilPage() {
           {/* Password change */}
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="flex items-center gap-2 border-b border-border px-6 py-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/10"><Key className="h-4 w-4 text-warning" /></div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/10">
+                <Key className="h-4 w-4 text-warning" />
+              </div>
               <div>
                 <h3 className="font-semibold">Sécurité du compte</h3>
-                <p className="text-xs text-muted-foreground">Changez votre mot de passe régulièrement pour sécuriser votre compte</p>
+                <p className="text-xs text-muted-foreground">
+                  Changez votre mot de passe régulièrement pour sécuriser votre compte
+                </p>
               </div>
             </div>
             <form onSubmit={handleChangePassword} className="p-6 space-y-4">
@@ -229,8 +336,17 @@ function ProfilPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Ancien mot de passe</label>
                   <div className="relative">
-                    <Input type={showOld ? "text" : "password"} value={oldPwd} onChange={e => setOldPwd(e.target.value)} className="pr-10" />
-                    <button type="button" onClick={() => setShowOld(s => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground">
+                    <Input
+                      type={showOld ? "text" : "password"}
+                      value={oldPwd}
+                      onChange={(e) => setOldPwd(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowOld((s) => !s)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                    >
                       {showOld ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
@@ -238,15 +354,27 @@ function ProfilPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Nouveau mot de passe</label>
                   <div className="relative">
-                    <Input type={showNew ? "text" : "password"} value={newPwd} onChange={e => setNewPwd(e.target.value)} className="pr-10" />
-                    <button type="button" onClick={() => setShowNew(s => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground">
+                    <Input
+                      type={showNew ? "text" : "password"}
+                      value={newPwd}
+                      onChange={(e) => setNewPwd(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNew((s) => !s)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                    >
                       {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
                   {newPwd && (
                     <div className="flex gap-1 mt-1">
-                      {[1,2,3,4].map(i => (
-                        <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${newPwd.length >= i * 3 ? (newPwd.length >= 10 ? "bg-success" : newPwd.length >= 6 ? "bg-warning" : "bg-destructive") : "bg-muted"}`} />
+                      {[1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          className={`h-1 flex-1 rounded-full transition-colors ${newPwd.length >= i * 3 ? (newPwd.length >= 10 ? "bg-success" : newPwd.length >= 6 ? "bg-warning" : "bg-destructive") : "bg-muted"}`}
+                        />
                       ))}
                     </div>
                   )}
@@ -254,19 +382,35 @@ function ProfilPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Confirmer le mot de passe</label>
                   <div className="relative">
-                    <Input type={showConfirm ? "text" : "password"} value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} className="pr-10" />
-                    <button type="button" onClick={() => setShowConfirm(s => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground">
+                    <Input
+                      type={showConfirm ? "text" : "password"}
+                      value={confirmPwd}
+                      onChange={(e) => setConfirmPwd(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirm((s) => !s)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                    >
                       {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
                   {confirmPwd && newPwd !== confirmPwd && (
-                    <p className="text-xs text-destructive mt-1">Les mots de passe ne correspondent pas</p>
+                    <p className="text-xs text-destructive mt-1">
+                      Les mots de passe ne correspondent pas
+                    </p>
                   )}
                 </div>
               </div>
               <div className="flex justify-end pt-2">
-                <Button type="submit" variant="outline" className="shadow-sm hover:shadow-md transition-shadow">
-                  <Key className="mr-1.5 h-4 w-4" />Changer le mot de passe
+                <Button
+                  type="submit"
+                  variant="outline"
+                  className="shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <Key className="mr-1.5 h-4 w-4" />
+                  Changer le mot de passe
                 </Button>
               </div>
             </form>

@@ -20,21 +20,23 @@ function DirectionDetailPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold">Direction non trouvée</h1>
           <Button className="mt-4" onClick={() => router.history.back()}>
-            <ArrowLeft className="mr-2 h-4 w-4" />Retour
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Retour
           </Button>
         </div>
       </div>
     );
   }
 
-  const bureaux = BUREAUX_DOUANIERS.filter(b => b.province === direction.denomination);
-  const agents = ACCOUNTS.filter(a => a.province === direction.denomination);
+  const bureaux = BUREAUX_DOUANIERS.filter((b) => b.province === direction.denomination);
+  const agents = ACCOUNTS.filter((a) => a.province === direction.denomination);
 
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
         <Button variant="outline" size="sm" onClick={() => router.history.back()}>
-          <ArrowLeft className="mr-2 h-4 w-4" />Retour
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Retour
         </Button>
       </div>
 
@@ -48,13 +50,17 @@ function DirectionDetailPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-semibold">Direction {direction.denomination}</h1>
-                <p className="text-sm text-muted-foreground">Direction provinciale Nº {direction.numero}</p>
+                <p className="text-sm text-muted-foreground">
+                  Direction provinciale Nº {direction.numero}
+                </p>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide">Dénomination</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                  Dénomination
+                </div>
                 <div className="font-medium">{direction.denomination}</div>
               </div>
               <div className="space-y-1">
@@ -62,28 +68,38 @@ function DirectionDetailPage() {
                 <div className="font-medium">{direction.numero}</div>
               </div>
               <div className="space-y-1">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Users className="h-3 w-3" /> Directeur</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <Users className="h-3 w-3" /> Directeur
+                </div>
                 <div className="font-medium">{direction.directeur}</div>
               </div>
               <div className="space-y-1">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Building2 className="h-3 w-3" /> Nombre de bureaux</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <Building2 className="h-3 w-3" /> Nombre de bureaux
+                </div>
                 <div className="font-medium">{direction.nombreBureaux}</div>
               </div>
               {direction.telephone && (
                 <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Phone className="h-3 w-3" /> Téléphone</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                    <Phone className="h-3 w-3" /> Téléphone
+                  </div>
                   <div className="text-sm">{direction.telephone}</div>
                 </div>
               )}
               {direction.email && (
                 <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Mail className="h-3 w-3" /> Email</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                    <Mail className="h-3 w-3" /> Email
+                  </div>
                   <div className="text-sm">{direction.email}</div>
                 </div>
               )}
               {direction.dateCreation && (
                 <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1"><Calendar className="h-3 w-3" /> Date de création</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                    <Calendar className="h-3 w-3" /> Date de création
+                  </div>
                   <div className="text-sm">{direction.dateCreation}</div>
                 </div>
               )}
@@ -111,7 +127,9 @@ function DirectionDetailPage() {
                 ))}
               </div>
             ) : (
-              <div className="py-4 text-center text-sm text-muted-foreground">Aucun bureau enregistré pour cette province</div>
+              <div className="py-4 text-center text-sm text-muted-foreground">
+                Aucun bureau enregistré pour cette province
+              </div>
             )}
           </div>
         </div>
@@ -130,9 +148,15 @@ function DirectionDetailPage() {
                 >
                   <div>
                     <div className="text-sm font-medium">{a.fullName}</div>
-                    <div className="text-xs text-muted-foreground capitalize">{a.role.replace(/_/g, " ")}</div>
+                    <div className="text-xs text-muted-foreground capitalize">
+                      {a.role.replace(/_/g, " ")}
+                    </div>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${a.status === "actif" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>{a.status}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs ${a.status === "actif" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
+                  >
+                    {a.status}
+                  </span>
                 </Link>
               ))}
               {agents.length === 0 && (

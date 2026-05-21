@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 export default function ChefRechercheDash() {
   const traites = DOSSIERS_TRAITES;
-  const apures = DOSSIERS.filter(d => d.status === "apure");
+  const apures = DOSSIERS.filter((d) => d.status === "apure");
 
   return (
     <div>
@@ -25,15 +25,28 @@ export default function ChefRechercheDash() {
           title="Appurement"
           actions={
             <FormDialog
-              trigger={<Button size="sm"><Search className="mr-1.5 h-4 w-4" />Apurer un dossier</Button>}
+              trigger={
+                <Button size="sm">
+                  <Search className="mr-1.5 h-4 w-4" />
+                  Apurer un dossier
+                </Button>
+              }
               title="Appurement dossier"
               onSubmit={() => toast.success("Dossier apuré")}
             >
               <FormGrid>
-                <Field label="Référence dossier" required><Input placeholder="DSR/…" /></Field>
-                <Field label="Année"><Input placeholder="2025" /></Field>
-                <Field label="Référence douane (E-…)" required><Input /></Field>
-                <Field label="Date appurement"><Input type="date" /></Field>
+                <Field label="Référence dossier" required>
+                  <Input placeholder="DSR/…" />
+                </Field>
+                <Field label="Année">
+                  <Input placeholder="2025" />
+                </Field>
+                <Field label="Référence douane (E-…)" required>
+                  <Input />
+                </Field>
+                <Field label="Date appurement">
+                  <Input type="date" />
+                </Field>
               </FormGrid>
             </FormDialog>
           }
@@ -50,9 +63,18 @@ export default function ChefRechercheDash() {
               </thead>
               <tbody>
                 {apures.slice(0, 10).map((d) => (
-                  <tr key={d.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                  <tr
+                    key={d.id}
+                    className="border-t border-border hover:bg-muted/30 transition-colors"
+                  >
                     <td className="px-3 py-2">
-                      <Link to="/app/dossiers/$dossierId" params={{ dossierId: d.id }} className="text-accent hover:underline font-mono text-xs">{d.reference}</Link>
+                      <Link
+                        to="/app/dossiers/$dossierId"
+                        params={{ dossierId: d.id }}
+                        className="text-accent hover:underline font-mono text-xs"
+                      >
+                        {d.reference}
+                      </Link>
                     </td>
                     <td className="px-3 py-2">{d.importateur}</td>
                     <td className="px-3 py-2 capitalize">{d.type}</td>
@@ -78,15 +100,28 @@ export default function ChefRechercheDash() {
               </thead>
               <tbody>
                 {traites.map((d) => (
-                  <tr key={d.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                  <tr
+                    key={d.id}
+                    className="border-t border-border hover:bg-muted/30 transition-colors"
+                  >
                     <td className="px-3 py-2">
-                      <Link to="/app/dossiers/$dossierId" params={{ dossierId: d.dossierId }} className="text-accent hover:underline font-mono text-xs">{d.reference}</Link>
+                      <Link
+                        to="/app/dossiers/$dossierId"
+                        params={{ dossierId: d.dossierId }}
+                        className="text-accent hover:underline font-mono text-xs"
+                      >
+                        {d.reference}
+                      </Link>
                     </td>
                     <td className="px-3 py-2 capitalize">{d.type}</td>
                     <td className="px-3 py-2">{d.dateTraitement}</td>
                     <td className="px-3 py-2">{d.agent}</td>
                     <td className="px-3 py-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${d.resultat === "conforme" ? "bg-success/15 text-success" : d.resultat === "non_conforme" ? "bg-destructive/15 text-destructive" : "bg-warning/15 text-warning"}`}>{d.resultat.replace("_", " ")}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs ${d.resultat === "conforme" ? "bg-success/15 text-success" : d.resultat === "non_conforme" ? "bg-destructive/15 text-destructive" : "bg-warning/15 text-warning"}`}
+                      >
+                        {d.resultat.replace("_", " ")}
+                      </span>
                     </td>
                   </tr>
                 ))}

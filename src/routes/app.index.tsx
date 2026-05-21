@@ -22,6 +22,7 @@ import ChefEntrepotDouaneDash from "@/dashboards/ChefEntrepotDouaneDash";
 import AgentPointageDash from "@/dashboards/AgentPointageDash";
 import GenericDash from "@/dashboards/GenericDash";
 import PartenaireDash from "@/dashboards/PartenaireDash";
+import ReceveurDash from "@/dashboards/ReceveurDash";
 
 export const Route = createFileRoute("/app/")({
   component: Dashboard,
@@ -30,29 +31,65 @@ export const Route = createFileRoute("/app/")({
 function Dashboard() {
   const { user } = useAuth();
   if (!user) return null;
-  switch (user.role) {
-    case "super_admin": return <SuperAdminDash />;
-    case "directeur": return <DirecteurDash />;
-    case "directeur_provincial": return <DirecteurProvincialDash />;
-    case "inspecteur_chef": return <InspecteurChefDash />;
-    case "agent_controle": return <InspecteurChefDash />;
-    case "chef_bureau_repr": return <ChefBureauReprDash />;
-    case "operateur_saisie": return <OperateurSaisieDash />;
-    case "chef_barriere": return <ChefBarriereDash />;
-    case "typing_operator": return <TypingOperatorDash />;
-    case "brigadier_barriere": return <BrigadierBarriereDash />;
-    case "secretaire_inspecteur": return <SecretaireInspecteurDash />;
-    case "brigadier_entrepot": return <BrigadierEntrepotDash />;
-    case "barriere_controle": return <BarriereControleDash />;
-    case "verificateur": return <VerificateurDash />;
-    case "cb_verification": return <CBVerificationDash />;
-    case "chef_recherche": return <ChefRechercheDash />;
-    case "chef_manifest": return <ChefManifestDash />;
-    case "percepteur": return <PercepteurDash />;
-    case "chef_entrepot_log": return <ChefEntrepotLogDash />;
-    case "chef_entrepot_douane": return <ChefEntrepotDouaneDash />;
-    case "agent_pointage": return <AgentPointageDash />;
-    case "partenaire": return <PartenaireDash />;
-    default: return <GenericDash />;
-  }
+
+  const renderDash = () => {
+    switch (user.role) {
+      case "super_admin":
+        return <SuperAdminDash />;
+      case "directeur":
+        return <DirecteurDash />;
+      case "directeur_provincial":
+        return <DirecteurProvincialDash />;
+      case "inspecteur_chef":
+        return <InspecteurChefDash />;
+      case "agent_controle":
+        return <InspecteurChefDash />;
+      case "chef_bureau_repr":
+        return <ChefBureauReprDash />;
+      case "operateur_saisie":
+        return <OperateurSaisieDash />;
+      case "chef_barriere":
+        return <ChefBarriereDash />;
+      case "typing_operator":
+        return <TypingOperatorDash />;
+      case "brigadier_barriere":
+        return <BrigadierBarriereDash />;
+      case "secretaire_inspecteur":
+        return <SecretaireInspecteurDash />;
+      case "brigadier_entrepot":
+        return <BrigadierEntrepotDash />;
+      case "barriere_controle":
+        return <BarriereControleDash />;
+      case "verificateur":
+        return <VerificateurDash />;
+      case "cb_verification":
+        return <CBVerificationDash />;
+      case "chef_recherche":
+        return <ChefRechercheDash />;
+      case "chef_manifest":
+        return <ChefManifestDash />;
+      case "percepteur":
+        return <PercepteurDash />;
+      case "chef_entrepot_log":
+        return <ChefEntrepotLogDash />;
+      case "chef_entrepot_douane":
+        return <ChefEntrepotDouaneDash />;
+      case "agent_pointage":
+        return <AgentPointageDash />;
+      case "partenaire":
+        return <PartenaireDash />;
+      case "receveur":
+        return <ReceveurDash />;
+      default:
+        return <GenericDash />;
+    }
+  };
+
+  return (
+    <div className="h-full w-full max-w-[1400px] mx-auto flex flex-col overflow-hidden animate-in fade-in duration-500">
+      <div className="flex-1 overflow-y-auto pr-1 scrollbar-hide">
+        {renderDash()}
+      </div>
+    </div>
+  );
 }

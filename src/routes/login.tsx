@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -49,10 +53,13 @@ function LoginPage() {
         </div>
         <div className="space-y-3">
           <h2 className="text-3xl font-semibold leading-tight">
-            Plateforme intégrée<br />de gestion douanière terrain.
+            Plateforme intégrée
+            <br />
+            de gestion douanière terrain.
           </h2>
           <p className="max-w-md text-sm text-sidebar-foreground/70">
-            Dossiers, barrières, entrepôts, manifest, vérification, apurement, communication & alertes — un seul outil pour tous les rôles.
+            Dossiers, barrières, entrepôts, manifest, vérification, apurement, communication &
+            alertes — un seul outil pour tous les rôles.
           </p>
         </div>
         <div className="text-xs text-sidebar-foreground/50">© 2026 — Système douanier</div>
@@ -100,19 +107,27 @@ function LoginPage() {
           <div className="space-y-2">
             <Label>{t("auth.role")}</Label>
             <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent className="max-h-72">
                 {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-                  <SelectItem key={r} value={r}>{ROLE_LABELS[r][lang]}</SelectItem>
+                  <SelectItem key={r} value={r}>
+                    {ROLE_LABELS[r][lang]}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <Button type="submit" className="w-full">{t("auth.signin")}</Button>
+          <Button type="submit" className="w-full">
+            {t("auth.signin")}
+          </Button>
 
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <button type="button" className="hover:text-foreground">{t("auth.forgot")}</button>
+            <button type="button" className="hover:text-foreground">
+              {t("auth.forgot")}
+            </button>
             <button
               type="button"
               onClick={() => setLang(lang === "fr" ? "en" : "fr")}

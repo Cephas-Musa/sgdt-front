@@ -21,22 +21,38 @@ function ConfigPage() {
         description="Bureaux de sortie et bureaux d'entrée pays"
         actions={
           <FormDialog
-            trigger={<Button><Plus className="mr-1.5 h-4 w-4" />Ajouter un bureau</Button>}
+            trigger={
+              <Button>
+                <Plus className="mr-1.5 h-4 w-4" />
+                Ajouter un bureau
+              </Button>
+            }
             title="Nouveau bureau"
             onSubmit={() => toast.success("Bureau ajouté")}
           >
             <Tabs defaultValue="sortie">
-              <TabsList><TabsTrigger value="sortie">Bureau sortie</TabsTrigger><TabsTrigger value="entree">Bureau entrée pays</TabsTrigger></TabsList>
+              <TabsList>
+                <TabsTrigger value="sortie">Bureau sortie</TabsTrigger>
+                <TabsTrigger value="entree">Bureau entrée pays</TabsTrigger>
+              </TabsList>
               <TabsContent value="sortie" className="space-y-3 pt-3">
                 <FormGrid>
-                  <Field label="Code (ex: UGMPO / UGCYKA)"><Input /></Field>
-                  <Field label="Dénomination (ex: MPONDWE / CHANIKA)"><Input /></Field>
+                  <Field label="Code (ex: UGMPO / UGCYKA)">
+                    <Input />
+                  </Field>
+                  <Field label="Dénomination (ex: MPONDWE / CHANIKA)">
+                    <Input />
+                  </Field>
                 </FormGrid>
               </TabsContent>
               <TabsContent value="entree" className="space-y-3 pt-3">
                 <FormGrid>
-                  <Field label="Code (ex: 617B / 603B)"><Input /></Field>
-                  <Field label="Dénomination (ex: KASINDI / GOMA VILLE)"><Input /></Field>
+                  <Field label="Code (ex: 617B / 603B)">
+                    <Input />
+                  </Field>
+                  <Field label="Dénomination (ex: KASINDI / GOMA VILLE)">
+                    <Input />
+                  </Field>
                 </FormGrid>
               </TabsContent>
             </Tabs>

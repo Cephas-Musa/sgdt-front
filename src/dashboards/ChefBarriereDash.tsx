@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileText, Users, DollarSign, Plus, KeyRound, Search } from "lucide-react";
+import { FileText, Users, DollarSign, Plus, KeyRound, Search, Printer, Calendar, Package } from "lucide-react";
 import { DashHeader, StatCard, Panel } from "./_shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,85 +9,260 @@ import { DOSSIERS, EMPTY_MANIFESTS, ACCOUNTS } from "@/lib/mock";
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 export default function ChefBarriereDash() {
   const { user } = useAuth();
-  const [pwd, setPwd] = useState("");
-  const generate = () => setPwd(Math.random().toString(36).slice(2, 10) + "!");
-  const typingOps = ACCOUNTS.filter(a => a.role === "typing_operator");
-  const canSeeAmount = user?.role === "super_admin";
-  const dossiersTotal = DOSSIERS.reduce((s, d) => s + d.montant, 0);
-  const emptyManifestTotal = canSeeAmount ? EMPTY_MANIFESTS.reduce((s, m) => s + m.montant, 0) : 0;
-  const totalGain = canSeeAmount ? dossiersTotal + emptyManifestTotal : 0;
+  const [activeTab, setActiveTab] = useState("docs");
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
+  const [docType, setDocType] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const typingOps = ACCOUNTS.filter((a) => a.role === "typing_operator");
+  
+  // Filtering logic for Docs
+  const filteredDocs = DOSSIERS.filter(d => {
+    const matchesSearch = d.reference.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         d.importateur.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = docType === "all" || d.type.toLowerCase() === docType.toLowerCase();
+    return matchesSearch && matchesType;
+  });
+
+  const totalGainsDocs = filteredDocs.reduce((s, d) => s + d.montant, 0);
+
+  // Filtering logic for Empty Manifest
+  const filteredManifests = EMPTY_MANIFESTS.filter(m => {
+    return m.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           m.vehicule.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const totalGainsManifests = filteredManifests.reduce((s, m) => s + m.montant, 0);
 
   return (
-    <div>
-      <DashHeader subtitle="Chef Barrière Ouganda — docs, empty manifest, balance, utilisateurs" />
+    <div className="space-y-6">
+      <DashHeader subtitle="Chef Barrière Étranger — gestion des documents, manifestes vides et opérateurs" />
+      
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={FileText} label="Docs" value={DOSSIERS.length} />
-        <StatCard icon={FileText} label="Empty manifests" value={EMPTY_MANIFESTS.length} />
-        <StatCard icon={DollarSign} label="Balance totale" value={canSeeAmount ? `$${totalGain}` : "Confidentiel"} />
+        <StatCard icon={FileText} label="Total Dossiers" value={filteredDocs.length} />
+        <StatCard icon={Package} label="Empty manifests" value={filteredManifests.length} />
+        <StatCard
+          icon={DollarSign}
+          label="Gains Totaux (Période)"
+          value={`$${totalGainsDocs + totalGainsManifests}`}
+          hint="Cumul dossiers + manifestes"
+        />
         <StatCard icon={Users} label="Typing operators" value={typingOps.length} />
       </div>
+
       <div className="mt-6">
-        <Tabs defaultValue="docs">
-          <TabsList>
-            <TabsTrigger value="docs">Docs</TabsTrigger>
+        <Tabs defaultValue="docs" onValueChange={setActiveTab}>
+          <TabsList className="bg-muted/50 p-1">
+            <TabsTrigger value="docs">Docs (Dossiers)</TabsTrigger>
             <TabsTrigger value="manifest">Empty Manifest</TabsTrigger>
-            <TabsTrigger value="balance">Balance</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="users">Typing Operators</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="docs" className="mt-4">
-            <Panel title="Documents">
+          {/* --- TAB: DOCS --- */}
+          <TabsContent value="docs" className="mt-4 space-y-4">
+            <Panel 
+              title="Liste des dossiers"
+              actions={
+                <div className="flex gap-2">
+                   <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input 
+                        placeholder="Rechercher..." 
+                        className="pl-8 h-8 w-40 text-xs" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                   </div>
+                   <Button size="sm" variant="outline" className="h-8 gap-2" onClick={() => toast.info("Impression en cours...")}>
+                      <Printer className="h-3.5 w-3.5" />
+                      Imprimer
+                   </Button>
+                </div>
+              }
+            >
+              <div className="flex flex-wrap gap-4 mb-4 p-3 bg-muted/30 rounded-lg">
+                 <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Intervalle de date</label>
+                    <div className="flex items-center gap-2">
+                       <Input type="date" className="h-8 w-36 text-xs" />
+                       <Input type="date" className="h-8 w-36 text-xs" />
+                    </div>
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Type de dossier</label>
+                    <select 
+                      className="h-8 w-40 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus:outline-none"
+                      value={docType}
+                      onChange={(e) => setDocType(e.target.value)}
+                    >
+                       <option value="all">Tous les types</option>
+                       <option value="transhipment">Transhipment</option>
+                       <option value="it">IT</option>
+                       <option value="direct">Direct</option>
+                    </select>
+                 </div>
+                 <div className="ml-auto flex items-end gap-4 px-4 border-l">
+                    <div className="text-right">
+                       <div className="text-[10px] text-muted-foreground uppercase font-bold">Nombre total</div>
+                       <div className="text-lg font-bold">{filteredDocs.length}</div>
+                    </div>
+                    <div className="text-right">
+                       <div className="text-[10px] text-muted-foreground uppercase font-bold">Gain total</div>
+                       <div className="text-lg font-bold text-success">${totalGainsDocs}</div>
+                    </div>
+                 </div>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50"><tr><th className="px-3 py-2">Réf.</th><th className="px-3 py-2">Importateur</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Montant</th><th className="px-3 py-2">Date</th></tr></thead>
-                  <tbody>{DOSSIERS.slice(0, 12).map(d => (<tr key={d.id} className="border-t border-border hover:bg-muted/30"><td className="px-3 py-2"><Link to="/app/dossiers/$dossierId" params={{ dossierId: d.id }} className="text-accent hover:underline font-mono text-xs">{d.reference}</Link></td><td className="px-3 py-2">{d.importateur}</td><td className="px-3 py-2 capitalize">{d.type}</td><td className="px-3 py-2">${d.montant}</td><td className="px-3 py-2">{d.date}</td></tr>))}</tbody>
+                  <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
+                    <tr>
+                      <th className="px-3 py-3">N°</th>
+                      <th className="px-3 py-3">Consignée</th>
+                      <th className="px-3 py-3">Entry Reference</th>
+                      <th className="px-3 py-3">Date</th>
+                      <th className="px-3 py-3">Doc Type</th>
+                      <th className="px-3 py-3">Gains</th>
+                      <th className="px-3 py-3">Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredDocs.map((d, i) => (
+                      <tr key={d.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-3 py-3 font-mono text-xs">{i+1}</td>
+                        <td className="px-3 py-3 font-medium">{d.importateur}</td>
+                        <td className="px-3 py-3 font-mono text-xs text-accent">
+                          <Link to="/app/dossiers/$dossierId" params={{ dossierId: d.id }} className="hover:underline">
+                            {d.reference}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-3 text-xs">{d.date}</td>
+                        <td className="px-3 py-3 capitalize">
+                           <Badge variant="outline" className="text-[10px]">{d.type}</Badge>
+                        </td>
+                        <td className="px-3 py-3 font-bold text-success">${d.montant}</td>
+                        <td className="px-3 py-3">
+                           <Badge variant={d.status === 'paye' ? 'success' : 'warning'} className="text-[9px] uppercase">
+                              {d.status}
+                           </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               </div>
             </Panel>
           </TabsContent>
 
-          <TabsContent value="manifest" className="mt-4">
-            <Panel title="Empty Manifests">
+          {/* --- TAB: EMPTY MANIFEST --- */}
+          <TabsContent value="manifest" className="mt-4 space-y-4">
+            <Panel 
+              title="Manifestes vides"
+              actions={
+                <div className="flex gap-2">
+                   <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input 
+                        placeholder="Rechercher..." 
+                        className="pl-8 h-8 w-40 text-xs" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                   </div>
+                   <Button size="sm" variant="outline" className="h-8 gap-2" onClick={() => window.print()}>
+                      <Printer className="h-3.5 w-3.5" />
+                      Imprimer
+                   </Button>
+                </div>
+              }
+            >
+              <div className="flex flex-wrap gap-4 mb-4 p-3 bg-muted/30 rounded-lg">
+                 <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Trier par date / intervalle</label>
+                    <div className="flex items-center gap-2">
+                       <Input type="date" className="h-8 w-36 text-xs" />
+                       <Input type="date" className="h-8 w-36 text-xs" />
+                    </div>
+                 </div>
+                 <div className="ml-auto flex items-end gap-4 px-4 border-l">
+                    <div className="text-right">
+                       <div className="text-[10px] text-muted-foreground uppercase font-bold">Nombre manifests</div>
+                       <div className="text-lg font-bold">{filteredManifests.length}</div>
+                    </div>
+                    <div className="text-right">
+                       <div className="text-[10px] text-muted-foreground uppercase font-bold">Gain total</div>
+                       <div className="text-lg font-bold text-success">${totalGainsManifests}</div>
+                    </div>
+                 </div>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50"><tr><th className="px-3 py-2">Réf.</th><th className="px-3 py-2">Déclarant</th><th className="px-3 py-2">Véhicule</th><th className="px-3 py-2">Montant</th><th className="px-3 py-2">Statut</th></tr></thead>
-                  <tbody>{EMPTY_MANIFESTS.map(m => (<tr key={m.id} className="border-t border-border hover:bg-muted/30"><td className="px-3 py-2"><Link to="/app/manifest/$manifestId" params={{ manifestId: m.id }} className="text-accent hover:underline font-mono text-xs">{m.reference}</Link></td><td className="px-3 py-2">{m.declarant}</td><td className="px-3 py-2">{m.vehicule}</td><td className="px-3 py-2">{canSeeAmount ? `$${m.montant}` : <span className="text-muted-foreground">Confidentiel</span>}</td><td className="px-3 py-2"><span className={`rounded-full px-2 py-0.5 text-xs ${m.status === "payé" ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}>{m.status}</span></td></tr>))}</tbody>
+                  <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
+                    <tr>
+                      <th className="px-3 py-3">Manifest Ref</th>
+                      <th className="px-3 py-3">Véhicule</th>
+                      <th className="px-3 py-3">Date</th>
+                      <th className="px-3 py-3">Price</th>
+                      <th className="px-3 py-3">Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredManifests.map((m) => (
+                      <tr key={m.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-3 py-3 font-mono text-xs text-accent">
+                          <Link to="/app/manifest/$manifestId" params={{ manifestId: m.id }} className="hover:underline">
+                            {m.reference}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-3 font-bold">{m.vehicule}</td>
+                        <td className="px-3 py-3 text-xs">{m.date}</td>
+                        <td className="px-3 py-3 font-bold text-success">${m.montant}</td>
+                        <td className="px-3 py-3">
+                           <Badge variant={m.status === 'payé' ? 'success' : 'warning'} className="text-[9px] uppercase">
+                              {m.status}
+                           </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               </div>
             </Panel>
           </TabsContent>
 
-          <TabsContent value="balance" className="mt-4">
-            <Panel title="Balance — total des gains">
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-lg border border-border p-4 text-center"><div className="text-xs text-muted-foreground uppercase">Dossiers</div><div className="mt-1 text-2xl font-bold">${dossiersTotal}</div><div className="text-xs text-muted-foreground">{DOSSIERS.length} dossiers</div></div>
-                <div className="rounded-lg border border-border p-4 text-center"><div className="text-xs text-muted-foreground uppercase">Empty Manifests</div><div className="mt-1 text-2xl font-bold">{canSeeAmount ? `$${emptyManifestTotal}` : "Confidentiel"}</div><div className="text-xs text-muted-foreground">{EMPTY_MANIFESTS.length} manifests</div></div>
-                <div className="rounded-lg border border-success/30 bg-success/5 p-4 text-center"><div className="text-xs text-success uppercase">Total gains</div><div className="mt-1 text-2xl font-bold text-success">{canSeeAmount ? `$${totalGain}` : "Confidentiel"}</div><div className="text-xs text-muted-foreground">Pourcentage applicable</div></div>
-              </div>
-            </Panel>
-          </TabsContent>
-
+          {/* --- TAB: USERS --- */}
           <TabsContent value="users" className="mt-4">
-            <Panel title="Typing Operators" actions={
-              <FormDialog trigger={<Button><Plus className="mr-1.5 h-4 w-4" />Create</Button>} title="Create Typing Operator" onSubmit={() => toast.success("Typing operator created")}>
-                <FormGrid>
-                  <Field label="Name" required><Input /></Field>
-                  <Field label="Middle name"><Input /></Field>
-                  <Field label="Last name" required><Input /></Field>
-                  <Field label="Number"><Input /></Field>
-                  <Field label="Password">
-                    <div className="flex gap-2"><Input value={pwd} readOnly /><Button type="button" variant="outline" size="sm" onClick={generate}><KeyRound className="mr-1 h-3.5 w-3.5" />Generate</Button></div>
-                  </Field>
-                </FormGrid>
-              </FormDialog>
-            }>
+            <Panel title="Liste des Typing Operators">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50"><tr><th className="px-3 py-2">Nom</th><th className="px-3 py-2">Matricule</th><th className="px-3 py-2">Statut</th></tr></thead>
-                  <tbody>{typingOps.map(a => (<tr key={a.id} className="border-t border-border hover:bg-muted/30"><td className="px-3 py-2"><Link to="/app/comptes/$compteId" params={{ compteId: a.id }} className="text-accent hover:underline">{a.fullName}</Link></td><td className="px-3 py-2 font-mono text-xs">{a.matricule}</td><td className="px-3 py-2"><span className={`rounded-full px-2 py-0.5 text-xs ${a.status === "actif" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>{a.status}</span></td></tr>))}</tbody>
+                  <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
+                    <tr>
+                      <th className="px-3 py-3">N°</th>
+                      <th className="px-3 py-3">Name</th>
+                      <th className="px-3 py-3">Number (Matricule)</th>
+                      <th className="px-3 py-3">Account Type</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {typingOps.map((a, i) => (
+                      <tr key={a.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-3 py-3 font-mono text-xs">{i+1}</td>
+                        <td className="px-3 py-3 font-medium">{a.fullName}</td>
+                        <td className="px-3 py-3 font-mono text-xs">{a.matricule}</td>
+                        <td className="px-3 py-3">
+                           <Badge variant="outline" className="bg-accent/5 text-accent border-accent/20 text-[10px] font-bold uppercase">
+                              Typing Operator
+                           </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               </div>
             </Panel>
@@ -97,3 +272,4 @@ export default function ChefBarriereDash() {
     </div>
   );
 }
+

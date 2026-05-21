@@ -1,12 +1,18 @@
 import { useState } from "react";
-import { FileText, Truck, Plus } from "lucide-react";
+import { FileText, Truck, Plus, Search, Calendar, Edit, AlertTriangle, CheckCircle, Info } from "lucide-react";
 import { DashHeader, StatCard, Panel } from "./_shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { DOSSIERS, EMPTY_MANIFESTS } from "@/lib/mock";
+import { DOSSIERS, EMPTY_MANIFESTS, IT_ENTRIES, type Dossier, type ITEntry } from "@/lib/mock";
 import { toast } from "sonner";
 
 interface TransshippedVehicle {
@@ -28,16 +34,53 @@ export default function TypingOperatorDash() {
   const [transhippedTo, setTranshippedTo] = useState("");
   const [vehicles, setVehicles] = useState<TransshippedVehicle[]>([]);
   const [transhippedDocs, setTranshippedDocs] = useState<TranshippedDocument[]>([]);
+  
+  // Local state for dossiers and IT entries to show immediate updates
+  const [localDossiers, setLocalDossiers] = useState<Dossier[]>(DOSSIERS);
+  const [localITEntries, setLocalITEntries] = useState<ITEntry[]>(IT_ENTRIES);
+  
+  const [itSearch, setItSearch] = useState("");
+  const [itChassisSearch, setItChassisSearch] = useState("");
+  
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
 
-  const filteredManifests = EMPTY_MANIFESTS.filter(m => !manifestSearch || m.reference.toLowerCase().includes(manifestSearch.toLowerCase()));
+  const filteredManifests = EMPTY_MANIFESTS.filter(
+    (m) => !manifestSearch || m.reference.toLowerCase().includes(manifestSearch.toLowerCase()),
+  );
+
+  const filteredIT = localITEntries.filter(
+    (it) => 
+      (!itSearch || it.reference.toLowerCase().includes(itSearch.toLowerCase())) &&
+      (!itChassisSearch || it.chassis.toLowerCase().includes(itChassisSearch.toLowerCase()))
+  );
+
+  const isEditable = (createdAt: string) => {
+    const createdDate = new Date(createdAt).getTime();
+    const now = Date.now();
+    // Use a bit of buffer for demo purposes if needed, but here 5 mins
+    return now - createdDate < 5 * 60 * 1000;
+  };
+
+  const formatTimeLeft = (createdAt: string) => {
+    const createdDate = new Date(createdAt).getTime();
+    const now = Date.now();
+    const diff = 5 * 60 * 1000 - (now - createdDate);
+    if (diff <= 0) return "Expiré";
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    return `${mins}m ${secs}s`;
+  };
 
   // Handle number of vehicles change
   const handleVehiclesChange = (num: number) => {
     setNumberOfVehicles(num);
-    // Create array with new vehicles if needed, or remove extras
-    const newVehicles = Array(num).fill(null).map((_, i) =>
-      vehicles[i] || { vehicleReference: "", container: "", documentReference: "", date: "" }
-    );
+    const newVehicles = Array(num)
+      .fill(null)
+      .map(
+        (_, i) =>
+          vehicles[i] || { vehicleReference: "", container: "", documentReference: "", date: "" },
+      );
     setVehicles(newVehicles);
   };
 
@@ -54,7 +97,7 @@ export default function TypingOperatorDash() {
       return;
     }
 
-    setTranshippedDocs(prev => [
+    setTranshippedDocs((prev) => [
       ...prev,
       {
         id: `${Date.now()}-${prev.length}`,
@@ -78,41 +121,220 @@ export default function TypingOperatorDash() {
       </div>
       <div className="mt-6">
         <Tabs defaultValue="docs">
-          <TabsList><TabsTrigger value="docs">Docs</TabsTrigger><TabsTrigger value="manifest">Empty Manifest</TabsTrigger><TabsTrigger value="it">IT</TabsTrigger></TabsList>
+          <TabsList>
+            <TabsTrigger value="docs">Docs</TabsTrigger>
+            <TabsTrigger value="manifest">Empty Manifest</TabsTrigger>
+            <TabsTrigger value="it">IT</TabsTrigger>
+          </TabsList>
 
-          <TabsContent value="docs" className="mt-4 space-y-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              {/* DIRECT */}
-              <Panel title="Load — Direct" actions={
-                <FormDialog trigger={<Button size="sm">New Direct</Button>} title="Direct Document" onSubmit={() => toast.success("Saved")}>
-                  <FormGrid>
-                    <Field label="Office" required><Input /></Field>
-                    <Field label="Entry Reference" required><Input /></Field>
-                    <Field label="Date" required><Input type="date" /></Field>
-                    <Field label="T1" required><Input /></Field>
-                    <Field label="Date T1" required><Input type="date" /></Field>
-                    <Field label="Consignee" required><Input /></Field>
-                    <Field label="Country of Export" required><Input /></Field>
-                    <Field label="Vehicle Reference" required><Input /></Field>
-                    <Field label="Container Nº"><Input /></Field>
-                    <Field label="Container type">
-                      <div className="flex gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" className="rounded" /> 1x20</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" className="rounded" /> 1x40</label></div>
-                    </Field>
-                  </FormGrid>
-                </FormDialog>
-              }>
-                <div className="py-4 text-center text-sm text-muted-foreground">Créez un nouveau document direct avec le formulaire ci-dessus.</div>
-              </Panel>
-
-              {/* TRANSHIPPED */}
+          <TabsContent value="docs" className="mt-4 space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* LOAD DIRECT */}
               <Panel
-                title="Load — Transhipped"
+                title="Load Direct"
+                className="border-primary/20 shadow-lg shadow-primary/5"
                 actions={
                   <FormDialog
-                    trigger={<Button size="sm" variant="outline">New Transhipped</Button>}
-                    title="Transhipped Document"
-                    onSubmit={() => handleCreateTranshipped()}
+                    trigger={
+                      <Button size="sm" className="gap-2 bg-primary hover:bg-primary/90">
+                        <Plus className="h-4 w-4" /> Load Direct
+                      </Button>
+                    }
+                    title="Créer un Nouveau Document Direct"
+                    onSubmit={() => {
+                      toast.success("Document créé et enregistré dans la base de données.");
+                      // Mock immediate view update
+                    }}
                   >
+                    <FormGrid>
+                      <Field label="Bureau de destination" required>
+                        <Input placeholder="Ex: KASINDI" />
+                      </Field>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Field label="Référence d'entrée" required>
+                          <Input placeholder="Ex: RD-001" />
+                        </Field>
+                        <Field label="Date" required>
+                          <Input type="date" />
+                        </Field>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Field label="T1" required>
+                          <Input placeholder="Ex: T1-001" />
+                        </Field>
+                        <Field label="Date T1" required>
+                          <Input type="date" />
+                        </Field>
+                      </div>
+                      <Field label="Importateur (Consignee)" required>
+                        <Input placeholder="Nom de l'importateur" />
+                      </Field>
+                      <Field label="Pays d'exportation" required>
+                        <Input placeholder="Ex: OUGANDA" />
+                      </Field>
+                      <Field label="Référence Véhicule" required>
+                        <Input placeholder="Nº de plaque" />
+                      </Field>
+                      <Field label="Type de conteneur" required>
+                        <Select defaultValue="conventional">
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner le type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ref">Entry reference</SelectItem>
+                            <SelectItem value="ref_date">sa date</SelectItem>
+                            <SelectItem value="t1">T1</SelectItem>
+                            <SelectItem value="t1_date">sa date</SelectItem>
+                            <SelectItem value="conventional">Conventional</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Nº de Conteneur">
+                        <Input placeholder="Si applicable" />
+                      </Field>
+                    </FormGrid>
+                  </FormDialog>
+                }
+              >
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="mb-4 rounded-full bg-primary/10 p-3">
+                    <FileText className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="text-sm font-semibold">Nouveau Document</h3>
+                  <p className="mt-1 text-xs text-muted-foreground max-w-[200px]">
+                    Utilisez ce formulaire pour créer directement un nouveau document dans le système.
+                  </p>
+                </div>
+              </Panel>
+
+              {/* DOCS - DIRECT */}
+              <Panel
+                title="Docs — Direct"
+                actions={
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="h-8 text-xs">
+                      Actualiser
+                    </Button>
+                  </div>
+                }
+              >
+                <div className="space-y-4">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                    Données de l'importateur
+                  </div>
+                  <div className="overflow-x-auto rounded-md border border-border">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/50 text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Réf</th>
+                          <th className="px-3 py-2 text-left">Importateur</th>
+                          <th className="px-3 py-2 text-left">Status</th>
+                          <th className="px-3 py-2 text-left">Créé le</th>
+                          <th className="px-3 py-2 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {localDossiers.slice(0, 5).map((d) => {
+                          const editable = isEditable(d.createdAt);
+                          return (
+                            <tr key={d.id} className="border-t border-border hover:bg-muted/30">
+                              <td className="px-3 py-2 font-mono">{d.reference}</td>
+                              <td className="px-3 py-2 font-medium">{d.importateur}</td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                  d.status === "paye" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
+                                }`}>
+                                  {d.status}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-muted-foreground">
+                                {new Date(d.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {editable ? (
+                                  <FormDialog
+                                    trigger={
+                                      <Button size="icon" variant="ghost" className="h-7 w-7 text-primary">
+                                        <Edit className="h-3.5 w-3.5" />
+                                      </Button>
+                                    }
+                                    title={`Édition : ${d.reference}`}
+                                    onSubmit={() => toast.success("Informations mises à jour immédiatement.")}
+                                  >
+                                    <div className="mb-4 rounded-md bg-info/10 p-3 text-xs text-info flex items-center gap-2">
+                                      <Info className="h-4 w-4" />
+                                      Temps restant pour modification : {formatTimeLeft(d.createdAt)}
+                                    </div>
+                                    <FormGrid>
+                                      <Field label="Importateur">
+                                        <Input defaultValue={d.importateur} />
+                                      </Field>
+                                      <Field label="Plaque">
+                                        <Input defaultValue={d.plaque} />
+                                      </Field>
+                                      <Field label="Type Marchandise">
+                                        <Input defaultValue={d.typeMarchandises} />
+                                      </Field>
+                                    </FormGrid>
+                                  </FormDialog>
+                                ) : (
+                                  <div className="flex items-center justify-end text-[10px] text-muted-foreground gap-1">
+                                    <AlertTriangle className="h-3 w-3" /> Verrouillé (&gt;5m)
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Panel>
+            </div>
+
+            {/* TRANSHIPPED */}
+            <Panel
+              title="Transshipped"
+              icon={Truck}
+              actions={
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-muted rounded-md px-2 py-1">
+                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Input 
+                      type="date" 
+                      className="h-7 w-32 border-none bg-transparent text-[10px]" 
+                      value={dateStart}
+                      onChange={(e) => setDateStart(e.target.value)}
+                    />
+                    <span className="text-muted-foreground">à</span>
+                    <Input 
+                      type="date" 
+                      className="h-7 w-32 border-none bg-transparent text-[10px]"
+                      value={dateEnd}
+                      onChange={(e) => setDateEnd(e.target.value)}
+                    />
+                  </div>
+                  <FormDialog
+                    trigger={
+                      <Button size="sm" variant="outline" className="gap-2 border-primary/30 text-primary">
+                        <Plus className="h-4 w-4" /> Transshipped
+                      </Button>
+                    }
+                    title="Transshipped Dossier"
+                    onSubmit={() => {
+                      toast.success("Formulaire transshipped ouvert.");
+                      handleCreateTranshipped();
+                    }}
+                  >
+                    <div className="mb-6 p-4 border-2 border-dashed border-warning/30 bg-warning/5 rounded-lg text-center">
+                      <AlertTriangle className="mx-auto h-8 w-8 text-warning mb-2" />
+                      <h4 className="font-bold text-warning uppercase">Espace Réservé</h4>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        This space is reserved for transhipped dossier. Use new transhipped form.
+                      </p>
+                    </div>
+                    
                     <FormGrid>
                       <Field label="Nº of vehicles transhipped" required>
                         <Input
@@ -130,29 +352,36 @@ export default function TypingOperatorDash() {
                       </Field>
                     </FormGrid>
 
-                    {numberOfVehicles > 0 ? (
-                      <div className="space-y-4 mt-4">
+                    {numberOfVehicles > 0 && (
+                      <div className="space-y-4 mt-6 pt-6 border-t border-border">
                         {vehicles.map((vehicle, index) => (
-                          <div key={index} className="grid grid-cols-1 xl:grid-cols-4 gap-3 p-3 bg-muted/50 rounded-lg">
+                          <div
+                            key={index}
+                            className="grid grid-cols-1 xl:grid-cols-4 gap-3 p-3 bg-muted/30 rounded-lg border border-border"
+                          >
                             <Field label={`Vehicle ${index + 1} Reference`} required>
                               <Input
                                 value={vehicle.vehicleReference}
-                                onChange={(e) => updateVehicle(index, "vehicleReference", e.target.value)}
-                                placeholder="Vehicle ref"
+                                onChange={(e) =>
+                                  updateVehicle(index, "vehicleReference", e.target.value)
+                                }
+                                placeholder="Plaque"
                               />
                             </Field>
                             <Field label={`Container ${index + 1}`} required>
                               <Input
                                 value={vehicle.container}
                                 onChange={(e) => updateVehicle(index, "container", e.target.value)}
-                                placeholder="Container Nº"
+                                placeholder="Nº Conteneur"
                               />
                             </Field>
                             <Field label={`Document Ref ${index + 1}`} required>
                               <Input
                                 value={vehicle.documentReference}
-                                onChange={(e) => updateVehicle(index, "documentReference", e.target.value)}
-                                placeholder="Document ref"
+                                onChange={(e) =>
+                                  updateVehicle(index, "documentReference", e.target.value)
+                                }
+                                placeholder="Réf Doc"
                               />
                             </Field>
                             <Field label={`Date ${index + 1}`} required>
@@ -165,74 +394,228 @@ export default function TypingOperatorDash() {
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <div className="py-4 text-center text-sm text-muted-foreground">
-                        Saisissez le nombre de véhicules pour afficher les formulaires de transbordement ci-dessous.
-                      </div>
                     )}
                   </FormDialog>
-                }
-              >
-                {transhippedDocs.length > 0 ? (
-                  <div className="space-y-3">
-                    {transhippedDocs.map((doc) => (
-                      <div key={doc.id} className="rounded-lg border border-border p-4 bg-card">
-                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border">
-                          <div>
-                            <div className="text-xs uppercase text-muted-foreground">Destination</div>
-                            <div className="font-semibold">{doc.transhippedTo}</div>
+                </div>
+              }
+            >
+              {transhippedDocs.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {transhippedDocs.map((doc) => (
+                    <div key={doc.id} className="rounded-xl border border-border p-4 bg-card shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className="rounded-full bg-info/10 p-2">
+                            <Truck className="h-4 w-4 text-info" />
                           </div>
                           <div>
-                            <div className="text-xs uppercase text-muted-foreground">Véhicules</div>
-                            <div className="font-semibold">{doc.vehicles.length}</div>
+                            <div className="text-[10px] uppercase text-muted-foreground font-bold">Destinataire</div>
+                            <div className="text-sm font-semibold">{doc.transhippedTo}</div>
                           </div>
                         </div>
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                          {doc.vehicles.map((vehicle, index) => (
-                            <div key={index} className="rounded-lg border border-border p-3 bg-muted/50">
-                              <div className="text-xs text-muted-foreground">Véhicule {index + 1}</div>
-                              <div className="text-sm font-semibold">{vehicle.vehicleReference || "-"}</div>
-                              <div className="text-xs text-muted-foreground">Conteneur</div>
-                              <div className="text-sm">{vehicle.container || "-"}</div>
-                            </div>
-                          ))}
+                        <div className="text-right">
+                          <div className="text-[10px] uppercase text-muted-foreground font-bold">Véhicules</div>
+                          <div className="text-sm font-mono">{doc.vehicles.length}</div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-12 text-center text-sm text-muted-foreground">
-                    Espace réservé pour la liste des transhipped. Cliquez sur <span className="font-semibold">New Transhipped</span> pour ouvrir le formulaire.
-                  </div>
-                )}
-              </Panel>
-            </div>
+                      <div className="grid gap-2">
+                        {doc.vehicles.map((v, i) => (
+                          <div key={i} className="flex items-center justify-between text-xs p-2 bg-muted/40 rounded-md">
+                            <span className="font-medium">{v.vehicleReference}</span>
+                            <span className="text-muted-foreground">{v.date}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-12 flex flex-col items-center justify-center text-center opacity-50 grayscale">
+                  <Truck className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-sm">Aucun dossier transhipped pour cet intervalle.</p>
+                </div>
+              )}
+            </Panel>
           </TabsContent>
 
           <TabsContent value="manifest" className="mt-4 space-y-4">
-            <div className="flex gap-3"><Input placeholder="Manifest reference…" value={manifestSearch} onChange={e => setManifestSearch(e.target.value)} className="max-w-xs" /><Button variant="outline" onClick={() => setManifestSearch("")}>Filter</Button></div>
+            <div className="flex gap-3">
+              <Input
+                placeholder="Manifest reference…"
+                value={manifestSearch}
+                onChange={(e) => setManifestSearch(e.target.value)}
+                className="max-w-xs"
+              />
+              <Button variant="outline" onClick={() => setManifestSearch("")}>
+                Filter
+              </Button>
+            </div>
             <Panel title={`Results (${filteredManifests.length})`}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50"><tr><th className="px-3 py-2">Plate Number</th><th className="px-3 py-2">Vehicle Mark</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Manifest Ref</th><th className="px-3 py-2">Date</th><th className="px-3 py-2"></th></tr></thead>
-                  <tbody>{filteredManifests.map(m => (<tr key={m.id} className="border-t border-border hover:bg-muted/30"><td className="px-3 py-2">{m.vehicule}</td><td className="px-3 py-2">{m.marque}</td><td className="px-3 py-2"><span className={`rounded-full px-2 py-0.5 text-xs ${m.status === "payé" ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}>{m.status}</span></td><td className="px-3 py-2 font-mono text-xs">{m.reference}</td><td className="px-3 py-2">{m.date}</td><td className="px-3 py-2"><Button size="sm" variant="outline" onClick={() => toast.success("OK")}>OK</Button></td></tr>))}</tbody>
+                  <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
+                    <tr>
+                      <th className="px-3 py-2">Plate Number</th>
+                      <th className="px-3 py-2">Vehicle Mark</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Manifest Ref</th>
+                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredManifests.map((m) => (
+                      <tr key={m.id} className="border-t border-border hover:bg-muted/30">
+                        <td className="px-3 py-2">{m.vehicule}</td>
+                        <td className="px-3 py-2">{m.marque}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs ${m.status === "payé" ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}
+                          >
+                            {m.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs">{m.reference}</td>
+                        <td className="px-3 py-2">{m.date}</td>
+                        <td className="px-3 py-2">
+                          <Button size="sm" variant="outline" onClick={() => toast.success("OK")}>
+                            OK
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               </div>
             </Panel>
           </TabsContent>
 
-          <TabsContent value="it" className="mt-4">
-            <Panel title="IT — Information Technology">
-              <FormDialog trigger={<Button>New IT Entry</Button>} title="IT Entry" onSubmit={() => toast.success("IT saved")}>
-                <FormGrid>
-                  <Field label="Consignee" required><Input /></Field>
-                  <Field label="Chassis" required><Input /></Field>
-                  <Field label="Vehicle Mark" required><Input /></Field>
-                  <Field label="Manifest Year" required><Input type="number" placeholder="2025" /></Field>
-                  <Field label="Color" required><Input /></Field>
-                  <Field label="IT Ref" required><Input /></Field>
-                </FormGrid>
-              </FormDialog>
+          <TabsContent value="it" className="mt-4 space-y-6">
+            <Panel 
+              title="Support IT" 
+              icon={CheckCircle}
+              actions={
+                <div className="flex gap-3">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Réf IT..." 
+                      className="pl-9 h-9 w-40 text-xs" 
+                      value={itSearch}
+                      onChange={(e) => setItSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Nº Châssis..." 
+                      className="pl-9 h-9 w-40 text-xs"
+                      value={itChassisSearch}
+                      onChange={(e) => setItChassisSearch(e.target.value)}
+                    />
+                  </div>
+                  <FormDialog
+                    trigger={<Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> New IT</Button>}
+                    title="Créer une Entrée IT"
+                    onSubmit={() => toast.success("IT saved")}
+                  >
+                    <FormGrid>
+                      <Field label="Consignee" required>
+                        <Input />
+                      </Field>
+                      <Field label="Chassis" required>
+                        <Input />
+                      </Field>
+                      <Field label="Vehicle Mark" required>
+                        <Input />
+                      </Field>
+                      <Field label="Manifest Year" required>
+                        <Input type="number" placeholder="2025" />
+                      </Field>
+                      <Field label="Color" required>
+                        <Input />
+                      </Field>
+                      <Field label="IT Ref" required>
+                        <Input />
+                      </Field>
+                    </FormGrid>
+                  </FormDialog>
+                </div>
+              }
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] font-bold">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Référence IT</th>
+                      <th className="px-4 py-3 text-left">Châssis</th>
+                      <th className="px-4 py-3 text-left">Consignataire</th>
+                      <th className="px-4 py-3 text-left">Marque</th>
+                      <th className="px-4 py-3 text-left">Date</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredIT.map((it) => (
+                      <tr key={it.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3 font-mono text-xs">{it.reference}</td>
+                        <td className="px-4 py-3 font-medium">{it.chassis}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{it.consignee}</td>
+                        <td className="px-4 py-3">{it.vehicleMark}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{it.date}</td>
+                        <td className="px-4 py-3 text-right">
+                          <Button size="icon" variant="ghost" className="h-8 w-8">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+
+            <Panel title="Gestion des Références" icon={Search}>
+              <div className="grid gap-6 md:grid-cols-3">
+                <div className="rounded-xl border border-border p-4 bg-muted/10 space-y-3">
+                  <div className="flex items-center gap-2 text-primary font-semibold">
+                    <Search className="h-5 w-5" />
+                    <span>Analyse</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Analyser la liste des références pour détecter les doublons ou anomalies de format.
+                  </p>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => toast.info("Analyse en cours...")}>
+                    Lancer l'analyse
+                  </Button>
+                </div>
+
+                <div className="rounded-xl border border-border p-4 bg-muted/10 space-y-3">
+                  <div className="flex items-center gap-2 text-warning font-semibold">
+                    <CheckCircle className="h-5 w-5" />
+                    <span>Vérification</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Vérifier l'intégrité des numéros de châssis par rapport au registre constructeur.
+                  </p>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => toast.info("Vérification des châssis...")}>
+                    Vérifier Châssis
+                  </Button>
+                </div>
+
+                <div className="rounded-xl border border-border p-4 bg-muted/10 space-y-3">
+                  <div className="flex items-center gap-2 text-success font-semibold">
+                    <Plus className="h-5 w-5" />
+                    <span>Correction</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Corriger manuellement ou automatiquement les incohérences détectées.
+                  </p>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => toast.info("Recherche d'incohérences...")}>
+                    Corriger Incohérences
+                  </Button>
+                </div>
+              </div>
             </Panel>
           </TabsContent>
         </Tabs>

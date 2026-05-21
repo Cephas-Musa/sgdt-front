@@ -40,7 +40,9 @@ export function DataTable<T extends { id: string }>({
     return data.filter((row) =>
       columns.some((c) => {
         const val = c.accessor ? c.accessor(row) : (row as Record<string, unknown>)[c.key];
-        return String(val ?? "").toLowerCase().includes(needle);
+        return String(val ?? "")
+          .toLowerCase()
+          .includes(needle);
       }),
     );
   }, [q, data, columns]);
@@ -58,12 +60,17 @@ export function DataTable<T extends { id: string }>({
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={q}
-                onChange={(e) => { setQ(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setPage(1);
+                }}
                 placeholder={t("common.search")}
                 className="pl-8"
               />
             </div>
-          ) : <span />}
+          ) : (
+            <span />
+          )}
           {toolbar && <div className="flex flex-wrap items-center gap-2">{toolbar}</div>}
         </div>
       )}
@@ -82,7 +89,10 @@ export function DataTable<T extends { id: string }>({
           <tbody>
             {slice.length === 0 && (
               <tr>
-                <td colSpan={columns?.length ?? 1} className="px-4 py-8 text-center text-muted-foreground">
+                <td
+                  colSpan={columns?.length ?? 1}
+                  className="px-4 py-8 text-center text-muted-foreground"
+                >
                   {empty ?? t("common.empty")}
                 </td>
               </tr>
@@ -95,7 +105,9 @@ export function DataTable<T extends { id: string }>({
               >
                 {columns?.map((c) => (
                   <td key={c.key} className={`px-4 py-2.5 ${c.className ?? ""}`}>
-                    {c.render ? c.render(row, (current - 1) * pageSize + rowIndex) : (row as Record<string, ReactNode>)[c.key] as ReactNode}
+                    {c.render
+                      ? c.render(row, (current - 1) * pageSize + rowIndex)
+                      : ((row as Record<string, ReactNode>)[c.key] as ReactNode)}
                   </td>
                 ))}
               </tr>
@@ -105,7 +117,9 @@ export function DataTable<T extends { id: string }>({
       </div>
 
       <div className="flex items-center justify-between border-t border-border p-3 text-xs text-muted-foreground">
-        <span>{filtered.length} · page {current}/{totalPages}</span>
+        <span>
+          {filtered.length} · page {current}/{totalPages}
+        </span>
         <div className="flex gap-1">
           <button
             className="rounded border border-border px-2 py-1 disabled:opacity-50"
