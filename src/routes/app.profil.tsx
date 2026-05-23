@@ -207,8 +207,8 @@ function ProfilPage() {
               <Button
                 variant="destructive"
                 className="mt-6 w-full"
-                onClick={() => {
-                  logout();
+                onClick={async () => {
+                  await logout();
                   toast.success("Déconnexion réussie");
                 }}
               >

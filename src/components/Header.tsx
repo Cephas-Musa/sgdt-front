@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 import { ROLE_LABELS } from "@/lib/roles";
-import { ALERTS, CHATS } from "@/lib/mock";
+import { useApi, apiGetAlertes, apiGetConversations } from "@/lib/api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,11 +29,14 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
 
-  const unreadAlerts = ALERTS.filter((a) => a.level !== "info").length;
-  const unreadChats = CHATS.reduce((s, c) => s + c.unread, 0);
+  const { data: alerts } = useApi(apiGetAlertes);
+  const { data: conversations } = useApi(apiGetConversations);
 
-  const handleLogout = () => {
-    logout();
+  const unreadAlerts = (alerts as Array<{type: string}> ?? []).filter((a) => a.type === "urgent" || a.type === "litige").length;
+  const unreadChats = (conversations as Array<{unread_count?: number}> ?? []).reduce((s, c) => s + (c.unread_count ?? 0), 0);
+
+  const handleLogout = async () => {
+    await logout();
     navigate({ to: "/login" });
   };
 
@@ -51,7 +54,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
 
       <button
         onClick={() => setLang(lang === "fr" ? "en" : "fr")}
-        className="hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium hover:bg-muted sm:flex"
+        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
       >
         <Globe className="h-4 w-4" />
         {lang.toUpperCase()}

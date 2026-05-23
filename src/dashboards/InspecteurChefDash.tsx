@@ -26,6 +26,8 @@ import {
   APUREMENT_SUBMISSIONS,
   SECRETAIRES_INSPECTEUR,
 } from "@/lib/mock";
+import { useApi, apiCreateWarehouse } from "@/lib/api";
+import { useState } from "react";
 
 const typeIcon = (t: string) => {
   if (t === "creation") return <ArrowUpRight className="h-3.5 w-3.5 text-accent" />;
@@ -40,6 +42,8 @@ export default function InspecteurChefDash() {
   const totalDossiers = DOSSIERS.length;
   const enCours = DOSSIERS.filter((d) => d.status === "en_cours").length;
   const apures = DOSSIERS.filter((d) => d.status === "apure").length;
+
+  const [newEntrepot, setNewEntrepot] = useState({ code: "", nom: "", ville: "" });
 
   return (
     <div className="space-y-6">
@@ -193,20 +197,46 @@ export default function InspecteurChefDash() {
                 }
                 title="Création Entrepôt"
                 submitLabel="Valider"
-                onSubmit={() => toast.success("Entrepôt créé avec succès.")}
+                onSubmit={async () => {
+                  try {
+                    await apiCreateWarehouse({
+                      id: "ent-" + Date.now(),
+                      code: newEntrepot.code,
+                      nom: newEntrepot.nom,
+                      bureau: "Bureau Kasindi", // Placeholder, since it's hardcoded below
+                      capacite: 100
+                    });
+                    toast.success("Entrepôt créé avec succès.");
+                    setNewEntrepot({ code: "", nom: "", ville: "" });
+                  } catch (e) {
+                    toast.error("Erreur lors de la création");
+                  }
+                }}
               >
                 <FormGrid>
                   <Field label="Code entrepôt" required>
-                    <Input placeholder="ENT-001" />
+                    <Input 
+                      value={newEntrepot.code} 
+                      onChange={e => setNewEntrepot(p => ({ ...p, code: e.target.value }))} 
+                      placeholder="ENT-001" 
+                    />
                   </Field>
                   <Field label="Nom entrepôt" required>
-                    <Input placeholder="Entrepôt Kasindi 1" />
+                    <Input 
+                      value={newEntrepot.nom} 
+                      onChange={e => setNewEntrepot(p => ({ ...p, nom: e.target.value }))} 
+                      placeholder="Entrepôt Kasindi 1" 
+                    />
                   </Field>
                   <Field label="Bureau douanier" required>
                     <Input value="Bureau Kasindi" readOnly className="bg-muted/50" />
                   </Field>
                   <Field label="Ville" required>
-                    <Input placeholder="Kasindi" />
+                    <Input 
+                      value={newEntrepot.ville} 
+                      onChange={e => setNewEntrepot(p => ({ ...p, ville: e.target.value }))} 
+                      placeholder="Kasindi" 
+                    />
                   </Field>
                 </FormGrid>
               </FormDialog>

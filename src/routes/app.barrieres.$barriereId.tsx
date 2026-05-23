@@ -4,7 +4,8 @@ import { ArrowLeft, MapPin, Truck, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
-import { BARRIERE_ENTRIES, type BarriereEntry } from "@/lib/mock";
+import { useApi, apiGetBarriereEntries } from "@/lib/api";
+import type { BarriereEntry } from "@/lib/mock";
 
 export const Route = createFileRoute("/app/barrieres/$barriereId")({
   component: BarriereDetailPage,
@@ -14,7 +15,9 @@ function BarriereDetailPage() {
   const { barriereId } = useParams({ from: "/app/barrieres/$barriereId" });
   const router = useRouter();
 
-  const entree = BARRIERE_ENTRIES.find((e) => e.id === barriereId);
+  const { data: rawEntries } = useApi(apiGetBarriereEntries);
+  const entries = (rawEntries as BarriereEntry[] ?? []);
+  const entree = entries.find((e) => String(e.id) === barriereId);
 
   if (!entree) {
     return (

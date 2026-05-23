@@ -1,35 +1,84 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useRef, useEffect } from "react";
-import { ArrowLeft, Send, Search, Phone, MoreVertical, Check, CheckCheck } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { ArrowLeft, Send, Search, Phone, MoreVertical, CheckCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CONVERSATIONS, type ChatConversation } from "@/lib/mock";
+import { useApi, apiGetConversations, apiGetMessages, apiSendMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/chat")({
   component: ChatPage,
 });
 
+type Conversation = {
+  id: number;
+  name?: string;
+  participant?: { full_name?: string; phone_number?: string; role?: string };
+  last_message?: string;
+  last_message_at?: string;
+  unread_count?: number;
+  is_online?: boolean;
+};
+
+type Message = {
+  id: number;
+  content: string;
+  sender_id: number;
+  created_at: string;
+  is_mine?: boolean;
+};
+
 function ChatPage() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [newMsg, setNewMsg] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const selected = CONVERSATIONS.find((c) => c.id === selectedId);
-  const filtered = CONVERSATIONS.filter(
-    (c) => !search || c.name.toLowerCase().includes(search.toLowerCase()),
+  const { data: rawConversations, loading: convsLoading } = useApi(apiGetConversations);
+  const conversations = (rawConversations as Conversation[] ?? []);
+
+  const selected = conversations.find((c) => c.id === selectedId);
+  const filtered = conversations.filter(
+    (c) => !search || (c.participant?.full_name ?? "").toLowerCase().includes(search.toLowerCase()),
   );
+
+  // Load messages when conversation is selected
+  useEffect(() => {
+    if (!selectedId) return;
+    setMessagesLoading(true);
+    apiGetMessages(selectedId)
+      .then((msgs) => setMessages(msgs as Message[]))
+      .catch(() => toast.error("Erreur lors du chargement des messages"))
+      .finally(() => setMessagesLoading(false));
+  }, [selectedId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [selectedId]);
+  }, [messages]);
 
-  const handleSend = () => {
-    if (!newMsg.trim()) return;
+  const handleSend = useCallback(async () => {
+    if (!newMsg.trim() || !selectedId) return;
+    const content = newMsg.trim();
     setNewMsg("");
-    // Toast pour simuler l'envoi
-  };
+    setSending(true);
+    try {
+      const msg = await apiSendMessage(selectedId, content) as Message;
+      setMessages((prev) => [...prev, { ...msg, is_mine: true }]);
+    } catch {
+      toast.error("Erreur envoi du message");
+    } finally {
+      setSending(false);
+    }
+  }, [newMsg, selectedId]);
+
+  const getConvName = (c: Conversation) => c.participant?.full_name ?? c.name ?? "Inconnu";
+  const getConvRole = (c: Conversation) => c.participant?.role ?? "";
+  const getConvAvatar = (c: Conversation) => (getConvName(c)[0] ?? "?").toUpperCase();
+  const getLastTime = (c: Conversation) => c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" }) : "";
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-lg border border-border bg-card">
@@ -57,45 +106,50 @@ function ChatPage() {
 
         {/* Liste conversations */}
         <div className="flex-1 overflow-y-auto">
-          {filtered.map((conv) => (
-            <button
-              key={conv.id}
-              onClick={() => setSelectedId(conv.id)}
-              className={cn(
-                "flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
-                selectedId === conv.id && "bg-accent/10",
-              )}
-            >
-              {/* Avatar */}
-              <div className="relative shrink-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold text-sm">
-                  {conv.avatar}
-                </div>
-                {conv.online && (
-                  <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-card bg-success" />
+          {convsLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">Aucune conversation</div>
+          ) : (
+            filtered.map((conv) => (
+              <button
+                key={conv.id}
+                onClick={() => setSelectedId(conv.id)}
+                className={cn(
+                  "flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
+                  selectedId === conv.id && "bg-accent/10",
                 )}
-              </div>
-
-              {/* Info */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm truncate">{conv.name}</span>
-                  <span className="text-xs text-muted-foreground shrink-0">{conv.lastTime}</span>
-                </div>
-                <div className="flex items-center justify-between mt-0.5">
-                  <span className="text-xs text-muted-foreground truncate">{conv.lastMessage}</span>
-                  {conv.unread > 0 && (
-                    <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-bold text-white">
-                      {conv.unread}
-                    </span>
+              >
+                {/* Avatar */}
+                <div className="relative shrink-0">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold text-sm">
+                    {getConvAvatar(conv)}
+                  </div>
+                  {conv.is_online && (
+                    <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-card bg-success" />
                   )}
                 </div>
-                <div className="text-[10px] text-muted-foreground/60 mt-0.5">{conv.role}</div>
-              </div>
-            </button>
-          ))}
-          {filtered.length === 0 && (
-            <div className="p-6 text-center text-sm text-muted-foreground">Aucune conversation</div>
+
+                {/* Info */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm truncate">{getConvName(conv)}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{getLastTime(conv)}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="text-xs text-muted-foreground truncate">{conv.last_message ?? "—"}</span>
+                    {(conv.unread_count ?? 0) > 0 && (
+                      <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-bold text-white">
+                        {conv.unread_count}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">{getConvRole(conv)}</div>
+                </div>
+              </button>
+            ))
           )}
         </div>
       </div>
@@ -124,16 +178,16 @@ function ChatPage() {
               </Button>
               <div className="relative shrink-0">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold text-sm">
-                  {selected.avatar}
+                  {getConvAvatar(selected)}
                 </div>
-                {selected.online && (
+                {selected.is_online && (
                   <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-card bg-success" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm">{selected.name}</div>
+                <div className="font-medium text-sm">{getConvName(selected)}</div>
                 <div className="text-xs text-muted-foreground">
-                  {selected.online ? "En ligne" : "Hors ligne"} · {selected.role}
+                  {selected.is_online ? "En ligne" : "Hors ligne"} · {getConvRole(selected)}
                 </div>
               </div>
               <div className="flex gap-1">
@@ -154,36 +208,37 @@ function ChatPage() {
                   "url(\"data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.627 0l.83.828-1.415 1.415L51.8 0h2.827zM5.373 0l-.83.828L5.96 2.243 8.2 0H5.374zM48.97 0l3.657 3.657-1.414 1.414L46.143 0h2.828zM11.03 0L7.372 3.657 8.787 5.07 13.857 0H11.03zm32.284 0L49.8 6.485 48.384 7.9l-7.9-7.9h2.83zM16.686 0L10.2 6.485 11.616 7.9l7.9-7.9h-2.83zm20.97 0l9.315 9.314-1.414 1.414L34.828 0h2.83zM22.344 0L13.03 9.314l1.414 1.414L25.172 0h-2.83zM32 0l12.142 12.142-1.414 1.414L30 .828 17.272 13.556l-1.414-1.414L28 0h4z' fill='%23000' fill-opacity='.015'/%3E%3C/svg%3E\")",
               }}
             >
-              {selected.messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={cn("flex", msg.isMe ? "justify-end" : "justify-start")}
-                >
+              {messagesLoading ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="text-center text-sm text-muted-foreground py-10">Aucun message — commencez la conversation</div>
+              ) : (
+                messages.map((msg) => (
                   <div
-                    className={cn(
-                      "max-w-[75%] rounded-2xl px-4 py-2 shadow-sm",
-                      msg.isMe
-                        ? "bg-accent text-accent-foreground rounded-br-md"
-                        : "bg-muted rounded-bl-md",
-                    )}
+                    key={msg.id}
+                    className={cn("flex", msg.is_mine ? "justify-end" : "justify-start")}
                   >
-                    <div className="text-sm whitespace-pre-wrap">{msg.text}</div>
                     <div
-                      className={cn("flex items-center gap-1 mt-1", msg.isMe ? "justify-end" : "")}
+                      className={cn(
+                        "max-w-[75%] rounded-2xl px-4 py-2 shadow-sm",
+                        msg.is_mine
+                          ? "bg-accent text-accent-foreground rounded-br-md"
+                          : "bg-muted rounded-bl-md",
+                      )}
                     >
-                      <span
-                        className={cn(
-                          "text-[10px]",
-                          msg.isMe ? "text-accent-foreground/60" : "text-muted-foreground",
-                        )}
-                      >
-                        {msg.time}
-                      </span>
-                      {msg.isMe && <CheckCheck className="h-3 w-3 text-accent-foreground/60" />}
+                      <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+                      <div className={cn("flex items-center gap-1 mt-1", msg.is_mine ? "justify-end" : "")}>
+                        <span className={cn("text-[10px]", msg.is_mine ? "text-accent-foreground/60" : "text-muted-foreground")}>
+                          {new Date(msg.created_at).toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        {msg.is_mine && <CheckCheck className="h-3 w-3 text-accent-foreground/60" />}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
               <div ref={endRef} />
             </div>
 
@@ -201,9 +256,10 @@ function ChatPage() {
                   value={newMsg}
                   onChange={(e) => setNewMsg(e.target.value)}
                   className="flex-1"
+                  disabled={sending}
                 />
-                <Button type="submit" size="sm" className="shrink-0">
-                  <Send className="h-4 w-4" />
+                <Button type="submit" size="sm" className="shrink-0" disabled={sending || !newMsg.trim()}>
+                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </form>
             </div>

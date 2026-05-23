@@ -9,7 +9,8 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { BARRIERE_ENTRIES, EMPTY_MANIFESTS, type BarriereEntry } from "@/lib/mock";
+import { useApi, apiGetBarriereEntries, apiGetEmptyManifests, apiGetLocodes } from "@/lib/api";
+import type { BarriereEntry } from "@/lib/mock";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -18,6 +19,10 @@ export const Route = createFileRoute("/app/barrieres")({
 });
 
 function BrigadierForms() {
+  const { data: rawManifests } = useApi(apiGetEmptyManifests);
+  type Manifest = { id: number | string; reference: string; vehicule: string; marque: string; destination?: string; receveur?: string; barriereEntree?: string; barriereSortie?: string };
+  const manifests = (rawManifests as Manifest[] ?? []);
+
   return (
     <FormDialog
       trigger={
@@ -119,7 +124,7 @@ function BrigadierForms() {
             </Button>
           </div>
           <DataTable
-            data={EMPTY_MANIFESTS}
+            data={manifests}
             columns={[
               { key: "reference", header: "Manifest" },
               { key: "vehicule", header: "Immat." },
@@ -144,6 +149,13 @@ function BarrieresPage() {
   const navigate = useNavigate();
   const isDP = user?.role === "directeur_provincial";
 
+  const { data: rawEntries } = useApi(apiGetBarriereEntries);
+  const entries = (rawEntries as BarriereEntry[] ?? []);
+
+  const { data: rawLocodes } = useApi(apiGetLocodes);
+  type Locode = { code: string; designation: string; denomination: string };
+  const locodes = (rawLocodes as Locode[] ?? []);
+
   const columns: Column<BarriereEntry>[] = [
     { key: "reference", header: t("common.reference") },
     { key: "vehicule", header: t("dossier.vehicule") },
@@ -162,14 +174,13 @@ function BarrieresPage() {
         />
         
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-           {/* Summary Stats for Bureaux */}
            <div className="p-4 rounded-xl border bg-card shadow-sm">
               <p className="text-[10px] font-bold text-muted-foreground uppercase">Bureaux Actifs</p>
               <p className="text-2xl font-bold">12 / 15</p>
            </div>
            <div className="p-4 rounded-xl border bg-card shadow-sm">
               <p className="text-[10px] font-bold text-muted-foreground uppercase">Mouvements Global</p>
-              <p className="text-2xl font-bold">458</p>
+              <p className="text-2xl font-bold">{entries.length}</p>
            </div>
         </div>
 
@@ -186,7 +197,7 @@ function BarrieresPage() {
                  </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                 {LOCODES.slice(0, 10).map((b) => (
+                 {locodes.slice(0, 10).map((b) => (
                     <tr key={b.code} className="hover:bg-muted/30 transition-colors">
                        <td className="px-4 py-4 font-mono font-bold text-accent">{b.code}</td>
                        <td className="px-4 py-4 font-medium">{b.designation}</td>
@@ -200,9 +211,9 @@ function BarrieresPage() {
                        <td className="px-4 py-4">
                           <div className="flex items-center gap-2">
                              <div className="h-1.5 w-20 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-accent" style={{ width: `${Math.random() * 100}%` }} />
+                                <div className="h-full bg-accent" style={{ width: "60%" }} />
                              </div>
-                             <span className="text-[10px] font-bold">{Math.floor(Math.random() * 50)}%</span>
+                             <span className="text-[10px] font-bold">60%</span>
                           </div>
                        </td>
                        <td className="px-4 py-4 text-right">
@@ -235,7 +246,7 @@ function BarrieresPage() {
         actions={action}
       />
       <DataTable
-        data={BARRIERE_ENTRIES}
+        data={entries}
         columns={columns}
         onRowClick={(entree) =>
           navigate({ to: "/app/barrieres/$barriereId", params: { barriereId: entree.id } })
@@ -244,4 +255,3 @@ function BarrieresPage() {
     </div>
   );
 }
-

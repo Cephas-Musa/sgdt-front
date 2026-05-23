@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { EMPTY_MANIFESTS } from "@/lib/mock";
+import { useApi, apiGetEmptyManifests } from "@/lib/api";
 import { Plus, Search, Filter, Edit, Trash2, DollarSign, Building2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
@@ -29,10 +29,14 @@ function ManifestPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const filtered = EMPTY_MANIFESTS.filter(
+  const { data: rawManifests, loading: manifestsLoading } = useApi(apiGetEmptyManifests);
+  type Manifest = { id: number|string; reference: string; declarant: string; vehicule: string; marque: string; montant: number; status: string; date: string; barriereSortie: string };
+  const manifests = (rawManifests as Manifest[] ?? []);
+
+  const filtered = manifests.filter(
     (m) =>
       (filterStatus === "all" || m.status === filterStatus) &&
-      (filterBureau === "all" || m.barriereSortie.toLowerCase() === filterBureau.toLowerCase()) &&
+      (filterBureau === "all" || (m.barriereSortie ?? "").toLowerCase() === filterBureau.toLowerCase()) &&
       (!startDate || m.date >= startDate) &&
       (!endDate || m.date <= endDate) &&
       (!search ||
@@ -41,7 +45,7 @@ function ManifestPage() {
   );
 
   const canSeeAmount = user?.role === "super_admin";
-  const totalRevenue = canSeeAmount ? filtered.reduce((s, m) => s + m.montant, 0) : 0;
+  const totalRevenue = canSeeAmount ? filtered.reduce((s, m) => s + (m.montant ?? 0), 0) : 0;
 
   return (
     <div>

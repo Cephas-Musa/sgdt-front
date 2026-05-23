@@ -19,7 +19,8 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { DOSSIERS, BUREAUX_REPR, ALERTS, type Dossier } from "@/lib/mock";
+import { useApi, apiGetDossiers, apiGetBureauxRepresentation, apiGetAlertes, type ApiError } from "@/lib/api";
+import type { Dossier, DossierStatus, DossierType } from "@/lib/mock";
 import { toast } from "sonner";
 import {
   DirectForm,
@@ -93,14 +94,26 @@ function DossiersPage() {
   const refError = searchRefNumber.length > 0 && !isValidRefNumber(searchRefNumber);
   const isAllowed = user?.role ? (ALLOWED_ROLES as readonly string[]).includes(user.role) : false;
 
+  /* ── Données API ── */
+  const { data: rawDossiers, loading: dossiersLoading } = useApi(
+    () => apiGetDossiers(),
+    []
+  );
+  const { data: rawBureauxRepr } = useApi(apiGetBureauxRepresentation);
+  const { data: rawAlertes } = useApi(apiGetAlertes);
+
+  type BureauRepr = { id: number; code: string; denomination: string };
+  const allDossiers = (rawDossiers as Dossier[] ?? []);
+  const bureauxRepr = (rawBureauxRepr as BureauRepr[] ?? []);
+  const alertes = (rawAlertes as Array<{type: string; reference?: string; code_bureau?: string}> ?? []);
+
   /* ── Filtrage des dossiers ── */
   const getFilteredDossiers = (): Dossier[] => {
-    let dossiers = [...DOSSIERS];
+    let dossiers = [...allDossiers];
 
     // Filtrage provincial pour le Directeur Provincial
-    if (user?.role === "directeur_provincial") {
-      const userProvince = "NORD-KIVU"; // En prod : user.province
-      dossiers = dossiers.filter((d) => d.province === userProvince);
+    if (user?.role === "directeur_provincial" && user?.province) {
+      dossiers = dossiers.filter((d) => d.province === user.province);
     }
 
     // Filtrage par référence complète (RD-XXXX)
@@ -136,21 +149,13 @@ function DossiersPage() {
       toast.error("Entrez un numéro valide (1 à 4 chiffres) après RD-");
       return;
     }
-    setIsLoading(true);
+    setIsLoading(false);
+    setActiveReference(searchRefNumber.trim() ? `RD-${searchRefNumber.trim()}` : "");
+    setActiveDra(searchDra.trim());
+    setActiveBureau(searchBureau);
+    setActiveStartDate(startDate);
+    setActiveEndDate(endDate);
     setHasSearched(true);
-
-    // Construire la référence complète RD-XXXX
-    const fullRef = searchRefNumber.trim() ? `RD-${searchRefNumber.trim()}` : "";
-
-    // Simuler un état de chargement (en prod : appel API)
-    setTimeout(() => {
-      setActiveReference(fullRef);
-      setActiveDra(searchDra.trim());
-      setActiveBureau(searchBureau);
-      setActiveStartDate(startDate);
-      setActiveEndDate(endDate);
-      setIsLoading(false);
-    }, 600);
   };
 
   const handleReset = () => {
@@ -251,8 +256,8 @@ function DossiersPage() {
       key: "status",
       header: "Statut",
       render: (r) => {
-        const hasAlert = ALERTS.some(
-          (a) => a.title.includes(r.reference) || a.codeBureau === r.bureauRepr,
+        const hasAlert = alertes.some(
+          (a) => a.reference?.includes(r.reference) || a.code_bureau === r.bureauRepr,
         );
         return (
           <div className="flex items-center gap-2">
@@ -370,7 +375,7 @@ function DossiersPage() {
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             >
               <option value="">Tous les bureaux</option>
-              {BUREAUX_REPR.map((b) => (
+              {bureauxRepr.map((b) => (
                 <option key={b.id} value={b.denomination}>
                   {b.denomination}
                 </option>

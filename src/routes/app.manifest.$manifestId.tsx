@@ -4,7 +4,8 @@ import { ArrowLeft, Truck, Users, CheckCircle2, Clock, AlertCircle } from "lucid
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
-import { EMPTY_MANIFESTS, type EmptyManifest } from "@/lib/mock";
+import { useApi, apiGetEmptyManifests } from "@/lib/api";
+import type { EmptyManifest } from "@/lib/mock";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/app/manifest/$manifestId")({
@@ -16,7 +17,9 @@ function ManifestDetailPage() {
   const { manifestId } = useParams({ from: "/app/manifest/$manifestId" });
   const router = useRouter();
 
-  const manifest = EMPTY_MANIFESTS.find((m) => m.id === manifestId);
+  const { data: rawManifests } = useApi(apiGetEmptyManifests);
+  const manifests = (rawManifests as EmptyManifest[] ?? []);
+  const manifest = manifests.find((m) => String(m.id) === manifestId);
   const canSeeAmount = user?.role === "super_admin";
 
   if (!manifest) {

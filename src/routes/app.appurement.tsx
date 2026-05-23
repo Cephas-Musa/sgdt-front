@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 import { Search, Eye, CheckCircle2, XCircle, FileCheck, Filter } from "lucide-react";
-import { DOSSIERS, APUREMENT_SUBMISSIONS } from "@/lib/mock";
+import { useApi, apiGetDossiers, apiGetApurements } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
@@ -28,27 +28,36 @@ function ApurementPage() {
   const [filter, setFilter] = useState<"all" | "soumis" | "validé" | "rejeté">("all");
   const [searchRef, setSearchRef] = useState("");
 
-  const submissions = APUREMENT_SUBMISSIONS.filter((a) => {
+  const { data: rawApurements } = useApi(apiGetApurements);
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  type Apurement = { id: number|string; dossierRef?: string; dossier_ref?: string; importateur?: string; type?: string; refDouane?: string; ref_douane?: string; secretaireNom?: string; dateSoumission?: string; created_at?: string; status: string; dossierId?: number|string; dossier_id?: number|string };
+  type Dossier = { id: number|string; reference: string; importateur?: string; type?: string; date?: string; status: string; refDouane?: string };
+
+  const allApurements = (rawApurements as Apurement[] ?? []);
+  const allDossiers = (rawDossiers as Dossier[] ?? []);
+
+  const submissions = allApurements.filter((a) => {
+    const ref = a.dossierRef ?? a.dossier_ref ?? "";
     if (filter !== "all" && a.status !== filter) return false;
-    if (searchRef && !a.dossierRef.toLowerCase().includes(searchRef.toLowerCase())) return false;
+    if (searchRef && !ref.toLowerCase().includes(searchRef.toLowerCase())) return false;
     return true;
   });
 
-  const soumisCount = APUREMENT_SUBMISSIONS.filter((a) => a.status === "soumis").length;
-  const valideCount = APUREMENT_SUBMISSIONS.filter((a) => a.status === "validé").length;
-  const rejeteCount = APUREMENT_SUBMISSIONS.filter((a) => a.status === "rejeté").length;
+  const soumisCount = allApurements.filter((a) => a.status === "soumis").length;
+  const valideCount = allApurements.filter((a) => a.status === "validé").length;
+  const rejeteCount = allApurements.filter((a) => a.status === "rejeté").length;
 
   /* Apurement search (secrétaire) */
   const [secSearchRef, setSecSearchRef] = useState("");
   const [secSearchYear, setSecSearchYear] = useState("");
-  const [foundDossier, setFoundDossier] = useState<(typeof DOSSIERS)[0] | null>(null);
+  const [foundDossier, setFoundDossier] = useState<Dossier | null>(null);
   const [showApurForm, setShowApurForm] = useState(false);
   const [apurE, setApurE] = useState("");
   const [apurNumero, setApurNumero] = useState("");
   const [apurDate, setApurDate] = useState("");
 
   const handleSecSearch = () => {
-    const found = DOSSIERS.find((d) =>
+    const found = allDossiers.find((d) =>
       d.reference.toLowerCase().includes(secSearchRef.toLowerCase()),
     );
     if (!found) {
@@ -141,12 +150,12 @@ function ApurementPage() {
                     key={ap.id}
                     className="border-t border-border hover:bg-muted/30 transition-colors"
                   >
-                    <td className="px-3 py-2 font-mono text-xs font-medium">{ap.dossierRef}</td>
+                    <td className="px-3 py-2 font-mono text-xs font-medium">{ap.dossierRef ?? ap.dossier_ref}</td>
                     <td className="px-3 py-2">{ap.importateur}</td>
                     <td className="px-3 py-2 capitalize">{ap.type}</td>
-                    <td className="px-3 py-2 font-mono text-xs">{ap.refDouane}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{ap.refDouane ?? ap.ref_douane}</td>
                     <td className="px-3 py-2">{ap.secretaireNom}</td>
-                    <td className="px-3 py-2 text-xs">{ap.dateSoumission}</td>
+                    <td className="px-3 py-2 text-xs">{ap.dateSoumission ?? ap.created_at?.split("T")[0]}</td>
                     <td className="px-3 py-2">
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs ${statusColor(ap.status)}`}
@@ -350,12 +359,12 @@ function ApurementPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {APUREMENT_SUBMISSIONS.map((ap) => (
+                  {allApurements.map((ap) => (
                     <tr key={ap.id} className="border-t border-border hover:bg-muted/30">
-                      <td className="px-3 py-2 font-mono text-xs">{ap.dossierRef}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{ap.dossierRef ?? ap.dossier_ref}</td>
                       <td className="px-3 py-2">{ap.importateur}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{ap.refDouane}</td>
-                      <td className="px-3 py-2 text-xs">{ap.dateSoumission}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{ap.refDouane ?? ap.ref_douane}</td>
+                      <td className="px-3 py-2 text-xs">{ap.dateSoumission ?? ap.created_at?.split("T")[0]}</td>
                       <td className="px-3 py-2">
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs ${statusColor(ap.status)}`}
@@ -389,7 +398,7 @@ function ApurementPage() {
                 </tr>
               </thead>
               <tbody>
-                {DOSSIERS.filter((d) => d.status === "apure")
+                {allDossiers.filter((d) => d.status === "apure")
                   .slice(0, 12)
                   .map((d) => (
                     <tr key={d.id} className="border-t border-border hover:bg-muted/30">

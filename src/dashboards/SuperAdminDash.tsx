@@ -28,22 +28,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 import { PartnerFormDialog } from "@/components/PartnerFormDialog";
 import {
-  TYPES_DOSSIERS,
-  PARTENAIRES,
-  ACCOUNTS,
-  BUREAUX_DOUANIERS,
-  DOSSIERS,
-  EMPTY_MANIFESTS,
   calcPartenaireStats,
   type TypeDossier,
   type ChefBarriereOuganda,
   type ChefBarriereCommission,
   type EmptyManifestBatchBilling,
-  EMPTY_MANIFEST_BATCH_BILLINGS,
-  CHEF_BARRIERE_OUGANDA,
-  TYPES_DOSSIERS as TYPES,
-  DIRECTIONS_PROVINCIALES,
 } from "@/lib/mock";
+import { 
+  useApi, 
+  apiGetUsers, 
+  apiGetBureauxDouaniers, 
+  apiGetDossiers, 
+  apiGetEmptyManifests, 
+  apiGetProvincialDirections, 
+  apiRechargeWallet,
+  apiCreateProvincialDirection,
+  apiDeleteProvincialDirection,
+  apiCreateBureauDouanier,
+  apiDeleteBureauDouanier
+} from "@/lib/api";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 import { getCreatableRoles } from "@/lib/hierarchy";
 import { Link } from "@tanstack/react-router";
@@ -64,8 +67,54 @@ export default function SuperAdminDash() {
   const [activeTab, setActiveTab] = useState("types");
   const [isBureauDialogOpen, setIsBureauDialogOpen] = useState(false);
   const [selectedProvince, setSelectedProvince] = useState("");
+  const [newBureau, setNewBureau] = useState({ code: "", denomination: "", manifest_price: 25, icb: "" });
 
-  const [types, setTypes] = useState<TypeDossier[]>(TYPES_DOSSIERS);
+  const { data: rawUsers, refetch: refetchUsers } = useApi(apiGetUsers);
+  const ACCOUNTS = (rawUsers as any[]) ?? [];
+
+  // Wallet Recharge State
+  const [rechargeAmount, setRechargeAmount] = useState(0);
+  const [rechargeUser, setRechargeUser] = useState("");
+  const [isRecharging, setIsRecharging] = useState(false);
+
+  const handleRecharge = async () => {
+    if (!rechargeUser || rechargeAmount <= 0) {
+      toast.error("Veuillez sélectionner un compte et un montant valide.");
+      return;
+    }
+    setIsRecharging(true);
+    try {
+      await apiRechargeWallet({
+        user_id: parseInt(rechargeUser),
+        amount: rechargeAmount,
+        description: "Recharge pour test système"
+      });
+      toast.success("Portefeuille rechargé avec succès !");
+      setRechargeAmount(0);
+      setRechargeUser("");
+      refetchUsers(); // Refresh the users to see new balance
+    } catch (e: any) {
+      toast.error(e.message || "Erreur lors de la recharge");
+    } finally {
+      setIsRecharging(false);
+    }
+  };
+
+  const { data: rawBureaux, refetch: refetchBureaux } = useApi(apiGetBureauxDouaniers);
+  const BUREAUX_DOUANIERS = (rawBureaux as any[]) ?? [];
+
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const DOSSIERS = (rawDossiers as any[]) ?? [];
+
+  const { data: rawManifests } = useApi(apiGetEmptyManifests);
+  const EMPTY_MANIFESTS = (rawManifests as any[]) ?? [];
+
+  const { data: rawDirections, refetch: refetchDirections } = useApi(apiGetProvincialDirections);
+  const DIRECTIONS_PROVINCIALES = (rawDirections as any[]) ?? [];
+
+  const PARTENAIRES: any[] = [];
+
+  const [types, setTypes] = useState<TypeDossier[]>([]);
   const [newType, setNewType] = useState({
     code: "",
     libelle: "",
@@ -87,19 +136,17 @@ export default function SuperAdminDash() {
   const resetNewType = () =>
     setNewType({ code: "", libelle: "", tarif: 50, devise: "USD", actif: true });
 
-  const [chefBarriere, setChefBarriere] = useState<ChefBarriereOuganda>(CHEF_BARRIERE_OUGANDA);
+  const [chefBarriere, setChefBarriere] = useState<ChefBarriereOuganda>({ commissions: [] } as unknown as ChefBarriereOuganda);
   const [newCommission, setNewCommission] = useState({
     typeDossierId: "",
     typeCommission: "pourcentage" as const,
     valeurCommission: 0,
   });
 
-  const [batches, setBatches] = useState<EmptyManifestBatchBilling[]>(
-    EMPTY_MANIFEST_BATCH_BILLINGS,
-  );
-  const [directions, setDirections] = useState(DIRECTIONS_PROVINCIALES);
+  const [batches, setBatches] = useState<EmptyManifestBatchBilling[]>([]);
+  const [directions, setDirections] = useState<any[]>(DIRECTIONS_PROVINCIALES);
   const [newDirection, setNewDirection] = useState({ denomination: "", directeur: "" });
-  const [bureaux, setBureaux] = useState(BUREAUX_DOUANIERS);
+  const [bureaux, setBureaux] = useState<any[]>(BUREAUX_DOUANIERS);
 
   const addCommissionToChef = () => {
     if (!newCommission.typeDossierId) {
@@ -302,6 +349,7 @@ export default function SuperAdminDash() {
             <TabsTrigger value="directions">Directions Provinciales</TabsTrigger>
             <TabsTrigger value="facturation">Empty Manifest</TabsTrigger>
             <TabsTrigger value="revenus">Revenus</TabsTrigger>
+            <TabsTrigger value="finance">Finance & Recharge</TabsTrigger>
           </TabsList>
 
           {/* === TYPES DE DOSSIERS === */}
@@ -934,7 +982,20 @@ export default function SuperAdminDash() {
                     </Button>
                   }
                   title="Créer une direction provinciale"
-                  onSubmit={() => toast.success("Direction créée")}
+                  onSubmit={async () => {
+                    try {
+                      await apiCreateProvincialDirection({
+                        id: "dp-" + Date.now(),
+                        denomination: newDirection.denomination,
+                        directeur: newDirection.directeur,
+                      });
+                      toast.success("Direction créée");
+                      setNewDirection({ denomination: "", directeur: "" });
+                      refetchDirections();
+                    } catch (e: any) {
+                      toast.error("Erreur lors de la création");
+                    }
+                  }}
                 >
                   <FormGrid>
                     <Field label="Dénomination (Province)" required>
@@ -987,6 +1048,22 @@ export default function SuperAdminDash() {
                               }}
                             >
                               + Bureau
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={async () => {
+                                try {
+                                  await apiDeleteProvincialDirection(d.id);
+                                  toast.success("Direction supprimée");
+                                  refetchDirections();
+                                } catch (e) {
+                                  toast.error("Erreur de suppression");
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                             <Button size="sm" variant="ghost">
                               <Edit className="h-3.5 w-3.5" />
@@ -1167,6 +1244,51 @@ export default function SuperAdminDash() {
               </div>
             </Panel>
           </TabsContent>
+
+          {/* === FINANCE & RECHARGE === */}
+          <TabsContent value="finance" className="mt-4">
+            <Panel title="Recharger un Portefeuille Utilisateur">
+              <div className="p-4 bg-muted/10 rounded-xl border space-y-4 max-w-lg">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Cette section vous permet d'ajouter des fonds virtuels au portefeuille d'un inspecteur ou autre agent pour les tests du système.
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Sélectionner l'inspecteur</label>
+                    <Select value={rechargeUser} onValueChange={setRechargeUser}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choisir un inspecteur" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ACCOUNTS.filter(acc => acc.role === 'inspecteur_chef').map(acc => (
+                          <SelectItem key={acc.id} value={String(acc.id)}>
+                            {acc.fullName} ({acc.bureau || 'Aucun bureau'}) - {acc.wallet_balance || 0}$
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Montant ($)</label>
+                    <Input 
+                      type="number" 
+                      min="1" 
+                      value={rechargeAmount || ""} 
+                      onChange={(e) => setRechargeAmount(Number(e.target.value))} 
+                      placeholder="Ex: 500" 
+                    />
+                  </div>
+                  <Button 
+                    className="w-full mt-2" 
+                    onClick={handleRecharge}
+                    disabled={isRecharging || !rechargeUser || rechargeAmount <= 0}
+                  >
+                    {isRecharging ? "En cours..." : "Recharger le portefeuille"}
+                  </Button>
+                </div>
+              </div>
+            </Panel>
+          </TabsContent>
         </Tabs>
       </div>
       <FormDialog
@@ -1175,24 +1297,58 @@ export default function SuperAdminDash() {
           setIsBureauDialogOpen(open);
           if (!open) setSelectedProvince("");
         }}
-        title="Créer un bureau"
-        onSubmit={() => {
-          toast.success("Bureau créé");
-          setIsBureauDialogOpen(false);
+        title="Créer un bureau douanier"
+        onSubmit={async () => {
+          if (!selectedProvince) {
+            toast.error("Veuillez sélectionner une province");
+            return;
+          }
+          try {
+            await apiCreateBureauDouanier({
+              id: "bd-" + Date.now(),
+              code: newBureau.code,
+              denomination: newBureau.denomination,
+              manifest_price: newBureau.manifest_price,
+              icb: newBureau.icb,
+              province: selectedProvince
+            });
+            toast.success("Bureau créé");
+            setNewBureau({ code: "", denomination: "", manifest_price: 25, icb: "" });
+            setIsBureauDialogOpen(false);
+            refetchBureaux();
+          } catch (e: any) {
+            toast.error("Erreur lors de la création");
+          }
         }}
       >
         <FormGrid>
           <Field label="Code" required>
-            <Input />
+            <Input 
+              value={newBureau.code} 
+              onChange={e => setNewBureau(p => ({ ...p, code: e.target.value }))} 
+              placeholder="ex: 617B" 
+            />
           </Field>
           <Field label="Dénomination" required>
-            <Input />
+            <Input 
+              value={newBureau.denomination} 
+              onChange={e => setNewBureau(p => ({ ...p, denomination: e.target.value }))} 
+              placeholder="ex: KASINDI" 
+            />
           </Field>
           <Field label="Prix Empty Manifest ($)" required>
-            <Input type="number" defaultValue={25} />
+            <Input 
+              type="number" 
+              value={newBureau.manifest_price} 
+              onChange={e => setNewBureau(p => ({ ...p, manifest_price: Number(e.target.value) }))} 
+            />
           </Field>
-          <Field label="ICB">
-            <Input />
+          <Field label="ICB (Facultatif)">
+            <Input 
+              value={newBureau.icb} 
+              onChange={e => setNewBureau(p => ({ ...p, icb: e.target.value }))} 
+              placeholder="ex: ICB Nord-Kivu" 
+            />
           </Field>
           <Field label="Province">
             <Select value={selectedProvince} onValueChange={setSelectedProvince}>

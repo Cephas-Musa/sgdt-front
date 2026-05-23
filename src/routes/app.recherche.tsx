@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
 import { useI18n } from "@/lib/i18n";
-import { DOSSIERS } from "@/lib/mock";
+import { useApi, apiGetDossiers } from "@/lib/api";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Search, History, Star, TrendingUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,9 @@ function RecherchePage() {
   const { t } = useI18n();
   const { user } = useAuth();
   const isDP = user?.role === "directeur_provincial";
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  type Dossier = { id: number|string; reference: string; importateur?: string; type?: string; date?: string; status: string; bureauRepr?: string };
+  const dossiers = (rawDossiers as Dossier[] ?? []);
   const [query, setQuery] = useState("");
 
   return (
@@ -103,7 +106,7 @@ function RecherchePage() {
               </div>
               <div className="rounded-2xl border bg-card overflow-hidden shadow-sm">
                  <DataTable
-                    data={DOSSIERS.slice(0, 5)}
+                    data={dossiers.slice(0, 5)}
                     columns={[
                        { key: "reference", header: "RÉFÉRENCE", render: (r) => <span className="font-mono font-bold text-accent">{r.reference}</span> },
                        { key: "importateur", header: "IMPORTATEUR", render: (r) => <span className="font-medium">{r.importateur}</span> },
@@ -132,7 +135,7 @@ function RecherchePage() {
             </div>
           </div>
           <DataTable
-            data={DOSSIERS.filter((d) => d.status === "verifie" || d.status === "apure")}
+            data={dossiers.filter((d) => d.status === "verifie" || d.status === "apure")}
             columns={[
               { key: "reference", header: t("common.reference") },
               { key: "importateur", header: t("dossier.importateur") },
