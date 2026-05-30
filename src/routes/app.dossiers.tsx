@@ -19,7 +19,7 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { useApi, apiGetDossiers, apiGetBureauxRepresentation, apiGetAlertes, type ApiError } from "@/lib/api";
+import { useApi, apiGetDossiers, apiGetBureauxRepresentation, apiGetAlertes, apiGetTypesDossiers, type ApiError } from "@/lib/api";
 import type { Dossier, DossierStatus, DossierType } from "@/lib/mock";
 import { toast } from "sonner";
 import {
@@ -105,7 +105,7 @@ function DossiersPage() {
   type BureauRepr = { id: number; code: string; denomination: string };
   const allDossiers = (rawDossiers as Dossier[] ?? []);
   const bureauxRepr = (rawBureauxRepr as BureauRepr[] ?? []);
-  const alertes = (rawAlertes as Array<{type: string; reference?: string; code_bureau?: string}> ?? []);
+  const alertes = (rawAlertes as Array<{ type: string; reference?: string; code_bureau?: string }> ?? []);
 
   /* ── Filtrage des dossiers ── */
   const getFilteredDossiers = (): Dossier[] => {
@@ -199,6 +199,11 @@ function DossiersPage() {
   /* ── Vue dédiée : Chef Bureau Représentation ── */
   if (user?.role === "chef_bureau_repr") {
     return <ChefReprDossiersView />;
+  }
+
+  /* ── Vue dédiée : Inspecteur ── */
+  if (user?.role === "inspecteur_chef" || user?.role === "inspecteur") {
+    return <InspecteurDossiersView />;
   }
 
   /* ── Colonnes du tableau ── */
@@ -298,30 +303,7 @@ function DossiersPage() {
         description={user?.role === 'directeur_provincial' ? "Supervision provinciale des dossiers douaniers." : "Consultation, recherche et suivi des dossiers douaniers."}
       />
 
-      {/* ── CRÉATION DE DOSSIERS (Inspecteur uniquement) ── */}
-      {user?.role === "inspecteur_chef" && (
-        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10">
-              <FileText className="h-4 w-4 text-accent" />
-            </div>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground/80">
-              Créer un nouveau dossier
-            </h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <DirectForm />
-            <TransbordementForm />
-            <VracForm />
-            <LotForm />
-            <PetrolierForm />
-            <DechargementForm />
-            <TraficForm />
-            <ExportForm />
-            <AutresForm />
-          </div>
-        </div>
-      )}
+      {/* Les dossiers de l'inspecteur sont gérés par la vue InspecteurDossiersView */}
 
       {/* ── SECTION RECHERCHE / FILTRES PROVINCIAUX ── */}
       <div className="rounded-xl border border-border bg-gradient-to-br from-card via-card to-accent/[0.03] p-6 shadow-sm">
@@ -587,7 +569,7 @@ function SecretaireDossiersView() {
                 type="text"
                 inputMode="numeric"
                 value={searchRD.replace(/^RD-/i, "")}
-                onChange={(e) => setSearchRD(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                onChange={(e) => setSearchRD("RD-" + e.target.value.replace(/\D/g, "").slice(0, 4))}
                 placeholder="0001"
                 className="h-9 w-32 flex-1 rounded-r-md bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/50"
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -754,9 +736,9 @@ function ChefReprDossiersView() {
 
   return (
     <div className="h-full flex flex-col gap-4 overflow-hidden animate-in fade-in duration-500 max-w-[1400px] mx-auto w-full">
-      <PageHeader 
-        title="Gestion des Dossiers (Bureau)" 
-        description="Supervision, alertes et consultation des dossiers douaniers." 
+      <PageHeader
+        title="Gestion des Dossiers (Bureau)"
+        description="Supervision, alertes et consultation des dossiers douaniers."
       />
 
       <div className="flex flex-wrap gap-3 items-end bg-card/50 p-4 rounded-xl border shrink-0">
@@ -764,9 +746,9 @@ function ChefReprDossiersView() {
           <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">Recherche par dossier</label>
           <div className="flex items-center rounded-lg border bg-background h-9 focus-within:ring-2 focus-within:ring-accent/20">
             <Search className="ml-2.5 h-3.5 w-3.5 text-muted-foreground" />
-            <input 
-              className="flex-1 bg-transparent px-2 text-xs outline-none" 
-              placeholder="RD-..." 
+            <input
+              className="flex-1 bg-transparent px-2 text-xs outline-none"
+              placeholder="RD-..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
@@ -774,14 +756,14 @@ function ChefReprDossiersView() {
         </div>
         <div className="w-36">
           <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">Date Début</label>
-          <input type="date" className="w-full h-9 rounded-lg border bg-background px-2 text-xs" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
+          <input type="date" className="w-full h-9 rounded-lg border bg-background px-2 text-xs" value={dateRange.start} onChange={e => setDateRange({ ...dateRange, start: e.target.value })} />
         </div>
         <div className="w-36">
           <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">Date Fin</label>
-          <input type="date" className="w-full h-9 rounded-lg border bg-background px-2 text-xs" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
+          <input type="date" className="w-full h-9 rounded-lg border bg-background px-2 text-xs" value={dateRange.end} onChange={e => setDateRange({ ...dateRange, end: e.target.value })} />
         </div>
         <Button size="sm" className="h-9 px-4 font-black uppercase tracking-widest text-[10px]" onClick={() => { setHasSearched(true); toast.success("Filtres appliqués"); }}>Rechercher</Button>
-        {hasSearched && <Button variant="ghost" size="sm" className="h-9 px-4 text-[10px]" onClick={() => { setSearchTerm(""); setDateRange({start: "", end: ""}); setHasSearched(false); }}>Reset</Button>}
+        {hasSearched && <Button variant="ghost" size="sm" className="h-9 px-4 text-[10px]" onClick={() => { setSearchTerm(""); setDateRange({ start: "", end: "" }); setHasSearched(false); }}>Reset</Button>}
       </div>
 
       <div className="flex-1 min-h-0 bg-card rounded-xl border overflow-hidden shadow-sm">
@@ -835,8 +817,8 @@ function ChefReprDossiersView() {
                                   <td className="py-2 text-right font-black text-success">{art.fob?.toLocaleString()}</td>
                                 </tr>
                               )) || (
-                                <tr><td colSpan={4} className="py-8 text-center text-muted-foreground italic">Aucun article listé</td></tr>
-                              )}
+                                  <tr><td colSpan={4} className="py-8 text-center text-muted-foreground italic">Aucun article listé</td></tr>
+                                )}
                             </tbody>
                           </table>
                         </div>
@@ -856,11 +838,129 @@ function ChefReprDossiersView() {
                     </div>
                   </td>
                   <td className="py-3 px-3">
-                     {i % 7 === 0 ? (
-                       <Badge variant="destructive" className="text-[8px] font-black uppercase py-0 px-2 animate-pulse">Alerte</Badge>
-                     ) : (
-                       <Badge variant="outline" className="text-[8px] font-black uppercase py-0 px-2 text-success border-success/30">Normal</Badge>
-                     )}
+                    {i % 7 === 0 ? (
+                      <Badge variant="destructive" className="text-[8px] font-black uppercase py-0 px-2 animate-pulse">Alerte</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[8px] font-black uppercase py-0 px-2 text-success border-success/30">Normal</Badge>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InspecteurDossiersView() {
+  const { data: rawDossiers, reload } = useApi(apiGetDossiers);
+  const { data: rawTypesDossiers } = useApi(apiGetTypesDossiers);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { t } = useI18n();
+
+  const [searchRef, setSearchRef] = useState("");
+  const [searchDra, setSearchDra] = useState("");
+  const [searchT1, setSearchT1] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("tous");
+
+  const allDossiers = (rawDossiers || []) as Dossier[];
+  const typesDossiers = (rawTypesDossiers || []) as any[];
+
+  // Le backend filtre déjà selon les accès (DossierAccessService)
+  const inspecteurDossiers = allDossiers;
+
+  const getFilteredDossiers = () => {
+    let filtered = [...inspecteurDossiers];
+    if (searchRef) filtered = filtered.filter((d) => d.reference.toLowerCase().includes(searchRef.toLowerCase()));
+    if (searchDra) filtered = filtered.filter((d) => d.dra?.toLowerCase().includes(searchDra.toLowerCase()));
+    if (searchT1) filtered = filtered.filter((d) => d.t1?.toLowerCase().includes(searchT1.toLowerCase()));
+    if (startDate) filtered = filtered.filter((d) => (d.date ?? d.created_at) >= startDate);
+    if (endDate) filtered = filtered.filter((d) => (d.date ?? d.created_at) <= endDate);
+    if (filterStatus !== "tous") filtered = filtered.filter((d) => d.status === filterStatus);
+    return filtered;
+  };
+
+  const filteredDossiers = getFilteredDossiers();
+
+  const handleSearch = () => {
+    setHasSearched(true);
+    toast.success(filteredDossiers.length + " dossier(s) trouvé(s).");
+  };
+  const handleReset = () => { setSearchRef(""); setSearchDra(""); setSearchT1(""); setStartDate(""); setEndDate(""); setFilterStatus("tous"); setHasSearched(false); };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Mes Dossiers" description="Création, suivi et appurement final de vos dossiers douaniers." />
+
+      <div className="space-y-6">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10">
+              <FileText className="h-4 w-4 text-accent" />
+            </div>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground/80">Créer un nouveau dossier</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {typesDossiers.length > 0 ? (
+              typesDossiers.map(t => {
+                const formMap: Record<string, React.FC<any>> = {
+                  direct: DirectForm,
+                  dir: DirectForm,
+                  transbordement: TransbordementForm,
+                  trans: TransbordementForm,
+                  vrac: VracForm,
+                  lot: LotForm,
+                  petrolier: PetrolierForm,
+                  petro: PetrolierForm,
+                  dechargement: DechargementForm,
+                  decharge: DechargementForm,
+                  trafic: TraficForm,
+                  export: ExportForm,
+                  autres: AutresForm,
+                };
+                const code = t.code?.toLowerCase() || "";
+                const libelle = t.libelle?.toLowerCase() || "";
+                const FormComponent = formMap[code] || formMap[libelle] || formMap["autres"] || AutresForm;
+                return <FormComponent key={t.id} type={t} onSuccess={() => { reload(); toast.success("Dossier créé avec succès !"); }} />;
+              })
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Aucun type de dossier n'a été créé par l'administrateur.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-gradient-to-br from-card via-card to-accent/[0.03] p-6 shadow-sm">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+            <div className="xl:col-span-1"><label className="text-xs text-muted-foreground">Réf. dossier</label><Input value={searchRef} onChange={e => setSearchRef(e.target.value)} placeholder="DR-XXXX" className="h-9 mt-1.5" /></div>
+            <div className="xl:col-span-1"><label className="text-xs text-muted-foreground">Référence E-</label><Input value={searchDra} onChange={e => setSearchDra(e.target.value)} placeholder="E-XXXX" className="h-9 mt-1.5" /></div>
+            <div className="xl:col-span-1"><label className="text-xs text-muted-foreground">T1</label><Input value={searchT1} onChange={e => setSearchT1(e.target.value)} placeholder="T1" className="h-9 mt-1.5" /></div>
+            <div className="xl:col-span-1"><label className="text-xs text-muted-foreground">Date Début</label><Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-9 mt-1.5" /></div>
+            <div className="xl:col-span-1"><label className="text-xs text-muted-foreground">Date Fin</label><Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-9 mt-1.5" /></div>
+            <div className="xl:col-span-1"><label className="text-xs text-muted-foreground">Statut</label><select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="flex h-9 w-full mt-1.5 rounded-md border border-input bg-background px-3 text-sm"><option value="tous">Tous</option><option value="brouillon">Brouillon</option><option value="complet">Complet</option><option value="appure">Appuré</option></select></div>
+            <div className="flex items-end gap-2 xl:col-span-1"><Button onClick={handleSearch} className="w-full h-9 bg-accent font-bold">Chercher</Button></div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-left text-[10px] font-bold uppercase text-muted-foreground">
+              <tr><th className="px-4 py-4">N°</th><th className="px-4 py-4">Importateur</th><th className="px-4 py-4">Référence</th><th className="px-4 py-4">Statut</th><th className="px-4 py-4 text-right">Action</th></tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filteredDossiers.map((d, i) => (
+                <tr key={d.id} className="hover:bg-muted/30">
+                  <td className="px-4 py-3 text-xs">{i + 1}</td>
+                  <td className="px-4 py-3 font-medium">{d.importateur}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{d.reference}</td>
+                  <td className="px-4 py-3"><StatusBadge status={d.status} /></td>
+                  <td className="px-4 py-3 text-right">
+                    <Button size="sm" variant="outline" className="h-8 border-accent text-accent hover:bg-accent hover:text-white" onClick={() => navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: d.id } })}>Ouvrir</Button>
                   </td>
                 </tr>
               ))}

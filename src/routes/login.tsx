@@ -167,13 +167,14 @@ function LoginPage() {
                     id="phone"
                     type="tel"
                     inputMode="numeric"
+                    maxLength={9}
                     value={localNumber}
                     onChange={(e) => {
                       let val = e.target.value.replace(/\D/g, "");
                       if (val.startsWith("243") && val.length > 9) {
                         val = val.substring(3);
                       }
-                      setLocalNumber(val);
+                      setLocalNumber(val.slice(0, 9));
                     }}
                     placeholder="813478556"
                     className="pl-8 rounded-l-none"

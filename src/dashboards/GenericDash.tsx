@@ -1,18 +1,22 @@
 import { FolderKanban, Bell, Activity, Clock } from "lucide-react";
 import { DashHeader, StatCard, Panel } from "./_shared";
+import { useApi, apiGetDossiers } from "@/lib/api";
 import { DOSSIERS, ALERTS } from "@/lib/mock";
 import { StatusBadge } from "@/components/StatusBadge";
 
 export default function GenericDash() {
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const activeDossiers = rawDossiers as any[] || [];
+
   return (
     <div>
       <DashHeader />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={FolderKanban} label="Dossiers" value={DOSSIERS.length} />
+        <StatCard icon={FolderKanban} label="Dossiers" value={activeDossiers.length} />
         <StatCard
           icon={Clock}
           label="En traitement"
-          value={DOSSIERS.filter((d) => d.status === "en_cours").length}
+          value={activeDossiers.filter((d) => d.status === "en_cours").length}
         />
         <StatCard icon={Bell} label="Alertes" value={ALERTS.length} />
         <StatCard icon={Activity} label="Activité 24h" value={34} />
@@ -21,7 +25,7 @@ export default function GenericDash() {
         <div className="lg:col-span-2">
           <Panel title="Dossiers récents">
             <ul className="divide-y divide-border text-sm">
-              {DOSSIERS.slice(0, 6).map((d) => (
+              {activeDossiers.slice(0, 6).map((d) => (
                 <li key={d.id} className="flex items-center justify-between py-2">
                   <div className="min-w-0">
                     <div className="truncate font-medium">{d.reference}</div>

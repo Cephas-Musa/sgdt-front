@@ -18,9 +18,13 @@ import {
   BUREAUX_DOUANIERS, 
   ALERTS 
 } from "@/lib/mock";
+import { useApi, apiGetDossiers } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 
 export default function DirecteurProvincialDash() {
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const activeDossiers = rawDossiers as any[] || [];
+
   const bureaux = BUREAUX_DOUANIERS;
   const comptes = ACCOUNTS.filter(a => ["inspecteur_chef", "agent_controle", "chef_bureau_repr", "chef_barriere"].includes(a.role));
 
@@ -33,7 +37,7 @@ export default function DirecteurProvincialDash() {
         <StatCard 
           icon={FolderKanban} 
           label="Dossiers Provinciaux" 
-          value={DOSSIERS.length} 
+          value={activeDossiers.length} 
           hint="Volume total province"
         />
         <StatCard 

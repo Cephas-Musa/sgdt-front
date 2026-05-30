@@ -12,7 +12,7 @@ export default function ReceveurDash() {
   const [stampedManifests, setStampedManifests] = useState<Set<string>>(new Set());
 
   const filteredManifests = EMPTY_MANIFESTS.filter(
-    (m) => !search || m.reference.toLowerCase().includes(search.toLowerCase())
+    (m) => !search || (m.reference || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const handleStamp = (id: string) => {

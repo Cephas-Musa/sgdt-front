@@ -12,14 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('apurements', function (Blueprint $table) {
-            $table->id();
-            $table->string('dossier_id', 50)->unique();
-            $table->foreignId('secretaire_id')->constrained('users')->onDelete('cascade');
-            $table->string('ref_douane', 100);
-            $table->date('date_apurement');
+            $table->uuid('id')->primary();
+            $table->uuid('dossier_id')->index();
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->enum('type_appurement', ['administratif', 'verification', 'sortie', 'entrepot', 'final'])->default('administratif');
+            $table->string('ref_douane', 100)->nullable();
+            $table->date('date_apurement')->nullable();
             $table->timestamp('date_soumission')->useCurrent();
             $table->string('status', 50)->default('soumis'); // soumis, valide, rejete
+            $table->text('observation')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->foreign('dossier_id')->references('id')->on('dossiers')->onDelete('cascade');
         });

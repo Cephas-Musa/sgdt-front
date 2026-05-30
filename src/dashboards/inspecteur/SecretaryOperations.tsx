@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { useApi, apiGetDossiers } from "@/lib/api";
 import { Search, FileCheck, Car, Trash2, Plus, Info, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DOSSIERS } from "@/lib/mock";
+
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

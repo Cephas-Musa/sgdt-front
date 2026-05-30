@@ -17,11 +17,15 @@ import {
   calcPartenaireStats,
 } from "@/lib/mock";
 import type { PartenaireTransaction } from "@/lib/mock";
+import { useApi, apiGetDossiers } from "@/lib/api";
 
 // Simule le partenaire connecté (premier partenaire actif pour la démo)
 const CURRENT_PARTNER_ID = "p1";
 
 export default function PartenaireDash() {
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const activeDossiers = rawDossiers as any[] || [];
+
   const partenaire = PARTENAIRES.find((p) => p.id === CURRENT_PARTNER_ID);
   const stats = calcPartenaireStats(CURRENT_PARTNER_ID);
   const transactions = PARTENAIRE_TRANSACTIONS.filter((t) => t.partenaireId === CURRENT_PARTNER_ID);

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useApi } from "@/lib/api";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { 
   Plus, 
@@ -17,7 +18,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { LOCODES, PAYS, DEVISES, DOSSIERS, NOTIFICATIONS } from "@/lib/mock";
+import { 
+  apiGetLocodes, apiCreateLocode, apiUpdateLocode, apiDeleteLocode,
+  apiGetCountries, apiCreateCountry, apiUpdateCountry, apiDeleteCountry,
+  apiGetCurrencies, apiCreateCurrency, apiUpdateCurrency, apiDeleteCurrency,
+  apiGetDossiers
+} from "@/lib/api";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
@@ -28,10 +34,28 @@ export const Route = createFileRoute("/app/representation")({
 });
 
 function ReprPage() {
+
   const { user } = useAuth();
   const isChefRepr = user?.role === "chef_bureau_repr";
 
+  const [locodes, setLocodes] = useState<any[]>([]);
+  const [countries, setCountries] = useState<any[]>([]);
+  const [currencies, setCurrencies] = useState<any[]>([]);
+  const [dossiers, setDossiers] = useState<any[]>([]);
+  
+  const reloadData = async () => {
+    try {
+      const [loc, cty, cur, dos] = await Promise.all([
+        apiGetLocodes(), apiGetCountries(), apiGetCurrencies(), apiGetDossiers()
+      ]);
+      setLocodes(loc); setCountries(cty); setCurrencies(cur); setDossiers(dos as any[]);
+    } catch (e) {}
+  };
+  
+  useEffect(() => { reloadData(); }, []);
+
   // Search & Filter States
+
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
 
@@ -43,20 +67,24 @@ function ReprPage() {
   // Auto-fill logic for country codes
   useEffect(() => {
     if (newLocode.codePays) {
-      const found = PAYS.find(p => p.code.toUpperCase() === newLocode.codePays.toUpperCase());
+      const found = countries.find(p => p.code.toUpperCase() === newLocode.codePays.toUpperCase());
       setNewLocode(prev => ({ ...prev, denomination: found?.designation || "" }));
     }
   }, [newLocode.codePays]);
 
   useEffect(() => {
     if (newDevise.codePays) {
-      const found = PAYS.find(p => p.code.toUpperCase() === newDevise.codePays.toUpperCase());
+      const found = countries.find(p => p.code.toUpperCase() === newDevise.codePays.toUpperCase());
       setNewDevise(prev => ({ ...prev, denominationPays: found?.designation || "" }));
     }
   }, [newDevise.codePays]);
 
-  const filteredDossiers = DOSSIERS.filter(d => {
-    const matchesRef = d.reference.toLowerCase().includes(searchTerm.toLowerCase());
+  // Le backend filtre déjà les dossiers
+  const representationDossiers = dossiers;
+
+  const filteredDossiers = representationDossiers.filter(d => {
+    const draRef = d.representationEntry?.dra_reference || d.dra || "";
+    const matchesRef = draRef.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDate = (!dateRange.start || d.date >= dateRange.start) && (!dateRange.end || d.date <= dateRange.end);
     return matchesRef && matchesDate;
   });
@@ -86,25 +114,25 @@ function ReprPage() {
             <Coins className="h-4 w-4" />
             Devises
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2 text-[10px] font-black uppercase tracking-widest">
-            <Bell className="h-4 w-4" />
-            Notifications
-          </TabsTrigger>
         </TabsList>
 
         {/* --- TAB: DOSSIERS --- */}
         <TabsContent value="dossiers" className="flex-1 mt-4 min-h-0">
           <div className="flex flex-col h-full gap-4">
             <div className="flex flex-wrap gap-3 items-end bg-card/50 p-4 rounded-xl border shrink-0">
-              <div className="w-48">
-                <label className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground mb-1 block">Réf. Dossier</label>
-                <div className="flex items-center rounded-lg border bg-background h-9">
-                  <Search className="ml-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <div className="w-56">
+                <label className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground mb-1 block">Réf. DRA</label>
+                <div className="flex items-center overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring h-9">
+                  <span className="flex items-center px-3 h-full border-r border-input bg-muted/50 font-bold text-muted-foreground select-none">E-</span>
                   <input 
-                    className="flex-1 bg-transparent px-2 text-xs outline-none" 
-                    placeholder="RD-..." 
+                    className="flex-1 bg-transparent px-3 text-xs outline-none placeholder:text-muted-foreground/50 h-full" 
+                    placeholder="0001" 
+                    inputMode="numeric"
                     value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 9);
+                      setSearchTerm(val);
+                    }}
                   />
                 </div>
               </div>
@@ -149,29 +177,46 @@ function ReprPage() {
                           <div className="flex gap-1">
                             <FormDialog
                               trigger={<Button variant="ghost" size="sm" className="h-7 px-2 text-[9px] font-black uppercase text-accent">Afficher</Button>}
-                              title={`Consultation Dossier — ${d.reference}`}
+                              title={`Consultation Dossier — ${d.representationEntry?.dra_reference || d.dra || "E-0000"}`}
                             >
                               <div className="space-y-4">
                                 <div className="p-4 rounded-xl bg-accent/5 border border-accent/10 grid grid-cols-2 gap-4 mb-4">
-                                   <div><p className="text-[10px] uppercase font-black opacity-50">DRA</p><p className="font-bold">{d.dra || "E-2026"}</p></div>
-                                   <div><p className="text-[10px] uppercase font-black opacity-50">T1</p><p className="font-bold">{d.t1 || "T1-XXXX"}</p></div>
+                                   <div><p className="text-[10px] uppercase font-black opacity-50">DRA</p><p className="font-bold">{d.representationEntry?.dra_reference || "-"}</p></div>
+                                   <div><p className="text-[10px] uppercase font-black opacity-50">T1</p><p className="font-bold">{d.representationEntry?.t1_reference || "-"}</p></div>
                                 </div>
                                 <table className="w-full text-[11px]">
                                   <thead>
                                     <tr className="border-b text-[9px] uppercase font-black tracking-widest text-muted-foreground">
                                       <th className="py-2 text-left">Article</th>
-                                      <th className="py-2 text-right">Poids (kg)</th>
+                                      <th className="py-2 text-left">Position Tarifaire</th>
                                       <th className="py-2 text-right">Qté</th>
+                                      <th className="py-2 text-right">Poids (kg)</th>
                                       <th className="py-2 text-right">FOB ($)</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y">
-                                    <tr>
-                                      <td className="py-2 font-bold uppercase">Marchandises Diverses</td>
-                                      <td className="py-2 text-right font-mono">14,200</td>
-                                      <td className="py-2 text-right">1</td>
-                                      <td className="py-2 text-right font-black text-success">52,300.00</td>
-                                    </tr>
+                                    {(() => {
+                                      const allArticles = [
+                                        ...(d.articles || []),
+                                        ...(d.representation_entry?.articles || d.representationEntry?.articles || [])
+                                      ];
+                                      if (allArticles.length === 0) {
+                                        return (
+                                          <tr>
+                                            <td colSpan={5} className="py-4 text-center italic text-muted-foreground">Aucun article enregistré.</td>
+                                          </tr>
+                                        );
+                                      }
+                                      return allArticles.map((art: any, i: number) => (
+                                        <tr key={art.id || i}>
+                                          <td className="py-2 font-bold uppercase">{art.designation || "-"}</td>
+                                          <td className="py-2 font-mono text-accent">{art.position_tarifaire || art.position || "-"}</td>
+                                          <td className="py-2 text-right">{art.quantite || "-"}</td>
+                                          <td className="py-2 text-right font-mono">{art.poids || "-"}</td>
+                                          <td className="py-2 text-right font-black text-success">{art.fob ? Number(art.fob).toLocaleString() : "-"}</td>
+                                        </tr>
+                                      ));
+                                    })()}
                                   </tbody>
                                 </table>
                               </div>
@@ -215,7 +260,20 @@ function ReprPage() {
               <FormDialog
                 trigger={<Button size="sm" className="gap-2 bg-accent text-[10px] font-black uppercase h-9 px-4" onClick={() => { setEditingItem(null); setNewLocode({ code: "", designation: "", codePays: "", denomination: "" }); }}><Plus className="h-4 w-4" />Nouveau Locode</Button>}
                 title={editingItem ? "Editer Locode" : "Ajouter Locode"}
-                onSubmit={() => toast.success("Enregistré")}
+                onSubmit={async () => {
+                  try {
+                    if (editingItem) {
+                      await apiUpdateLocode(editingItem.id, newLocode);
+                      toast.success("Locode mis à jour");
+                    } else {
+                      await apiCreateLocode(newLocode);
+                      toast.success("Locode ajouté");
+                    }
+                    reloadData();
+                  } catch (e: any) {
+                    toast.error(e?.message || "Erreur lors de l'enregistrement");
+                  }
+                }}
               >
                 <FormGrid>
                   <Field label="Code Locode"><Input placeholder="UGKLA" value={newLocode.code} onChange={e => setNewLocode({...newLocode, code: e.target.value.toUpperCase()})} /></Field>
@@ -229,7 +287,7 @@ function ReprPage() {
             <Panel title="Liste des Locodes" className="flex-1 min-h-0">
               <div className="h-full overflow-y-auto">
                 <DataTable
-                  data={LOCODES}
+                  data={locodes}
                   columns={[
                     { key: "code", header: "Code", render: (r) => <span className="font-mono font-bold text-accent">{r.code}</span> },
                     { key: "designation", header: "Désignation" },
@@ -253,10 +311,28 @@ function ReprPage() {
                 <FormDialog
                   trigger={<Button size="sm" className="gap-2 h-9 text-[10px] font-black uppercase" onClick={() => setEditingItem(null)}><Plus className="h-4 w-4" />Nouveau Pays</Button>}
                   title={editingItem ? "Editer Pays" : "Enregistrer un pays"}
+                  onSubmit={async (fd?: Record<string, string>) => {
+                    try {
+                      const payload = {
+                        code: (fd?.code || editingItem?.code || "").toUpperCase(),
+                        designation: fd?.designation || editingItem?.designation || ""
+                      };
+                      if (editingItem) {
+                        await apiUpdateCountry(editingItem.id, payload);
+                        toast.success("Pays mis à jour");
+                      } else {
+                        await apiCreateCountry(payload);
+                        toast.success("Pays ajouté");
+                      }
+                      reloadData();
+                    } catch (e: any) {
+                      toast.error(e?.message || "Erreur");
+                    }
+                  }}
                 >
                    <FormGrid>
-                     <Field label="Code ISO 2"><Input placeholder="UG" defaultValue={editingItem?.code} /></Field>
-                     <Field label="Désignation"><Input placeholder="OUGANDA" defaultValue={editingItem?.designation} /></Field>
+                     <Field label="Code ISO 2"><Input name="code" placeholder="UG" defaultValue={editingItem?.code} /></Field>
+                     <Field label="Désignation"><Input name="designation" placeholder="OUGANDA" defaultValue={editingItem?.designation} /></Field>
                    </FormGrid>
                    <Button className="w-full h-11 mt-4 font-black uppercase text-[10px]">{editingItem ? "Mettre à jour" : "Ajouter"}</Button>
                 </FormDialog>
@@ -264,7 +340,7 @@ function ReprPage() {
              <Panel title="Liste des Pays" className="flex-1 min-h-0">
                 <div className="h-full overflow-y-auto">
                   <DataTable
-                    data={PAYS}
+                    data={countries}
                     columns={[
                       { key: "code", header: "ISO", render: (r) => <Badge variant="secondary" className="font-mono">{r.code}</Badge> },
                       { key: "designation", header: "Dénomination", render: (r) => <span className="font-bold">{r.designation}</span> },
@@ -287,6 +363,25 @@ function ReprPage() {
                 <FormDialog
                   trigger={<Button size="sm" className="gap-2 h-9 text-[10px] font-black uppercase" onClick={() => { setEditingItem(null); setNewDevise({ codePays: "", codeDevise: "", denominationPays: "", denominationDevise: "" }); }}><Plus className="h-4 w-4" />Nouvelle Devise</Button>}
                   title={editingItem ? "Editer Devise" : "Ajouter Devise"}
+                  onSubmit={async () => {
+                    try {
+                      const payload = {
+                        codePays: newDevise.codePays,
+                        codeDevise: newDevise.codeDevise,
+                        denomination: newDevise.denominationDevise
+                      };
+                      if (editingItem) {
+                        await apiUpdateCurrency(editingItem.id, payload);
+                        toast.success("Devise mise à jour");
+                      } else {
+                        await apiCreateCurrency(payload);
+                        toast.success("Devise ajoutée");
+                      }
+                      reloadData();
+                    } catch (e: any) {
+                      toast.error(e?.message || "Erreur");
+                    }
+                  }}
                 >
                   <FormGrid>
                     <Field label="Code Pays"><Input placeholder="UG" value={newDevise.codePays} onChange={e => setNewDevise({...newDevise, codePays: e.target.value.toUpperCase()})} /></Field>
@@ -300,7 +395,7 @@ function ReprPage() {
             <Panel title="Gestion des Devises" className="flex-1 min-h-0">
               <div className="h-full overflow-y-auto">
                 <DataTable
-                  data={DEVISES}
+                  data={currencies}
                   columns={[
                     { key: "codePays", header: "Pays", render: (r) => <Badge variant="outline">{r.codePays}</Badge> },
                     { key: "codeDevise", header: "Devise", render: (r) => <Badge className="bg-success/10 text-success border-success/30 font-black">{r.codeDevise}</Badge> },
@@ -311,28 +406,6 @@ function ReprPage() {
               </div>
             </Panel>
           </div>
-        </TabsContent>
-
-        {/* --- TAB: NOTIFICATIONS --- */}
-        <TabsContent value="notifications" className="flex-1 mt-4 min-h-0">
-          <Panel title="Notifications Bureau" actions={<Button variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase">Tout marquer lu</Button>}>
-             <div className="h-full overflow-y-auto space-y-2">
-                {NOTIFICATIONS.slice(0, 15).map(n => (
-                  <div key={n.id} className="p-3 rounded-xl border border-border/50 bg-muted/20 flex items-start gap-4 hover:bg-muted/40 transition-all">
-                     <div className="h-8 w-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
-                        <Bell className="h-4 w-4" />
-                     </div>
-                     <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start mb-1">
-                           <h5 className="text-[10px] font-black uppercase tracking-tight truncate">{n.title}</h5>
-                           <span className="text-[8px] font-mono text-muted-foreground">{n.time}</span>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground leading-relaxed">{n.description}</p>
-                     </div>
-                  </div>
-                ))}
-             </div>
-          </Panel>
         </TabsContent>
       </Tabs>
     </div>

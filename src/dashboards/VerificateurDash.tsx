@@ -5,25 +5,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { DOSSIERS, DOSSIERS_TRAITES } from "@/lib/mock";
+import { useApi, apiGetDossiers } from "@/lib/api";
+import { DOSSIERS_TRAITES } from "@/lib/mock";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 export default function VerificateurDash() {
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const activeDossiers = rawDossiers as any[] || [];
+
   const [searchRef, setSearchRef] = useState("");
   const [searchYear, setSearchYear] = useState("");
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
   const [searchDRA, setSearchDRA] = useState("");
 
-  const filtered = DOSSIERS.filter((d) => {
-    if (searchRef && !d.reference.toLowerCase().includes(searchRef.toLowerCase())) return false;
+  const filtered = activeDossiers.filter((d) => {
+    if (searchRef && !(d.reference || "").toLowerCase().includes(searchRef.toLowerCase())) return false;
     if (searchYear && !d.date.startsWith(searchYear)) return false;
     return true;
   });
 
-  const filteredRepr = DOSSIERS.filter((d) => {
-    if (searchDRA && !d.dra.toLowerCase().includes(searchDRA.toLowerCase())) return false;
+  const filteredRepr = activeDossiers.filter((d) => {
+    if (searchDRA && !(d.dra || "").toLowerCase().includes(searchDRA.toLowerCase())) return false;
     if (dateDebut && d.date < dateDebut) return false;
     if (dateFin && d.date > dateFin) return false;
     return true;
@@ -35,17 +39,17 @@ export default function VerificateurDash() {
     <div>
       <DashHeader subtitle="Vérificateur — recherche dossiers, appurement, rapports" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={FolderKanban} label="Dossiers" value={DOSSIERS.length} />
+        <StatCard icon={FolderKanban} label="Dossiers" value={activeDossiers.length} />
         <StatCard icon={FileCheck} label="Dossiers traités" value={traites.length} />
         <StatCard
           icon={Search}
           label="En vérification"
-          value={DOSSIERS.filter((d) => d.status === "en_cours").length}
+          value={activeDossiers.filter((d) => d.status === "en_cours").length}
         />
         <StatCard
           icon={FileText}
           label="Apurés"
-          value={DOSSIERS.filter((d) => d.status === "apure").length}
+          value={activeDossiers.filter((d) => d.status === "apure").length}
         />
       </div>
 

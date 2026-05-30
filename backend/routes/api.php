@@ -19,6 +19,7 @@ use App\Http\Controllers\VracController;
 use App\Http\Controllers\DenombrementController;
 use App\Http\Controllers\DechargeController;
 use App\Http\Controllers\MouvementStockageController;
+use App\Http\Controllers\PartenaireController;
 
 /*
 |--------------------------------------------------------------------------
@@ -39,6 +40,9 @@ Route::prefix('config')->group(function () {
     Route::get('/provincial-directions', [ConfigurationController::class, 'getProvincialDirections']);
     Route::get('/locodes', [ConfigurationController::class, 'getLocodes']);
     Route::get('/warehouses', [ConfigurationController::class, 'getWarehouses']);
+    Route::get('/types-dossiers', [ConfigurationController::class, 'getTypesDossiers']);
+    Route::get('/entry-points', [ConfigurationController::class, 'getEntryPoints']);
+    Route::get('/exit-points', [ConfigurationController::class, 'getExitPoints']);
 });
 
 // Routes protégées par Sanctum (Authentification par jeton)
@@ -50,6 +54,19 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Gestion de la configuration (SuperAdmin)
     Route::prefix('config')->group(function () {
+        
+    Route::post('/countries', [ConfigurationController::class, 'storeCountry']);
+    Route::put('/countries/{id}', [ConfigurationController::class, 'updateCountry']);
+    Route::delete('/countries/{id}', [ConfigurationController::class, 'destroyCountry']);
+    
+    Route::post('/currencies', [ConfigurationController::class, 'storeCurrency']);
+    Route::put('/currencies/{id}', [ConfigurationController::class, 'updateCurrency']);
+    Route::delete('/currencies/{id}', [ConfigurationController::class, 'destroyCurrency']);
+    
+    Route::post('/locodes', [ConfigurationController::class, 'storeLocode']);
+    Route::put('/locodes/{id}', [ConfigurationController::class, 'updateLocode']);
+    Route::delete('/locodes/{id}', [ConfigurationController::class, 'destroyLocode']);
+
         Route::post('/customs-offices', [ConfigurationController::class, 'storeCustomsOffice']);
         Route::put('/customs-offices/{id}', [ConfigurationController::class, 'updateCustomsOffice']);
         Route::delete('/customs-offices/{id}', [ConfigurationController::class, 'destroyCustomsOffice']);
@@ -65,16 +82,49 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/warehouses', [ConfigurationController::class, 'storeWarehouse']);
         Route::put('/warehouses/{id}', [ConfigurationController::class, 'updateWarehouse']);
         Route::delete('/warehouses/{id}', [ConfigurationController::class, 'destroyWarehouse']);
+
+        Route::post('/types-dossiers', [ConfigurationController::class, 'storeTypeDossier']);
+        Route::put('/types-dossiers/{id}', [ConfigurationController::class, 'updateTypeDossier']);
+        Route::delete('/types-dossiers/{id}', [ConfigurationController::class, 'destroyTypeDossier']);
+
+        Route::get('/entry-points', [ConfigurationController::class, 'getEntryPoints']);
+        Route::post('/entry-points', [ConfigurationController::class, 'storeEntryPoint']);
+        Route::put('/entry-points/{id}', [ConfigurationController::class, 'updateEntryPoint']);
+        Route::delete('/entry-points/{id}', [ConfigurationController::class, 'destroyEntryPoint']);
+
+        Route::get('/exit-points', [ConfigurationController::class, 'getExitPoints']);
+        Route::post('/exit-points', [ConfigurationController::class, 'storeExitPoint']);
+        Route::put('/exit-points/{id}', [ConfigurationController::class, 'updateExitPoint']);
+        Route::delete('/exit-points/{id}', [ConfigurationController::class, 'destroyExitPoint']);
     });
 
     // Gestion des comptes utilisateurs (Admin uniquement)
     Route::apiResource('users', UserController::class)->only(['index', 'store', 'destroy']);
     Route::put('/users/{id}', [UserController::class, 'update']);
     Route::patch('/users/{id}/status', [UserController::class, 'updateStatus']);
+    Route::post('/users/{id}/topup', [UserController::class, 'topupWallet']);
+
+    // Gestion des partenaires
+    Route::apiResource('partenaires', PartenaireController::class);
 
     // Gestion des Dossiers de Transit
+    Route::get('/dossiers/search/{reference}', [DossierController::class, 'search']);
+    Route::get('/dossiers/history', [DossierController::class, 'history']);
+    Route::get('/dossiers/next-reference', [DossierController::class, 'nextReference']);
+    Route::get('/dossiers/{id}/details', [DossierController::class, 'details']);
     Route::apiResource('dossiers', DossierController::class);
     Route::patch('/dossiers/{id}/status', [DossierController::class, 'updateStatus']);
+    
+    // Actions spécifiques aux Dossiers (Workflows)
+    Route::post('/dossiers/{id}/infos', [\App\Http\Controllers\DossierActionController::class, 'updateInfos']);
+    Route::post('/dossiers/{id}/verification', [\App\Http\Controllers\DossierActionController::class, 'submitVerification']);
+    Route::post('/dossiers/{id}/anomaly', [\App\Http\Controllers\DossierActionController::class, 'flagAnomaly']);
+    Route::post('/dossiers/{id}/representation', [\App\Http\Controllers\DossierActionController::class, 'addRepresentationData']);
+    Route::post('/dossiers/{id}/barriere', [\App\Http\Controllers\DossierActionController::class, 'linkBarriereData']);
+
+    // Chat Contextuel par Dossier
+    Route::get('/dossiers/{id}/chat', [\App\Http\Controllers\DossierChatController::class, 'index']);
+    Route::post('/dossiers/{id}/chat', [\App\Http\Controllers\DossierChatController::class, 'store']);
 
     // Mouvements Brigadier (Entrées/Sorties, VRAC)
     Route::apiResource('mouvements', MouvementController::class)->only(['index', 'store', 'show']);
@@ -124,13 +174,19 @@ Route::middleware('auth:sanctum')->group(function () {
     // Entrepôts et stockage
     Route::prefix('warehouses')->group(function () {
         Route::get('/', [EntrepotController::class, 'index']);
+        Route::post('/', [EntrepotController::class, 'store']);
         Route::get('/{id}', [EntrepotController::class, 'show']);
+        Route::put('/{id}', [EntrepotController::class, 'update']);
+        Route::delete('/{id}', [EntrepotController::class, 'destroy']);
         Route::get('/{id}/movements', [EntrepotController::class, 'movements']);
         Route::post('/{id}/denumbrement', [EntrepotController::class, 'createDenumbrement']);
         Route::get('/{id}/deneumbrement', [EntrepotController::class, 'getDenumbrements']);
         Route::post('/{id}/decharge', [EntrepotController::class, 'createDecharge']);
         Route::patch('/{id}/decharge/{dechargeId}', [EntrepotController::class, 'updateDecharge']);
     });
+
+    // Upload de fichiers (protégé par auth)
+    Route::post('/upload', [\App\Http\Controllers\UploadController::class, 'store'])->middleware('auth:sanctum');
 
     // Barrières
     Route::prefix('barriers')->group(function () {
@@ -190,5 +246,31 @@ Route::middleware('auth:sanctum')->group(function () {
     // Transactions et Portefeuille
     Route::post('/wallet/recharge', [TransactionController::class, 'rechargeWallet']);
     Route::get('/transactions', [TransactionController::class, 'indexTransactions']);
+
+    // ─── Représentation — données complètes ───────────────────────────────────
+    Route::prefix('representation')->group(function () {
+        Route::get('/', [\App\Http\Controllers\RepresentationEntryController::class, 'index']);
+        Route::get('/stats', [\App\Http\Controllers\RepresentationEntryController::class, 'stats']);
+        Route::get('/dossier/{dossierId}', [\App\Http\Controllers\RepresentationEntryController::class, 'showByDossier']);
+        Route::post('/dossier/{dossierId}', [\App\Http\Controllers\RepresentationEntryController::class, 'store']);
+    });
+
+    // ─── Typing Docs (Barrière Étranger) ─────────────────────────────────────
+    Route::prefix('typing-docs')->group(function () {
+        Route::get('/stats', [\App\Http\Controllers\TypingDocController::class, 'getDashboardStats']);
+        Route::get('/dossier/{dossierId}', [\App\Http\Controllers\TypingDocController::class, 'indexByDossier']);
+        Route::post('/direct', [\App\Http\Controllers\TypingDocController::class, 'storeDirect']);
+        Route::post('/transhipment', [\App\Http\Controllers\TypingDocController::class, 'storeTranshipment']);
+        Route::patch('/{docId}/link', [\App\Http\Controllers\TypingDocController::class, 'linkToDossier']);
+    });
+
+    // ─── IT Entries (Inventory Transit) ──────────────────────────────────────
+    Route::prefix('it-entries')->group(function () {
+        Route::get('/', [\App\Http\Controllers\ItEntryController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\ItEntryController::class, 'store']);
+        Route::get('/dossier/{dossierId}', [\App\Http\Controllers\ItEntryController::class, 'showByDossier']);
+    });
 });
 
+
+Route::get('/test-ref', function() { return \App\Services\ReferenceGeneratorService::generate(); });

@@ -41,6 +41,7 @@ function Dashboard() {
       case "directeur_provincial":
         return <DirecteurProvincialDash />;
       case "inspecteur_chef":
+      case "inspecteur":
         return <InspecteurChefDash />;
       case "agent_controle":
         return <InspecteurChefDash />;

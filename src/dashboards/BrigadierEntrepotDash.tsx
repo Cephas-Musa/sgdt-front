@@ -200,8 +200,18 @@ export default function BrigadierEntrepotDash() {
                       <Field label="Agent émetteur" required>
                         <Input />
                       </Field>
-                      <Field label="Réf. dossier farde (RD-…)" required>
-                        <Input placeholder="RD-… + date" />
+                      <Field label="Réf. dossier farde" required>
+                        <div className="flex items-center overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
+                          <span className="flex items-center px-3 border-r border-input bg-muted/50 font-bold text-muted-foreground select-none">RD-</span>
+                          <input 
+                            className="flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/50 h-9"
+                            placeholder="0001" 
+                            inputMode="numeric"
+                            onChange={(e) => { 
+                              e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9);
+                            }}
+                          />
+                        </div>
                       </Field>
                       <Field label="Lieu de déchargement">
                         <Input />

@@ -160,7 +160,7 @@ function AlerteDetailPage() {
                         <div className="text-sm">
                           <p className="font-medium">Relancer le responsable</p>
                           <p className="text-xs text-muted-foreground">
-                            Envoyer une notification urgente
+                            Envoyer une alerte urgente
                           </p>
                         </div>
                       </div>

@@ -49,11 +49,11 @@ function UnifiedAlertsPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden animate-in fade-in duration-300 max-w-[1400px] mx-auto w-full">
-      <DashHeader subtitle="Supervision du solde, des alertes de sécurité et des notifications" />
+      <DashHeader subtitle="Supervision du solde et des alertes de sécurité" />
 
       <div className="flex-1 flex flex-col gap-6 min-h-0">
         {/* TOP STATS */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 shrink-0">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 shrink-0">
           <StatCard
             icon={DollarSign}
             label="Solde Net"
@@ -66,16 +66,10 @@ function UnifiedAlertsPage() {
             value={alertesLoading ? "…" : urgentAlerts}
             hint="Nécessitent une action"
           />
-          <StatCard
-            icon={Bell}
-            label="Notifications"
-            value={alertesLoading ? "…" : unreadNotifs}
-            hint="Messages non lus"
-          />
         </div>
 
         {/* MAIN GRID - 3 PANELS */}
-        <div className="flex-1 grid gap-6 lg:grid-cols-3 min-h-0 overflow-hidden">
+        <div className="flex-1 grid gap-6 lg:grid-cols-2 min-h-0 overflow-hidden">
           {/* COL 1: HISTORIQUE TRANSACTIONS */}
           <Panel 
             title="Historique Transactions" 
@@ -164,42 +158,6 @@ function UnifiedAlertsPage() {
             </div>
           </Panel>
 
-          {/* COL 3: NOTIFICATIONS non-lues */}
-          <Panel 
-            title="Notifications"
-            actions={
-              <Button variant="ghost" size="sm" className="h-7 text-[9px] font-bold uppercase" onClick={() => toast.success("Toutes lues")}>
-                Tout lire
-              </Button>
-            }
-          >
-            <div className="h-full overflow-y-auto pr-1 divide-y divide-border/30 scrollbar-hide">
-              {alertesLoading ? (
-                <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-              ) : alertes.length === 0 ? (
-                <p className="text-center text-xs text-muted-foreground py-8">Aucune notification</p>
-              ) : (
-                alertes.map((n) => (
-                  <div key={n.id} className="py-3 first:pt-0 hover:bg-accent/[0.02] transition-colors group">
-                    <div className="flex gap-3">
-                      <div className={`h-7 w-7 rounded flex items-center justify-center shrink-0 border ${n.is_read ? 'bg-muted/20 border-border opacity-50' : 'bg-accent/10 border-accent/20 text-accent'}`}>
-                        {n.is_read ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5 animate-pulse" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <h4 className={`text-[10px] font-bold uppercase truncate ${!n.is_read ? 'text-foreground' : 'text-muted-foreground'}`}>{n.title ?? "Alerte"}</h4>
-                          <span className="text-[8px] text-muted-foreground">{n.created_at?.split("T")[0]}</span>
-                        </div>
-                        <p className="text-[10px] leading-snug text-muted-foreground font-medium line-clamp-2">
-                          {n.message ?? "—"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Panel>
         </div>
       </div>
     </div>

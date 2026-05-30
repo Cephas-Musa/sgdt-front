@@ -34,18 +34,26 @@ import {
   type ChefBarriereCommission,
   type EmptyManifestBatchBilling,
 } from "@/lib/mock";
-import { 
-  useApi, 
-  apiGetUsers, 
-  apiGetBureauxDouaniers, 
-  apiGetDossiers, 
-  apiGetEmptyManifests, 
-  apiGetProvincialDirections, 
+import {
+  useApi,
+  apiGetUsers,
+  apiGetBureauxDouaniers,
+  apiGetDossiers,
+  apiGetEmptyManifests,
+  apiGetProvincialDirections,
   apiRechargeWallet,
   apiCreateProvincialDirection,
   apiDeleteProvincialDirection,
   apiCreateBureauDouanier,
-  apiDeleteBureauDouanier
+  apiDeleteBureauDouanier,
+  apiGetPartenaires,
+  apiDeletePartenaire,
+  apiDeleteUser,
+  apiUpdateBureauDouanier,
+  apiGetTypesDossiers,
+  apiCreateTypeDossier,
+  apiUpdateTypeDossier,
+  apiDeleteTypeDossier
 } from "@/lib/api";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 import { getCreatableRoles } from "@/lib/hierarchy";
@@ -59,7 +67,7 @@ export default function SuperAdminDash() {
   const [username, setUsername] = useState("");
   const [filterBureau, setFilterBureau] = useState("all");
   const [filterDate, setFilterDate] = useState("");
-  const generate = () => setPwd(Math.random().toString(36).slice(2, 10) + "!");
+  const generate = () => setPwd("SGDT@" + Math.random().toString(36).slice(2, 6).toUpperCase() + Math.floor(1000 + Math.random() * 9000));
   const allRoles = getCreatableRoles("super_admin");
   const [selectedRole, setSelectedRole] = useState<Role | "">("");
   const [borderCommission, setBorderCommission] = useState(0);
@@ -69,7 +77,7 @@ export default function SuperAdminDash() {
   const [selectedProvince, setSelectedProvince] = useState("");
   const [newBureau, setNewBureau] = useState({ code: "", denomination: "", manifest_price: 25, icb: "" });
 
-  const { data: rawUsers, refetch: refetchUsers } = useApi(apiGetUsers);
+  const { data: rawUsers, reload: refetchUsers } = useApi(apiGetUsers);
   const ACCOUNTS = (rawUsers as any[]) ?? [];
 
   // Wallet Recharge State
@@ -100,7 +108,7 @@ export default function SuperAdminDash() {
     }
   };
 
-  const { data: rawBureaux, refetch: refetchBureaux } = useApi(apiGetBureauxDouaniers);
+  const { data: rawBureaux, reload: refetchBureaux } = useApi(apiGetBureauxDouaniers);
   const BUREAUX_DOUANIERS = (rawBureaux as any[]) ?? [];
 
   const { data: rawDossiers } = useApi(apiGetDossiers);
@@ -109,12 +117,20 @@ export default function SuperAdminDash() {
   const { data: rawManifests } = useApi(apiGetEmptyManifests);
   const EMPTY_MANIFESTS = (rawManifests as any[]) ?? [];
 
-  const { data: rawDirections, refetch: refetchDirections } = useApi(apiGetProvincialDirections);
+  const { data: rawDirections, reload: refetchDirections } = useApi(apiGetProvincialDirections);
   const DIRECTIONS_PROVINCIALES = (rawDirections as any[]) ?? [];
 
-  const PARTENAIRES: any[] = [];
+  const { data: rawPartenaires, reload: refetchPartenaires } = useApi(apiGetPartenaires);
+  const PARTENAIRES = (rawPartenaires as any[]) ?? [];
 
-  const [types, setTypes] = useState<TypeDossier[]>([]);
+  const availableDPs = ACCOUNTS.filter(u => u.role === "directeur_provincial" && !DIRECTIONS_PROVINCIALES.some(d => d.directeur === u.full_name));
+
+  const allICBs = ACCOUNTS.filter(u => u.role === "inspecteur_chef");
+  const assignedICBs = BUREAUX_DOUANIERS.map((b: any) => b.icb).filter(Boolean);
+  const availableICBs = allICBs.filter(u => !assignedICBs.includes(u.full_name));
+
+  const { data: rawTypes, reload: refetchTypes } = useApi(apiGetTypesDossiers);
+  const types = (rawTypes as TypeDossier[]) ?? [];
   const [newType, setNewType] = useState({
     code: "",
     libelle: "",
@@ -144,9 +160,7 @@ export default function SuperAdminDash() {
   });
 
   const [batches, setBatches] = useState<EmptyManifestBatchBilling[]>([]);
-  const [directions, setDirections] = useState<any[]>(DIRECTIONS_PROVINCIALES);
   const [newDirection, setNewDirection] = useState({ denomination: "", directeur: "" });
-  const [bureaux, setBureaux] = useState<any[]>(BUREAUX_DOUANIERS);
 
   const addCommissionToChef = () => {
     if (!newCommission.typeDossierId) {
@@ -237,75 +251,84 @@ export default function SuperAdminDash() {
       prev.map((batch) =>
         batch.id === id
           ? {
-              ...batch,
-              statut,
-              dateFacturation:
-                statut === "facturé"
-                  ? new Date().toISOString().slice(0, 10)
-                  : batch.dateFacturation,
-              datePaiement:
-                statut === "payé" ? new Date().toISOString().slice(0, 10) : batch.datePaiement,
-            }
+            ...batch,
+            statut,
+            dateFacturation:
+              statut === "facturé"
+                ? new Date().toISOString().slice(0, 10)
+                : batch.dateFacturation,
+            datePaiement:
+              statut === "payé" ? new Date().toISOString().slice(0, 10) : batch.datePaiement,
+          }
           : batch,
       ),
     );
     toast.success(`Lot de facturation mis à jour : ${statut}`);
   };
 
-  const handleCreateType = () => {
+  const handleCreateType = async () => {
     if (!newType.code.trim() || !newType.libelle.trim()) {
       toast.error("Le code et le libellé sont obligatoires.");
       return false;
     }
-    setTypes((prev) => [
-      ...prev,
-      {
+    try {
+      await apiCreateTypeDossier({
         id: crypto.randomUUID(),
         code: newType.code.trim().toUpperCase(),
         libelle: newType.libelle.trim(),
         tarif: newType.tarif,
         devise: newType.devise,
         actif: newType.actif,
-        dateCreation: new Date().toISOString().slice(0, 10),
-      },
-    ]);
-    resetNewType();
-    toast.success("Type de dossier créé");
+      });
+      resetNewType();
+      toast.success("Type de dossier créé");
+      refetchTypes();
+    } catch (e: any) {
+      toast.error(e.message || "Erreur de création");
+    }
     return undefined;
   };
 
-  const handleUpdateType = () => {
+  const handleUpdateType = async () => {
     if (!editingType) return false;
     if (!editType.code.trim() || !editType.libelle.trim()) {
       toast.error("Le code et le libellé sont obligatoires.");
       return false;
     }
-    setTypes((prev) =>
-      prev.map((t) =>
-        t.id === editingType.id
-          ? {
-              ...t,
-              code: editType.code.trim().toUpperCase(),
-              libelle: editType.libelle.trim(),
-              tarif: editType.tarif,
-              devise: editType.devise,
-              actif: editType.actif,
-            }
-          : t,
-      ),
-    );
-    setEditingType(null);
-    toast.success("Type de dossier modifié");
+    try {
+      await apiUpdateTypeDossier(editingType.id, {
+        code: editType.code.trim().toUpperCase(),
+        libelle: editType.libelle.trim(),
+        tarif: editType.tarif,
+        devise: editType.devise,
+        actif: editType.actif,
+      });
+      setEditingType(null);
+      toast.success("Type de dossier modifié");
+      refetchTypes();
+    } catch (e: any) {
+      toast.error(e.message || "Erreur de modification");
+    }
     return undefined;
   };
 
-  const handleDeleteType = (typeId: string) => {
-    setTypes((prev) => prev.filter((t) => t.id !== typeId));
-    toast.success("Type de dossier supprimé");
+  const handleDeleteType = async (typeId: string) => {
+    try {
+      await apiDeleteTypeDossier(typeId);
+      toast.success("Type de dossier supprimé");
+      refetchTypes();
+    } catch (e: any) {
+      toast.error(e.message || "Erreur de suppression");
+    }
   };
 
-  const toggleTypeActive = (typeId: string) => {
-    setTypes((prev) => prev.map((t) => (t.id === typeId ? { ...t, actif: !t.actif } : t)));
+  const toggleTypeActive = async (type: TypeDossier) => {
+    try {
+      await apiUpdateTypeDossier(type.id, { actif: !type.actif });
+      refetchTypes();
+    } catch (e: any) {
+      toast.error(e.message || "Erreur lors de la modification du statut");
+    }
   };
 
   const revenue = DOSSIERS.reduce((s, d) => s + d.montant, 0);
@@ -371,17 +394,19 @@ export default function SuperAdminDash() {
                     <Field label="Code" required>
                       <Input
                         value={newType.code}
-                        onChange={(e) => setNewType((prev) => ({ ...prev, code: e.target.value }))}
-                        placeholder="ex: DIRECT"
+                        onChange={(e) => setNewType((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                        placeholder="EX: DIRECT"
+                        className="uppercase"
                       />
                     </Field>
                     <Field label="Libellé" required>
                       <Input
                         value={newType.libelle}
                         onChange={(e) =>
-                          setNewType((prev) => ({ ...prev, libelle: e.target.value }))
+                          setNewType((prev) => ({ ...prev, libelle: e.target.value.toUpperCase() }))
                         }
-                        placeholder="ex: Direct"
+                        placeholder="EX: DIRECT"
+                        className="uppercase"
                       />
                     </Field>
                     <Field label="Tarification ($)" required>
@@ -475,16 +500,18 @@ export default function SuperAdminDash() {
                                   <Input
                                     value={editType.code}
                                     onChange={(e) =>
-                                      setEditType((prev) => ({ ...prev, code: e.target.value }))
+                                      setEditType((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))
                                     }
+                                    className="uppercase"
                                   />
                                 </Field>
                                 <Field label="Libellé">
                                   <Input
                                     value={editType.libelle}
                                     onChange={(e) =>
-                                      setEditType((prev) => ({ ...prev, libelle: e.target.value }))
+                                      setEditType((prev) => ({ ...prev, libelle: e.target.value.toUpperCase() }))
                                     }
+                                    className="uppercase"
                                   />
                                 </Field>
                                 <Field label="Tarif ($)">
@@ -574,7 +601,8 @@ export default function SuperAdminDash() {
                       Nouveau partenaire
                     </Button>
                   }
-                  title="Créer un partenaire"
+                  title="Ajouter un partenaire"
+                  onSuccess={refetchPartenaires}
                 />
               }
             >
@@ -638,12 +666,23 @@ export default function SuperAdminDash() {
                                 }
                                 title={`Modifier — ${p.nom}`}
                                 initial={p}
+                                onSuccess={refetchPartenaires}
                               />
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 className="text-destructive"
-                                onClick={() => toast.success("Partenaire supprimé")}
+                                onClick={async () => {
+                                  if (confirm("Confirmer la suppression du partenaire ?")) {
+                                    try {
+                                      await apiDeletePartenaire(p.id.toString());
+                                      toast.success("Partenaire supprimé");
+                                      refetchPartenaires();
+                                    } catch (e: any) {
+                                      toast.error(e.message || "Erreur lors de la suppression");
+                                    }
+                                  }
+                                }}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
@@ -724,7 +763,11 @@ export default function SuperAdminDash() {
                       <Input />
                     </Field>
                     <Field label="Téléphone">
-                      <Input />
+                      <Input
+                        type="tel"
+                        maxLength={9}
+                        onChange={(e) => e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9)}
+                      />
                     </Field>
                     <Field label="Bureau douanier">
                       <Select>
@@ -769,7 +812,7 @@ export default function SuperAdminDash() {
                               <SelectValue placeholder="Choisir le bureau" />
                             </SelectTrigger>
                             <SelectContent>
-                              {bureaux.map((b) => (
+                              {BUREAUX_DOUANIERS.map((b) => (
                                 <SelectItem key={b.id} value={b.id}>
                                   {b.denomination}
                                 </SelectItem>
@@ -834,7 +877,7 @@ export default function SuperAdminDash() {
                             params={{ compteId: a.id }}
                             className="text-accent hover:underline"
                           >
-                            {a.fullName}
+                            {a.full_name}
                           </Link>
                         </td>
                         <td className="px-3 py-2 text-xs">
@@ -857,15 +900,20 @@ export default function SuperAdminDash() {
                                   <Edit className="h-3.5 w-3.5" />
                                 </Button>
                               }
-                              title={`Modifier — ${a.fullName}`}
+                              title={`Modifier — ${a.full_name}`}
                               onSubmit={() => toast.success("Modifié")}
                             >
                               <FormGrid>
                                 <Field label="Nom">
-                                  <Input defaultValue={a.fullName} />
+                                  <Input defaultValue={a.full_name} />
                                 </Field>
                                 <Field label="Téléphone">
-                                  <Input defaultValue={a.phone} />
+                                  <Input
+                                    type="tel"
+                                    maxLength={9}
+                                    defaultValue={a.phone}
+                                    onChange={(e) => e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9)}
+                                  />
                                 </Field>
                               </FormGrid>
                             </FormDialog>
@@ -873,7 +921,17 @@ export default function SuperAdminDash() {
                               size="sm"
                               variant="ghost"
                               className="text-destructive"
-                              onClick={() => toast.success("Supprimé")}
+                              onClick={async () => {
+                                if (confirm("Voulez-vous vraiment supprimer ce compte ?")) {
+                                  try {
+                                    await apiDeleteUser(a.id);
+                                    toast.success("Compte supprimé");
+                                    refetchUsers();
+                                  } catch (e: any) {
+                                    toast.error(e.message || "Erreur lors de la suppression");
+                                  }
+                                }
+                              }}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -908,7 +966,7 @@ export default function SuperAdminDash() {
                     </tr>
                   </thead>
                   <tbody>
-                    {bureaux.map((b) => (
+                    {BUREAUX_DOUANIERS.map((b) => (
                       <tr key={b.id} className="border-t border-border hover:bg-muted/30">
                         <td className="px-3 py-2 font-mono text-xs">
                           <Link
@@ -921,45 +979,17 @@ export default function SuperAdminDash() {
                         </td>
                         <td className="px-3 py-2 font-medium">{b.denomination}</td>
                         <td className="px-3 py-2 text-right font-semibold text-warning">
-                          ${b.manifestPrice}
+                          ${b.manifest_price ?? b.manifestPrice}
                         </td>
                         <td className="px-3 py-2 text-muted-foreground">{b.icb ?? "—"}</td>
                         <td className="px-3 py-2">{b.province ?? "—"}</td>
                         <td className="px-3 py-2 text-right">
-                          <div className="flex gap-1 justify-end">
-                            <FormDialog
-                              trigger={
-                                <Button size="sm" variant="ghost">
-                                  <Edit className="h-3.5 w-3.5" />
-                                </Button>
-                              }
-                              title={`Modifier — ${b.denomination}`}
-                              onSubmit={() => toast.success("Bureau modifié")}
-                            >
-                              <FormGrid>
-                                <Field label="Code">
-                                  <Input defaultValue={b.code} />
-                                </Field>
-                                <Field label="Dénomination">
-                                  <Input defaultValue={b.denomination} />
-                                </Field>
-                                <Field label="Prix Empty Manifest ($)">
-                                  <Input type="number" defaultValue={b.manifestPrice} />
-                                </Field>
-                                <Field label="ICB">
-                                  <Input defaultValue={b.icb ?? ""} />
-                                </Field>
-                              </FormGrid>
-                            </FormDialog>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive"
-                              onClick={() => toast.success("Bureau supprimé")}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                          <BureauEditDialog
+                            bureau={b}
+                            allICBs={allICBs}
+                            assignedICBs={assignedICBs}
+                            onSuccess={refetchBureaux}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -993,7 +1023,7 @@ export default function SuperAdminDash() {
                       setNewDirection({ denomination: "", directeur: "" });
                       refetchDirections();
                     } catch (e: any) {
-                      toast.error("Erreur lors de la création");
+                      toast.error(e.message || "Erreur lors de la création");
                     }
                   }}
                 >
@@ -1008,13 +1038,22 @@ export default function SuperAdminDash() {
                       />
                     </Field>
                     <Field label="Directeur Provincial">
-                      <Input
-                        value={newDirection.directeur}
-                        onChange={(e) =>
-                          setNewDirection((prev) => ({ ...prev, directeur: e.target.value }))
-                        }
-                        placeholder="Nom complet"
-                      />
+                      <Select
+                        value={newDirection.directeur || undefined}
+                        onValueChange={(v) => setNewDirection((prev) => ({ ...prev, directeur: v }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un DP disponible" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableDPs.map(dp => (
+                            <SelectItem key={dp.id} value={dp.full_name}>{dp.full_name}</SelectItem>
+                          ))}
+                          {availableDPs.length === 0 && (
+                            <div className="text-sm p-2 text-muted-foreground text-center">Aucun DP disponible</div>
+                          )}
+                        </SelectContent>
+                      </Select>
                     </Field>
                   </FormGrid>
                 </FormDialog>
@@ -1031,7 +1070,7 @@ export default function SuperAdminDash() {
                     </tr>
                   </thead>
                   <tbody>
-                    {directions.map((d) => (
+                    {DIRECTIONS_PROVINCIALES.map((d) => (
                       <tr key={d.id} className="border-t border-border hover:bg-muted/30">
                         <td className="px-3 py-2 font-medium">{d.denomination}</td>
                         <td className="px-3 py-2">{d.directeur}</td>
@@ -1262,7 +1301,7 @@ export default function SuperAdminDash() {
                       <SelectContent>
                         {ACCOUNTS.filter(acc => acc.role === 'inspecteur_chef').map(acc => (
                           <SelectItem key={acc.id} value={String(acc.id)}>
-                            {acc.fullName} ({acc.bureau || 'Aucun bureau'}) - {acc.wallet_balance || 0}$
+                            {acc.full_name} - {acc.wallet_balance || 0}$
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1270,16 +1309,16 @@ export default function SuperAdminDash() {
                   </div>
                   <div>
                     <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Montant ($)</label>
-                    <Input 
-                      type="number" 
-                      min="1" 
-                      value={rechargeAmount || ""} 
-                      onChange={(e) => setRechargeAmount(Number(e.target.value))} 
-                      placeholder="Ex: 500" 
+                    <Input
+                      type="number"
+                      min="1"
+                      value={rechargeAmount || ""}
+                      onChange={(e) => setRechargeAmount(Number(e.target.value))}
+                      placeholder="Ex: 500"
                     />
                   </div>
-                  <Button 
-                    className="w-full mt-2" 
+                  <Button
+                    className="w-full mt-2"
                     onClick={handleRecharge}
                     disabled={isRecharging || !rechargeUser || rechargeAmount <= 0}
                   >
@@ -1323,40 +1362,51 @@ export default function SuperAdminDash() {
       >
         <FormGrid>
           <Field label="Code" required>
-            <Input 
-              value={newBureau.code} 
-              onChange={e => setNewBureau(p => ({ ...p, code: e.target.value }))} 
-              placeholder="ex: 617B" 
+            <Input
+              value={newBureau.code}
+              onChange={e => setNewBureau(p => ({ ...p, code: e.target.value }))}
+              placeholder="ex: 617B"
             />
           </Field>
           <Field label="Dénomination" required>
-            <Input 
-              value={newBureau.denomination} 
-              onChange={e => setNewBureau(p => ({ ...p, denomination: e.target.value }))} 
-              placeholder="ex: KASINDI" 
+            <Input
+              value={newBureau.denomination}
+              onChange={e => setNewBureau(p => ({ ...p, denomination: e.target.value }))}
+              placeholder="ex: KASINDI"
             />
           </Field>
           <Field label="Prix Empty Manifest ($)" required>
-            <Input 
-              type="number" 
-              value={newBureau.manifest_price} 
-              onChange={e => setNewBureau(p => ({ ...p, manifest_price: Number(e.target.value) }))} 
+            <Input
+              type="number"
+              value={newBureau.manifest_price}
+              onChange={e => setNewBureau(p => ({ ...p, manifest_price: Number(e.target.value) }))}
             />
           </Field>
-          <Field label="ICB (Facultatif)">
-            <Input 
-              value={newBureau.icb} 
-              onChange={e => setNewBureau(p => ({ ...p, icb: e.target.value }))} 
-              placeholder="ex: ICB Nord-Kivu" 
-            />
+          <Field label="Inspecteur Chef de Bureau (ICB)">
+            <Select
+              value={newBureau.icb || undefined}
+              onValueChange={(v) => setNewBureau((prev) => ({ ...prev, icb: v }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner un ICB disponible" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableICBs.map(icb => (
+                  <SelectItem key={icb.id} value={icb.full_name}>{icb.full_name}</SelectItem>
+                ))}
+                {availableICBs.length === 0 && (
+                  <div className="text-sm p-2 text-muted-foreground text-center">Aucun ICB disponible</div>
+                )}
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="Province">
-            <Select value={selectedProvince} onValueChange={setSelectedProvince}>
+            <Select value={selectedProvince || undefined} onValueChange={setSelectedProvince}>
               <SelectTrigger>
                 <SelectValue placeholder="Sélectionner" />
               </SelectTrigger>
               <SelectContent>
-                {directions.map((d) => (
+                {DIRECTIONS_PROVINCIALES.map((d) => (
                   <SelectItem key={d.id} value={d.denomination}>
                     {d.denomination}
                   </SelectItem>
@@ -1369,3 +1419,97 @@ export default function SuperAdminDash() {
     </div>
   );
 }
+
+function BureauEditDialog({ bureau, allICBs, assignedICBs, onSuccess }: any) {
+  const [code, setCode] = useState(bureau.code);
+  const [denomination, setDenomination] = useState(bureau.denomination);
+  const [manifestPrice, setManifestPrice] = useState(bureau.manifest_price ?? bureau.manifestPrice);
+  const [icb, setIcb] = useState(bureau.icb ?? "");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const availableICBsForEdit = allICBs.filter((u: any) => !assignedICBs.includes(u.full_name) || u.full_name === bureau.icb);
+
+  const handleUpdate = async () => {
+    setIsSubmitting(true);
+    try {
+      await apiUpdateBureauDouanier(bureau.id.toString(), {
+        code,
+        denomination,
+        manifest_price: manifestPrice,
+        icb: icb || null,
+      });
+      toast.success("Bureau modifié avec succès");
+      onSuccess();
+    } catch (e: any) {
+      toast.error(e.message || "Erreur lors de la modification");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (confirm("Voulez-vous vraiment supprimer ce bureau ?")) {
+      try {
+        await apiDeleteBureauDouanier(bureau.id.toString());
+        toast.success("Bureau supprimé");
+        onSuccess();
+      } catch (e: any) {
+        toast.error(e.message || "Erreur lors de la suppression");
+      }
+    }
+  };
+
+  return (
+    <div className="flex gap-1 justify-end">
+      <FormDialog
+        trigger={
+          <Button size="sm" variant="ghost">
+            <Edit className="h-3.5 w-3.5" />
+          </Button>
+        }
+        title={`Modifier — ${bureau.denomination}`}
+        onSubmit={handleUpdate}
+      >
+        <FormGrid>
+          <Field label="Code">
+            <Input value={code} onChange={(e) => setCode(e.target.value)} disabled={isSubmitting} />
+          </Field>
+          <Field label="Dénomination">
+            <Input value={denomination} onChange={(e) => setDenomination(e.target.value)} disabled={isSubmitting} />
+          </Field>
+          <Field label="Prix Empty Manifest ($)">
+            <Input type="number" value={manifestPrice} onChange={(e) => setManifestPrice(Number(e.target.value))} disabled={isSubmitting} />
+          </Field>
+          <Field label="Inspecteur Chef de Bureau">
+            <Select
+              value={icb || undefined}
+              onValueChange={setIcb}
+              disabled={isSubmitting}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableICBsForEdit.map((u: any) => (
+                  <SelectItem key={u.id} value={u.full_name}>{u.full_name}</SelectItem>
+                ))}
+                {availableICBsForEdit.length === 0 && (
+                  <div className="text-sm p-2 text-muted-foreground text-center">Aucun ICB disponible</div>
+                )}
+              </SelectContent>
+            </Select>
+          </Field>
+        </FormGrid>
+      </FormDialog>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-destructive"
+        onClick={handleDelete}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
+}
+

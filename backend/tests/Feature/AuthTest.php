@@ -20,7 +20,7 @@ class AuthTest extends TestCase
     {
         // Créer l'utilisateur Superadmin (déjà vérifié)
         User::create([
-            'phone_number' => '+243995833424',
+            'phone_number' => '+243813478556',
             'password' => Hash::make('Dragon@2004'),
             'role' => 'super_admin',
             'full_name' => 'Superadmin',
@@ -28,7 +28,7 @@ class AuthTest extends TestCase
         ]);
 
         $response = $this->postJson('/api/login', [
-            'phone_number' => '+243995833424',
+            'phone_number' => '+243813478556',
             'password' => 'Dragon@2004',
         ]);
 
@@ -37,7 +37,7 @@ class AuthTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'status' => 'otp_required',
-                'phone_number' => '+243995833424',
+                'phone_number' => '+243813478556',
             ])
             ->assertJsonMissing(['otp_code']); // Le code ne doit JAMAIS apparaître dans la réponse
     }
@@ -151,7 +151,7 @@ class AuthTest extends TestCase
     public function test_superadmin_can_create_user_with_copyable_credentials(): void
     {
         $superadmin = User::create([
-            'phone_number' => '+243995833424',
+            'phone_number' => '+243813478556',
             'password' => Hash::make('Dragon@2004'),
             'role' => 'super_admin',
             'full_name' => 'Super Admin',

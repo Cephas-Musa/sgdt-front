@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { MapPin, Building2, Truck, Navigation, ArrowRight } from "lucide-react";
-import { DOSSIERS } from "@/lib/mock";
+import { useApi, apiGetDossiers } from "@/lib/api";
+import { useState, useEffect } from "react";
 
 export const Route = createFileRoute("/app/localisation")({
   component: LocalisationPage,

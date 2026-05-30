@@ -58,7 +58,7 @@ function ApurementPage() {
 
   const handleSecSearch = () => {
     const found = allDossiers.find((d) =>
-      d.reference.toLowerCase().includes(secSearchRef.toLowerCase()),
+      (d.reference || "").toLowerCase().includes(secSearchRef.toLowerCase()),
     );
     if (!found) {
       toast.error("Aucun dossier trouvé.");

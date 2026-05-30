@@ -5,13 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { DOSSIERS, EMPTY_MANIFESTS, ACCOUNTS } from "@/lib/mock";
+import { useApi, apiGetDossiers } from "@/lib/api";
+import { EMPTY_MANIFESTS, ACCOUNTS } from "@/lib/mock";
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { apiGetTypingDocStats } from "@/lib/api";
 
 export default function ChefBarriereDash() {
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const activeDossiers = rawDossiers as any[] || [];
+
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("docs");
   const [dateStart, setDateStart] = useState("");
@@ -19,13 +24,16 @@ export default function ChefBarriereDash() {
   const [docType, setDocType] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const { data: rawStats } = useApi(apiGetTypingDocStats);
+  const stats = (rawStats as any) || {};
+
   const typingOps = ACCOUNTS.filter((a) => a.role === "typing_operator");
   
   // Filtering logic for Docs
-  const filteredDocs = DOSSIERS.filter(d => {
-    const matchesSearch = d.reference.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         d.importateur.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = docType === "all" || d.type.toLowerCase() === docType.toLowerCase();
+  const filteredDocs = activeDossiers.filter(d => {
+    const matchesSearch = (d.reference || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         (d.importateur || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = docType === "all" || (d.type || "").toLowerCase() === docType.toLowerCase();
     return matchesSearch && matchesType;
   });
 
@@ -33,8 +41,8 @@ export default function ChefBarriereDash() {
 
   // Filtering logic for Empty Manifest
   const filteredManifests = EMPTY_MANIFESTS.filter(m => {
-    return m.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           m.vehicule.toLowerCase().includes(searchQuery.toLowerCase());
+    return (m.reference || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+           (m.vehicule || "").toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const totalGainsManifests = filteredManifests.reduce((s, m) => s + m.montant, 0);
@@ -44,8 +52,8 @@ export default function ChefBarriereDash() {
       <DashHeader subtitle="Chef Barrière Étranger — gestion des documents, manifestes vides et opérateurs" />
       
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={FileText} label="Total Dossiers" value={filteredDocs.length} />
-        <StatCard icon={Package} label="Empty manifests" value={filteredManifests.length} />
+        <StatCard icon={FileText} label="Docs Saisis (Aujourd'hui)" value={(stats?.direct_today || 0) + (stats?.tranship_today || 0)} />
+        <StatCard icon={Package} label="Docs En Attente" value={stats?.pending_docs || 0} />
         <StatCard
           icon={DollarSign}
           label="Gains Totaux (Période)"

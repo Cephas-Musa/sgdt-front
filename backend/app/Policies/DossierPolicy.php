@@ -17,37 +17,29 @@ class DossierPolicy
 
     /**
      * Determine whether the user can view the model.
+     * La logique fine est gérée par DossierAccessService ; ici on est permissif.
      */
     public function view(User $user, Dossier $dossier): bool
     {
-        // Super admin voit tout
-        if ($user->role === 'super_admin') {
+        if (in_array($user->role, ['super_admin', 'directeur', 'directeur_provincial'])) {
             return true;
         }
 
-        // Directeur général voit tous les dossiers
-        if ($user->role === 'directeur_general') {
-            return true;
+        // Inspecteur chef, agent controle, secrétaire, chef bureau repr => même bureau
+        if (in_array($user->role, ['inspecteur_chef', 'inspecteur', 'agent_controle', 'secretaire_inspecteur', 'chef_bureau_repr'])) {
+            return $dossier->bureau_id === $user->bureau_id
+                || $dossier->created_by === $user->id
+                || $dossier->inspecteur_id === $user->id;
         }
 
-        // Directeur provincial voit dossiers de sa province
-        if ($user->role === 'directeur_provincial') {
-            return $user->province_id &&
-                   ($dossier->province === $user->province || $dossier->localisation === $user->province);
-        }
-
-        // Inspecteur, Chef Bureau, Agent Contrôle, Secrétaire voient les dossiers de leur bureau
-        if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur', 'agent_controle', 'secretaire_inspecteur', 'chef_bureau_representation'])) {
-            return $user->bureau_id && $dossier->bureau_repr === $user->bureau;
-        }
-
-        // Opérateur Saisie voit ses dossiers et ceux du bureau
+        // Opérateur saisie voit ses propres dossiers
         if ($user->role === 'operateur_saisie') {
-            return $user->bureau_representation_id === $dossier->bureau_repr || $user->id === $dossier->user_id;
+            return $dossier->created_by === $user->id
+                || ($dossier->bureau_id === $user->bureau_id);
         }
 
-        // Créateur voit son dossier
-        if ($dossier->user_id === $user->id) {
+        // Créateur voit toujours son dossier
+        if ($dossier->created_by === $user->id) {
             return true;
         }
 
@@ -60,8 +52,12 @@ class DossierPolicy
     public function create(User $user): bool
     {
         return in_array($user->role, [
-            'declarant', 'importateur', 'super_admin', 'secretaire_inspecteur',
-            'operateur_saisie', 'chef_bureau_representation'
+            'super_admin',
+            'inspecteur_chef',
+            'inspecteur',
+            'secretaire_inspecteur',
+            'operateur_saisie',
+            'chef_bureau_repr',
         ]);
     }
 
@@ -70,25 +66,19 @@ class DossierPolicy
      */
     public function update(User $user, Dossier $dossier): bool
     {
-        // Super admin peut modifier
         if ($user->role === 'super_admin') {
             return true;
         }
 
-        // Créateur peut modifier si en brouillon
-        if ($dossier->user_id === $user->id && $dossier->status === 'brouillon') {
+        // Créateur peut modifier si pas encore appuré
+        if ($dossier->created_by === $user->id && $dossier->status !== 'appure') {
             return true;
         }
 
-        // Directeur provincial de sa province
-        if ($user->role === 'directeur_provincial') {
-            return $user->province_id &&
-                   ($dossier->province === $user->province || $dossier->localisation === $user->province);
-        }
-
-        // Inspecteur, Chef Bureau, Secrétaire de leur bureau
-        if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur', 'secretaire_inspecteur', 'chef_bureau_representation'])) {
-            return $user->bureau_id && $dossier->bureau_repr === $user->bureau;
+        // Inspecteur chef peut modifier les dossiers de son bureau
+        if (in_array($user->role, ['inspecteur_chef', 'inspecteur', 'secretaire_inspecteur'])) {
+            return $dossier->inspecteur_id === $user->id
+                || $dossier->bureau_id === $user->bureau_id;
         }
 
         return false;
@@ -103,8 +93,8 @@ class DossierPolicy
             return true;
         }
 
-        // Créateur peut supprimer s'il n'est pas payé
-        if ($dossier->user_id === $user->id && $dossier->status === 'brouillon') {
+        // Créateur peut supprimer si pas encore appuré
+        if ($dossier->created_by === $user->id && in_array($dossier->status, ['brouillon', 'en_cours'])) {
             return true;
         }
 
@@ -112,45 +102,35 @@ class DossierPolicy
     }
 
     /**
-     * Déterminer si l'utilisateur peut valider un dossier
+     * Déterminer si l'utilisateur peut valider un dossier.
      */
     public function validate(User $user, Dossier $dossier): bool
     {
-        // Super admin
         if ($user->role === 'super_admin') {
             return true;
         }
 
-        // Inspecteur chef bureau peut valider dossiers de son bureau
-        if ($user->role === 'inspecteur_chef_bureau') {
-            return $user->bureau_id && $dossier->bureau_repr === $user->bureau;
+        if (in_array($user->role, ['inspecteur_chef', 'inspecteur'])) {
+            return $dossier->inspecteur_id === $user->id
+                || $dossier->bureau_id === $user->bureau_id;
         }
 
         return false;
     }
 
     /**
-     * Déterminer si l'utilisateur peut appurer un dossier
+     * Déterminer si l'utilisateur peut appurer un dossier.
      */
     public function appure(User $user, Dossier $dossier): bool
     {
-        // Super admin
         if ($user->role === 'super_admin') {
             return true;
         }
 
-        // Inspecteur chef bureau et verificateur
-        if (in_array($user->role, ['inspecteur_chef_bureau', 'verificateur', 'chef_verification'])) {
-            return $user->bureau_id && $dossier->bureau_repr === $user->bureau;
-        }
-
-        return false;
-    }
-}
-        }
-
-        if ($dossier->user_id === $user->id && $dossier->status === 'en_attente') {
-            return true;
+        if (in_array($user->role, ['inspecteur_chef', 'inspecteur', 'verificateur', 'cb_verification'])) {
+            return $dossier->bureau_id === $user->bureau_id
+                || $dossier->inspecteur_id === $user->id
+                || $dossier->created_by === $user->id;
         }
 
         return false;

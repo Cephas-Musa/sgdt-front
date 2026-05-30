@@ -4,18 +4,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { DOSSIERS, COLISAGES } from "@/lib/mock";
+import { useApi, apiGetDossiers } from "@/lib/api";
+import { COLISAGES } from "@/lib/mock";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 export default function AgentPointageDash() {
-  const direct = DOSSIERS.filter((d) => d.type === "direct");
-  const trans = DOSSIERS.filter((d) => d.type === "transbordement");
-  const lot = DOSSIERS.filter((d) => d.type === "lot");
-  const colis = DOSSIERS.filter((d) => d.type === "colis");
-  const dechargement = DOSSIERS.filter((d) => d.type === "dechargement");
-  const chargement = DOSSIERS.filter((d) => d.type === "chargement");
-  const petrolier = DOSSIERS.filter((d) => d.type === "petrolier");
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const activeDossiers = rawDossiers as any[] || [];
+
+  const direct = activeDossiers.filter((d) => d.type === "direct");
+  const trans = activeDossiers.filter((d) => d.type === "transbordement");
+  const lot = activeDossiers.filter((d) => d.type === "lot");
+  const colis = activeDossiers.filter((d) => d.type === "colis");
+  const dechargement = activeDossiers.filter((d) => d.type === "dechargement");
+  const chargement = activeDossiers.filter((d) => d.type === "chargement");
+  const petrolier = activeDossiers.filter((d) => d.type === "petrolier");
 
   const ColisageButton = ({ dossierId }: { dossierId: string }) => (
     <FormDialog
@@ -170,7 +174,7 @@ export default function AgentPointageDash() {
 
           {/* Onglets génériques pour lot, colis, etc. */}
           {["lot", "colis", "dechargement", "chargement", "petrolier"].map((typ) => {
-            const items = DOSSIERS.filter((d) => d.type === typ);
+            const items = activeDossiers.filter((d) => d.type === typ);
             return (
               <TabsContent key={typ} value={typ} className="mt-4">
                 <Panel title={`Liste des dossiers — ${typ.charAt(0).toUpperCase() + typ.slice(1)}`}>

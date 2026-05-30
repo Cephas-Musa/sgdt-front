@@ -26,7 +26,8 @@ import {
   APUREMENT_SUBMISSIONS,
   SECRETAIRES_INSPECTEUR,
 } from "@/lib/mock";
-import { useApi, apiCreateWarehouse } from "@/lib/api";
+import { useApi, apiCreateWarehouse, apiGetDossiers } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useState } from "react";
 
 const typeIcon = (t: string) => {
@@ -39,11 +40,15 @@ const typeIcon = (t: string) => {
 };
 
 export default function InspecteurChefDash() {
-  const totalDossiers = DOSSIERS.length;
-  const enCours = DOSSIERS.filter((d) => d.status === "en_cours").length;
-  const apures = DOSSIERS.filter((d) => d.status === "apure").length;
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const activeDossiers = rawDossiers as any[] || [];
 
-  const [newEntrepot, setNewEntrepot] = useState({ code: "", nom: "", ville: "" });
+  const { user } = useAuth();
+  const totalDossiers = activeDossiers.length;
+  const enCours = activeDossiers.filter((d) => d.status === "en_cours").length;
+  const apures = activeDossiers.filter((d) => d.status === "apure").length;
+
+
 
   return (
     <div className="space-y-6">
@@ -64,41 +69,12 @@ export default function InspecteurChefDash() {
         <StatCard
           icon={DollarSign}
           label="Solde virtuel"
-          value={`$${SOLDE_VIRTUEL.soldeNet}`}
+          value={`$${user?.walletBalance || 0}`}
         />
         <StatCard icon={Activity} label="Dossiers en cours" value={enCours} />
       </div>
 
-      {/* ── TARIFICATION ── */}
-      <div className="rounded-lg border border-border bg-card p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <DollarSign className="h-4 w-4 text-accent" />
-          <span className="text-sm font-medium">Tarification active</span>
-        </div>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <span className="rounded-md bg-accent/10 px-3 py-1">
-            Direct — <strong>50$</strong>
-          </span>
-          <span className="rounded-md bg-accent/10 px-3 py-1">
-            Transbordement — <strong>50$</strong>
-          </span>
-          <span className="rounded-md bg-accent/10 px-3 py-1">
-            Pétrolier — <strong>50$</strong>
-          </span>
-          <span className="rounded-md bg-accent/10 px-3 py-1">
-            Vrac — <strong>10$</strong>
-          </span>
-          <span className="rounded-md bg-accent/10 px-3 py-1">
-            Lot / Colis — <strong>10$</strong>
-          </span>
-          <span className="rounded-md bg-accent/10 px-3 py-1">
-            Déchargement — <strong>10$</strong>
-          </span>
-          <span className="rounded-md bg-accent/10 px-3 py-1">
-            Autres — <strong>10$</strong>
-          </span>
-        </div>
-      </div>
+
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* ── ACTIVITÉ RÉCENTE ── */}
@@ -182,66 +158,7 @@ export default function InspecteurChefDash() {
             </div>
           </Panel>
 
-          {/* ── GESTION ENTREPÔTS ── */}
-          <Panel title="Gestion Entrepôts">
-            <div className="space-y-4">
-              <p className="text-xs text-muted-foreground">
-                Gérez vos entrepôts locaux et affectez-les aux managers.
-              </p>
-              <FormDialog
-                trigger={
-                  <Button variant="outline" size="sm" className="w-full gap-2">
-                    <Plus className="h-3.5 w-3.5" />
-                    Créer un entrepôt
-                  </Button>
-                }
-                title="Création Entrepôt"
-                submitLabel="Valider"
-                onSubmit={async () => {
-                  try {
-                    await apiCreateWarehouse({
-                      id: "ent-" + Date.now(),
-                      code: newEntrepot.code,
-                      nom: newEntrepot.nom,
-                      bureau: "Bureau Kasindi", // Placeholder, since it's hardcoded below
-                      capacite: 100
-                    });
-                    toast.success("Entrepôt créé avec succès.");
-                    setNewEntrepot({ code: "", nom: "", ville: "" });
-                  } catch (e) {
-                    toast.error("Erreur lors de la création");
-                  }
-                }}
-              >
-                <FormGrid>
-                  <Field label="Code entrepôt" required>
-                    <Input 
-                      value={newEntrepot.code} 
-                      onChange={e => setNewEntrepot(p => ({ ...p, code: e.target.value }))} 
-                      placeholder="ENT-001" 
-                    />
-                  </Field>
-                  <Field label="Nom entrepôt" required>
-                    <Input 
-                      value={newEntrepot.nom} 
-                      onChange={e => setNewEntrepot(p => ({ ...p, nom: e.target.value }))} 
-                      placeholder="Entrepôt Kasindi 1" 
-                    />
-                  </Field>
-                  <Field label="Bureau douanier" required>
-                    <Input value="Bureau Kasindi" readOnly className="bg-muted/50" />
-                  </Field>
-                  <Field label="Ville" required>
-                    <Input 
-                      value={newEntrepot.ville} 
-                      onChange={e => setNewEntrepot(p => ({ ...p, ville: e.target.value }))} 
-                      placeholder="Kasindi" 
-                    />
-                  </Field>
-                </FormGrid>
-              </FormDialog>
-            </div>
-          </Panel>
+
 
         </div>
       </div>

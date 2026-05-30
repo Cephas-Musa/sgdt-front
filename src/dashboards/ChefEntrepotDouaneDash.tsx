@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { DOSSIERS, ALERTS, ACCOUNTS, type Dossier } from "@/lib/mock";
+import { useApi, apiGetDossiers } from "@/lib/api";
+import { ALERTS, ACCOUNTS, type Dossier } from "@/lib/mock";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,6 +19,9 @@ const agents = ACCOUNTS.filter((a) => a.role === "agent_pointage");
 const TYPES = ["lot", "vehicule", "direct", "transbordement", "colis", "export", "trafic"];
 
 export default function ChefEntrepotDouaneDash() {
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const activeDossiers = rawDossiers as any[] || [];
+
   const [search, setSearch] = useState("");
   const [typeActif, setTypeActif] = useState("tous");
   const [rapportOuvert, setRapportOuvert] = useState<RapportColisage | null>(null);
@@ -30,12 +34,12 @@ export default function ChefEntrepotDouaneDash() {
   const [dossierLotOuvert, setDossierLotOuvert] = useState<Dossier | null>(null);
 
   const filtered = useMemo(() => {
-    return DOSSIERS.filter((d) => {
+    return activeDossiers.filter((d) => {
       const q = search.toLowerCase();
       const matchSearch = !search ||
-        d.reference.toLowerCase().includes(q) ||
-        d.importateur.toLowerCase().includes(q) ||
-        d.dra.toLowerCase().includes(q);
+        (d.reference || "").toLowerCase().includes(q) ||
+        (d.importateur || "").toLowerCase().includes(q) ||
+        (d.dra || "").toLowerCase().includes(q);
       const matchType = typeActif === "tous" || d.type === typeActif;
       return matchSearch && matchType;
     });
@@ -44,7 +48,7 @@ export default function ChefEntrepotDouaneDash() {
   const dossiersByType = useMemo(() => {
     const map: Record<string, typeof DOSSIERS> = { tous: DOSSIERS };
     for (const t of TYPES) {
-      map[t] = DOSSIERS.filter((d) => d.type === t);
+      map[t] = activeDossiers.filter((d) => d.type === t);
     }
     return map;
   }, []);
@@ -96,8 +100,8 @@ export default function ChefEntrepotDouaneDash() {
     <div>
       <DashHeader subtitle="Chef Entrepôt Douane — dossiers, affectation agents, colisage" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={FolderKanban} label="Dossiers" value={DOSSIERS.length} />
-        <StatCard icon={FileCheck} label="Apurés" value={DOSSIERS.filter(d => d.status === "apure").length} />
+        <StatCard icon={FolderKanban} label="Dossiers" value={activeDossiers.length} />
+        <StatCard icon={FileCheck} label="Apurés" value={activeDossiers.filter(d => d.status === "apure").length} />
         <StatCard icon={Users} label="Agents affectés" value={AFFECTATIONS.length} />
         <StatCard icon={ListChecks} label="Colisages reçus" value={RAPPORTS_COLISAGE.length} />
       </div>
@@ -118,7 +122,7 @@ export default function ChefEntrepotDouaneDash() {
             <button
               onClick={() => setTypeActif("tous")}
               className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${typeActif === "tous" ? "bg-accent text-white border-accent" : "border-accent/20 text-muted-foreground hover:border-accent/40"}`}
-            >Tous ({DOSSIERS.length})</button>
+            >Tous ({activeDossiers.length})</button>
             {TYPES.map(t => (
               <button
                 key={t}

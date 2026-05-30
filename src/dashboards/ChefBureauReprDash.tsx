@@ -7,19 +7,27 @@ import {
   ArrowRight,
   TrendingUp,
   ShieldCheck,
-  Activity
+  Activity,
+  DollarSign,
 } from "lucide-react";
 import { DashHeader, StatCard, Panel } from "./_shared";
-import { 
-  DOSSIERS, 
-  ACCOUNTS, 
-  ALERTS 
-} from "@/lib/mock";
+import { useApi, apiGetDossiers, apiGetUsers, apiGetAlertes, apiGetRepresentationStats } from "@/lib/api";
 import { Link } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
 
 export default function ChefBureauReprDash() {
-  const operators = ACCOUNTS.filter((a) => a.role === "operateur_saisie");
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const activeDossiers = (rawDossiers as any[]) || [];
+
+  const { data: rawUsers } = useApi(apiGetUsers);
+  const allUsers = (rawUsers as any[]) || [];
+  const operators = allUsers.filter((u) => u.role === "operateur_saisie");
+
+  const { data: rawAlertes } = useApi(apiGetAlertes);
+  const alertes = (rawAlertes as any[]) || [];
+
+  const { data: reprStats } = useApi(apiGetRepresentationStats);
+  const stats = reprStats as any;
 
   return (
     <div className="space-y-6">
@@ -30,7 +38,7 @@ export default function ChefBureauReprDash() {
         <StatCard 
           icon={FolderKanban} 
           label="Dossiers du bureau" 
-          value={DOSSIERS.length} 
+          value={activeDossiers.length} 
           hint="En attente de validation"
         />
         <StatCard 
@@ -39,15 +47,15 @@ export default function ChefBureauReprDash() {
           value={operators.length} 
         />
         <StatCard 
-          icon={Activity} 
-          label="Performance" 
-          value="94%" 
-          hint="Taux de traitement"
+          icon={TrendingUp} 
+          label="Représentations du jour" 
+          value={stats?.today ?? 0}
+          hint={`Total: ${stats?.total ?? 0}`}
         />
         <StatCard 
           icon={Bell} 
-          label="Notifications" 
-          value={ALERTS.length} 
+          label="Alertes" 
+          value={alertes.length}
         />
       </div>
 
@@ -73,7 +81,7 @@ export default function ChefBureauReprDash() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {DOSSIERS.slice(0, 8).map((d) => (
+                    {activeDossiers.slice(0, 8).map((d) => (
                       <tr key={d.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-3 py-3 font-mono text-xs text-accent font-bold">{d.reference}</td>
                         <td className="px-3 py-3 font-medium">{d.importateur}</td>
@@ -101,34 +109,26 @@ export default function ChefBureauReprDash() {
                 </Link>
               }
             >
-               <div className="space-y-4">
+                <div className="space-y-4">
                   {operators.slice(0, 4).map(op => (
                      <div key={op.id} className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                            <div className="h-8 w-8 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-[10px]">
-                              {op.fullName.split(' ').map(n => n[0]).join('')}
+                              {(op.full_name || op.fullName || 'O').split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
                            </div>
-                           <div className="text-xs font-medium">{op.fullName}</div>
+                           <div className="text-xs font-medium">{op.full_name || op.fullName}</div>
                         </div>
-                        <Badge variant={op.status === 'actif' ? 'success' : 'destructive'} className="text-[8px]">
-                           {op.status}
+                        <Badge variant={op.status === 'actif' || op.status === 'active' ? 'success' : 'destructive'} className="text-[8px]">
+                           {op.status || 'actif'}
                         </Badge>
                      </div>
                   ))}
-               </div>
+                  {operators.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-4">Aucun opérateur actif</p>
+                  )}
+                </div>
             </Panel>
 
-            <Panel title="Système">
-               <div className="p-4 rounded-xl bg-accent/5 border border-accent/10 space-y-3">
-                  <div className="flex items-center gap-3">
-                     <ShieldCheck className="h-5 w-5 text-accent" />
-                     <p className="text-xs font-bold uppercase tracking-wider">Sécurité OK</p>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                     Votre session est sécurisée. Toutes les modifications de données de référence (Locodes, Pays) sont tracées par le système provincial.
-                  </p>
-               </div>
-            </Panel>
          </div>
       </div>
     </div>

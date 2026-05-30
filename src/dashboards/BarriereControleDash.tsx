@@ -15,24 +15,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { DOSSIERS, EMPTY_MANIFESTS } from "@/lib/mock";
+import { useApi, apiGetDossiers } from "@/lib/api";
+import { EMPTY_MANIFESTS } from "@/lib/mock";
 import { DataTable, type Column } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
 
 export default function BarriereControleDash() {
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const activeDossiers = rawDossiers as any[] || [];
+
   const [dossierSearch, setDossierSearch] = useState("");
   const [manifestSearch, setManifestSearch] = useState("");
 
   const filteredDossiers = (DOSSIERS || []).filter(
     (d) =>
       !dossierSearch ||
-      d.reference?.toLowerCase().includes(`rd-${dossierSearch}`.toLowerCase()) ||
-      d.importateur?.toLowerCase().includes(dossierSearch.toLowerCase()),
+      (d.reference || "").toLowerCase().includes(`rd-${dossierSearch}`.toLowerCase()) ||
+      (d.importateur || "").toLowerCase().includes(dossierSearch.toLowerCase()),
   );
 
   const filteredManifests = (EMPTY_MANIFESTS || []).filter(
-    (m) => !manifestSearch || m.reference?.toLowerCase().includes(manifestSearch.toLowerCase()),
+    (m) => !manifestSearch || (m.reference || "").toLowerCase().includes(manifestSearch.toLowerCase()),
   );
 
   const dossierColumns: Column<any>[] = [
@@ -103,8 +107,12 @@ export default function BarriereControleDash() {
               </span>
               <input
                 type="text"
+                inputMode="numeric"
                 value={dossierSearch}
-                onChange={(e) => setDossierSearch(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "").slice(0, 9);
+                  setDossierSearch(val);
+                }}
                 placeholder="0001"
                 className="h-9 w-full bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/40"
               />

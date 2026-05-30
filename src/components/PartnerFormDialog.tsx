@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useApi, apiGetDossiers } from "@/lib/api";
 import { Plus, Trash2, Building2, ChevronDown, ChevronRight, KeyRound, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,14 +22,16 @@ import {
 import { BUREAUX_DOUANIERS, TYPES_DOSSIERS } from "@/lib/mock";
 import type { PartenaireBureau, PartenaireCommission, Partenaire } from "@/lib/mock";
 import { toast } from "sonner";
+import { apiCreatePartenaire, apiUpdatePartenaire } from "@/lib/api";
 
 interface Props {
   trigger: React.ReactNode;
   title: string;
   initial?: Partenaire;
+  onSuccess?: () => void;
 }
 
-export function PartnerFormDialog({ trigger, title, initial }: Props) {
+export function PartnerFormDialog({ trigger, title, initial, onSuccess }: Props) {
   const [open, setOpen] = useState(false);
   const [nom, setNom] = useState(initial?.nom ?? "");
   const [contact, setContact] = useState(initial?.contact ?? "");
@@ -103,15 +106,50 @@ export function PartnerFormDialog({ trigger, title, initial }: Props) {
     );
   };
 
-  const generatePassword = () => setPassword(Math.random().toString(36).slice(2, 10) + "!");
+  const generatePassword = () => setPassword("SGDT@" + Math.random().toString(36).slice(2, 6).toUpperCase() + Math.floor(1000 + Math.random() * 9000));
 
-  const handleSubmit = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
     if (!nom.trim()) {
       toast.error("Le nom est requis");
       return;
     }
-    toast.success(initial ? "Partenaire modifié" : "Partenaire créé");
-    setOpen(false);
+    if (!telephone.trim()) {
+      toast.error("Le téléphone est requis");
+      return;
+    }
+    if (!initial && !password.trim()) {
+      toast.error("Le mot de passe est requis");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        nom,
+        contact,
+        telephone,
+        email,
+        password,
+        username,
+        bureaux
+      };
+
+      if (initial) {
+        await apiUpdatePartenaire(initial.id.toString(), payload);
+        toast.success("Partenaire modifié");
+      } else {
+        await apiCreatePartenaire(payload);
+        toast.success("Partenaire créé");
+      }
+      setOpen(false);
+      if (onSuccess) onSuccess();
+    } catch (e: any) {
+      toast.error(e.message || "Erreur lors de l'enregistrement");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getBureauName = (id: string) =>
@@ -152,9 +190,11 @@ export function PartnerFormDialog({ trigger, title, initial }: Props) {
               Téléphone <span className="text-destructive">*</span>
             </label>
             <Input
+              type="tel"
+              maxLength={9}
               value={telephone}
-              onChange={(e) => setTelephone(e.target.value)}
-              placeholder="+243 ..."
+              onChange={(e) => setTelephone(e.target.value.replace(/\D/g, "").slice(0, 9))}
+              placeholder="ex: 813478556"
             />
           </div>
           <div className="space-y-1.5">
@@ -376,10 +416,12 @@ export function PartnerFormDialog({ trigger, title, initial }: Props) {
         )}
 
         <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
             Annuler
           </Button>
-          <Button onClick={handleSubmit}>Enregistrer</Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? "Enregistrement..." : "Enregistrer"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

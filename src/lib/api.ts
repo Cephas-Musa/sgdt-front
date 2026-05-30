@@ -28,12 +28,17 @@ async function request<T>(
 ): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     Accept: "application/json",
     ...(options.headers as Record<string, string>),
   };
+  
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  // Si le body n'est PAS un FormData, et qu'on n'a pas spécifié de content-type, on met JSON par défaut
+  if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
   }
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
@@ -119,15 +124,39 @@ export function apiSaveToken(token: string) {
 
 export async function apiGetDossiers(params?: Record<string, string>): Promise<unknown[]> {
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-  return request<unknown[]>(`/dossiers${qs}`);
+  return request<unknown[]>(`/dossiers${qs}`); // Retourne les dossiers actifs par défaut
+}
+
+export async function apiGetNextReference(): Promise<{ reference: string }> {
+  return request<{ reference: string }>("/dossiers/next-reference");
+}
+
+export async function apiSearchDossier(reference: string): Promise<unknown> {
+  return request<unknown>(`/dossiers/search/${reference}`);
+}
+
+export async function apiGetDossierHistory(): Promise<unknown[]> {
+  return request<unknown[]>("/dossiers/history");
 }
 
 export async function apiGetDossier(id: string): Promise<unknown> {
   return request<unknown>(`/dossiers/${id}`);
 }
 
+export async function apiGetTypeDossiers(): Promise<any[]> {
+  return request<any[]>("/type-dossiers");
+}
+
 export async function apiCreateDossier(data: unknown): Promise<unknown> {
   return request<unknown>("/dossiers", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiUpdateDossier(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/dossiers/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function apiDeleteDossier(id: string): Promise<unknown> {
+  return request<unknown>(`/dossiers/${id}`, { method: "DELETE" });
 }
 
 export async function apiUpdateDossierStatus(id: string, status: string): Promise<unknown> {
@@ -135,6 +164,47 @@ export async function apiUpdateDossierStatus(id: string, status: string): Promis
     method: "PATCH",
     body: JSON.stringify({ status }),
   });
+}
+
+export async function apiUploadAttachment(file: File): Promise<{ url: string; path: string; name: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return request<{ url: string; path: string; name: string }>("/upload", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function apiGetDossierDetails(id: string): Promise<unknown> {
+  return request<unknown>(`/dossiers/${id}/details`);
+}
+
+export async function apiActionUpdateInfos(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/dossiers/${id}/infos`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiActionSubmitVerification(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/dossiers/${id}/verification`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiActionFlagAnomaly(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/dossiers/${id}/anomaly`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiActionAddRepresentation(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/dossiers/${id}/representation`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiActionLinkBarriere(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/dossiers/${id}/barriere`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiGetDossierChat(id: string): Promise<unknown[]> {
+  return request<unknown[]>(`/dossiers/${id}/chat`);
+}
+
+export async function apiSendDossierChat(id: string, message: string, attachment?: string): Promise<unknown> {
+  return request<unknown>(`/dossiers/${id}/chat`, { method: "POST", body: JSON.stringify({ message, attachment }) });
 }
 
 // ─── ALERTES ─────────────────────────────────────────────────────────────────
@@ -169,6 +239,24 @@ export async function apiCreateEmptyManifest(data: unknown): Promise<unknown> {
 
 export async function apiPayEmptyManifest(id: number): Promise<unknown> {
   return request<unknown>(`/empty-manifests/${id}/pay`, { method: "POST" });
+}
+
+// ─── TYPES DOSSIERS ─────────────────────────────────────────────────────────
+
+export async function apiGetTypesDossiers(): Promise<unknown[]> {
+  return request<unknown[]>("/config/types-dossiers");
+}
+
+export async function apiCreateTypeDossier(data: unknown): Promise<unknown> {
+  return request<unknown>("/config/types-dossiers", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiUpdateTypeDossier(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/config/types-dossiers/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function apiDeleteTypeDossier(id: string): Promise<unknown> {
+  return request<unknown>(`/config/types-dossiers/${id}`, { method: "DELETE" });
 }
 
 // ─── CHAT ─────────────────────────────────────────────────────────────────────
@@ -206,8 +294,12 @@ export async function apiDeleteUser(id: number): Promise<unknown> {
   return request<unknown>(`/users/${id}`, { method: "DELETE" });
 }
 
-export async function apiUpdateUser(id: number, data: unknown): Promise<unknown> {
-  return request<unknown>(`/users/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export async function apiUpdateUser(id: string, data: Partial<ApiUser>): Promise<ApiUser> {
+  return request<ApiUser>(`/users/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function apiTopupWallet(id: string, amount: number): Promise<unknown> {
+  return request<unknown>(`/users/${id}/topup`, { method: "POST", body: JSON.stringify({ amount }) });
 }
 
 export async function apiUpdateUserStatus(id: number, status: string): Promise<unknown> {
@@ -220,8 +312,8 @@ export async function apiGetTransactions(): Promise<unknown[]> {
   return request<unknown[]>("/transactions");
 }
 
-export async function apiRechargeWallet(data: unknown): Promise<unknown> {
-  return request<unknown>("/transactions/recharge", { method: "POST", body: JSON.stringify(data) });
+export async function apiRechargeWallet(data: { user_id: number; amount: number; description?: string }): Promise<unknown> {
+  return request<unknown>(`/users/${data.user_id}/topup`, { method: "POST", body: JSON.stringify({ amount: data.amount }) });
 }
 
 // ─── APUREMENTS ──────────────────────────────────────────────────────────────
@@ -256,6 +348,15 @@ export async function apiGetColisageRapports(): Promise<unknown[]> {
 export async function apiGetCountries(): Promise<unknown[]> {
   return request<unknown[]>("/config/countries");
 }
+export async function apiCreateCountry(data: unknown): Promise<unknown> {
+  return request<unknown>("/config/countries", { method: "POST", body: JSON.stringify(data) });
+}
+export async function apiUpdateCountry(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/config/countries/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+export async function apiDeleteCountry(id: string): Promise<unknown> {
+  return request<unknown>(`/config/countries/${id}`, { method: "DELETE" });
+}
 
 export async function apiGetBureauxDouaniers(): Promise<unknown[]> {
   return request<unknown[]>("/config/customs-offices");
@@ -286,6 +387,15 @@ export async function apiDeleteBureauRepresentation(id: string): Promise<unknown
 export async function apiGetLocodes(): Promise<unknown[]> {
   return request<unknown[]>("/config/locodes");
 }
+export async function apiCreateLocode(data: unknown): Promise<unknown> {
+  return request<unknown>("/config/locodes", { method: "POST", body: JSON.stringify(data) });
+}
+export async function apiUpdateLocode(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/config/locodes/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+export async function apiDeleteLocode(id: string): Promise<unknown> {
+  return request<unknown>(`/config/locodes/${id}`, { method: "DELETE" });
+}
 
 export async function apiGetProvincialDirections(): Promise<unknown[]> {
   return request<unknown[]>("/config/provincial-directions");
@@ -303,18 +413,42 @@ export async function apiDeleteProvincialDirection(id: string): Promise<unknown>
 export async function apiGetCurrencies(): Promise<unknown[]> {
   return request<unknown[]>("/config/currencies");
 }
+export async function apiCreateCurrency(data: unknown): Promise<unknown> {
+  return request<unknown>("/config/currencies", { method: "POST", body: JSON.stringify(data) });
+}
+export async function apiUpdateCurrency(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/config/currencies/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+export async function apiDeleteCurrency(id: string): Promise<unknown> {
+  return request<unknown>(`/config/currencies/${id}`, { method: "DELETE" });
+}
 
 export async function apiGetWarehouses(): Promise<unknown[]> {
-  return request<unknown[]>("/config/warehouses");
+  return request<unknown[]>("/warehouses");
 }
 export async function apiCreateWarehouse(data: unknown): Promise<unknown> {
-  return request<unknown>("/config/warehouses", { method: "POST", body: JSON.stringify(data) });
+  return request<unknown>("/warehouses", { method: "POST", body: JSON.stringify(data) });
 }
 export async function apiUpdateWarehouse(id: string, data: unknown): Promise<unknown> {
-  return request<unknown>(`/config/warehouses/${id}`, { method: "PUT", body: JSON.stringify(data) });
+  return request<unknown>(`/warehouses/${id}`, { method: "PUT", body: JSON.stringify(data) });
 }
 export async function apiDeleteWarehouse(id: string): Promise<unknown> {
-  return request<unknown>(`/config/warehouses/${id}`, { method: "DELETE" });
+  return request<unknown>(`/warehouses/${id}`, { method: "DELETE" });
+}
+
+// ─── PARTENAIRES ─────────────────────────────────────────────────────────────
+
+export async function apiGetPartenaires(): Promise<unknown[]> {
+  return request<unknown[]>("/partenaires");
+}
+export async function apiCreatePartenaire(data: unknown): Promise<unknown> {
+  return request<unknown>("/partenaires", { method: "POST", body: JSON.stringify(data) });
+}
+export async function apiUpdatePartenaire(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/partenaires/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+export async function apiDeletePartenaire(id: string): Promise<unknown> {
+  return request<unknown>(`/partenaires/${id}`, { method: "DELETE" });
 }
 
 // ─── HOOK UTILITAIRE ─────────────────────────────────────────────────────────
@@ -340,3 +474,112 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
 
   return { data, loading, error, reload: () => fetcher().then(setData).catch(() => {}) };
 }
+
+
+// ─── REPRESENTATION ENTRIES ──────────────────────────────────────────────────
+
+export async function apiGetRepresentationEntry(dossierId: string): Promise<any> {
+  return request<any>(`/representation/dossier/${dossierId}`);
+}
+
+export async function apiSaveRepresentationEntry(dossierId: string, data: unknown): Promise<any> {
+  return request<any>(`/representation/dossier/${dossierId}`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function apiGetRepresentationList(): Promise<any[]> {
+  return request<any[]>("/representation");
+}
+
+export async function apiGetRepresentationStats(): Promise<any> {
+  return request<any>("/representation/stats");
+}
+
+// ─── TYPING DOCS (BARRIERE ETRANGER) ─────────────────────────────────────────
+
+export async function apiCreateTypingDocDirect(data: unknown): Promise<any> {
+  return request<any>("/typing-docs/direct", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function apiCreateTypingDocTranshipment(data: unknown): Promise<any> {
+  return request<any>("/typing-docs/transhipment", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function apiGetTypingDocsByDossier(dossierId: string): Promise<any> {
+  return request<any>(`/typing-docs/dossier/${dossierId}`);
+}
+
+export async function apiGetTypingDocStats(params?: Record<string, string>): Promise<any> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<any>(`/typing-docs/stats${qs}`);
+}
+
+export async function apiLinkTypingDocToDossier(docId: string, data: { dossier_reference: string; doc_type: "direct" | "transhipment" }): Promise<any> {
+  return request<any>(`/typing-docs/${docId}/link`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+// ─── IT ENTRIES ──────────────────────────────────────────────────────────────
+
+export async function apiGetItEntries(params?: Record<string, string>): Promise<any[]> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<any[]>(`/it-entries${qs}`);
+}
+
+export async function apiCreateItEntry(data: unknown): Promise<any> {
+  return request<any>("/it-entries", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function apiGetItEntriesByDossier(dossierId: string): Promise<any[]> {
+  return request<any[]>(`/it-entries/dossier/${dossierId}`);
+}
+
+// ─── ENTRY/EXIT POINTS ─────────────────────────────────────────────────────
+
+export async function apiGetEntryPoints(params?: Record<string, string>): Promise<any[]> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<any[]>(`/config/entry-points${qs}`);
+}
+
+export async function apiCreateEntryPoint(data: any): Promise<any> {
+  return request<any>("/config/entry-points", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiUpdateEntryPoint(id: string, data: any): Promise<any> {
+  return request<any>(`/config/entry-points/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function apiDeleteEntryPoint(id: string): Promise<any> {
+  return request<any>(`/config/entry-points/${id}`, { method: "DELETE" });
+}
+
+export async function apiGetExitPoints(params?: Record<string, string>): Promise<any[]> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<any[]>(`/config/exit-points${qs}`);
+}
+
+export async function apiCreateExitPoint(data: any): Promise<any> {
+  return request<any>("/config/exit-points", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiUpdateExitPoint(id: string, data: any): Promise<any> {
+  return request<any>(`/config/exit-points/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function apiDeleteExitPoint(id: string): Promise<any> {
+  return request<any>(`/config/exit-points/${id}`, { method: "DELETE" });
+}
+

@@ -61,6 +61,23 @@ class User extends Authenticatable
         return $this->belongsToMany(Conversation::class);
     }
 
+    public function roles(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'user_roles');
+    }
+
+    public function hasRole(string $roleSlug): bool
+    {
+        return $this->roles()->where('slug', $roleSlug)->exists();
+    }
+
+    public function hasPermission(string $permissionSlug): bool
+    {
+        return $this->roles()->whereHas('permissions', function ($q) use ($permissionSlug) {
+            $q->where('slug', $permissionSlug);
+        })->exists();
+    }
+
     public function messages(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Message::class, 'sender_id');
@@ -195,6 +212,12 @@ class User extends Authenticatable
     public function auditLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(AuditLog::class);
+    }
+
+    // Historique dossiers (Consultations, Actions)
+    public function dossierHistories(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(UserDossierHistory::class)->orderBy('created_at', 'desc');
     }
 
     /**

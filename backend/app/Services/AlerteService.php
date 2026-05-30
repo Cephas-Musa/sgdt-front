@@ -4,6 +4,11 @@ namespace App\Services;
 
 use App\Models\Alerte;
 use App\Models\User;
+use App\Models\Dossier;
+use App\Models\RepresentationEntry;
+use App\Models\TypingDocDirect;
+use App\Models\ItEntry;
+use Illuminate\Support\Facades\Log;
 
 class AlerteService
 {
@@ -288,6 +293,303 @@ class AlerteService
             ->where('operation_type', 'sortie')
             ->whereIn('sub_type_operation', ['validee', 'autorisee'])
             ->exists();
+    }
+
+    /**
+     * Déclenche une alerte suite à une anomalie signalée
+     */
+    public static function triggerAnomalyAlert(\App\Models\Dossier $dossier, \App\Models\DossierAnomaly $anomaly, User $author)
+    {
+        $service = new self();
+        
+        $title = 'Anomalie Détectée: ' . $anomaly->type;
+        $message = "Sévérité: {$anomaly->severity->value}. " . $anomaly->description;
+        
+        // Alerte à l'inspecteur responsable (Role alert ou Hierarchical alert)
+        // Dans ce contexte, on veut alerter l'inspecteur du dossier.
+        if ($dossier->inspecteur_id) {
+            $inspecteur = User::find($dossier->inspecteur_id);
+            if ($inspecteur) {
+                $alert = Alerte::create([
+                    'recipient_id' => $inspecteur->id,
+                    'dossier_id' => $dossier->id,
+                    'type' => 'anomalie',
+                    'title' => $title,
+                    'message' => $message,
+                    'hierarchy_level' => 1,
+                    'target_role' => $inspecteur->role,
+                    'is_read' => false,
+                    'triggered_by' => $author->id,
+                ]);
+                $service->notifyUser($inspecteur, $alert);
+            }
+        }
+
+        // Si c'est critique (high), on prévient aussi le DP
+        if ($anomaly->severity->value === 'high' && $dossier->province_id) {
+            $service->createRoleAlert($dossier->id, 'anomalie_critique', $title, $message, ['directeur_provincial']);
+        }
+    }
+
+    // ─── REPRESENTATION & BARRIERE CONSISTENCY ALERTS ───────────────────────
+
+    /**
+     * Vérifie la cohérence des poids entre les articles de représentation et les articles du dossier.
+     */
+    public function checkWeightConsistency(string $dossierId): array
+    {
+        $alerts = [];
+        $dossier = Dossier::find($dossierId);
+        if (!$dossier) return $alerts;
+
+        $repEntry = RepresentationEntry::where('dossier_id', $dossierId)->with('articles')->first();
+        if (!$repEntry || $repEntry->articles->isEmpty()) return $alerts;
+
+        $repPoids = $repEntry->articles->sum('poids');
+        $dossierPoids = $dossier->poids ?? 0;
+
+        if ($dossierPoids > 0 && $repPoids > 0) {
+            $diff = abs($repPoids - $dossierPoids);
+            $pct = ($diff / max($repPoids, $dossierPoids)) * 100;
+            if ($pct > 20) {
+                $alerts[] = [
+                    'type' => 'incoherence_poids',
+                    'message' => "Différence de poids détectée: Représentation={$repPoids}kg, Dossier={$dossierPoids}kg (Écart: " . round($pct, 1) . "%)",
+                    'severity' => 'high',
+                ];
+            }
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * Vérifie si un conteneur est présent dans la représentation mais absent dans les docs barrière.
+     */
+    public function checkContainerConsistency(string $dossierId): array
+    {
+        $alerts = [];
+        $repEntry = RepresentationEntry::where('dossier_id', $dossierId)->first();
+        if (!$repEntry) return $alerts;
+
+        $hasContainer = !empty($repEntry->numero_conteneur) || ($repEntry->container_20 + $repEntry->container_40) > 0;
+        if (!$hasContainer) return $alerts;
+
+        $typingDocs = TypingDocDirect::where('dossier_id', $dossierId)->get();
+        $hasContainerInDocs = $typingDocs->contains(fn($d) => !empty($d->container_number));
+
+        if (!$hasContainerInDocs) {
+            $alerts[] = [
+                'type' => 'conteneur_absent_barriere',
+                'message' => "Conteneur(s) déclaré(s) en représentation ({$repEntry->container_20}x20 + {$repEntry->container_40}x40) mais aucun conteneur dans les documents barrière.",
+                'severity' => 'medium',
+            ];
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * Vérifie les contradictions entre les documents (DRA/T1 différents entre modules).
+     */
+    public function checkDocumentContradictions(string $dossierId): array
+    {
+        $alerts = [];
+        $dossier = Dossier::find($dossierId);
+        if (!$dossier) return $alerts;
+
+        $repEntry = RepresentationEntry::where('dossier_id', $dossierId)->first();
+        $typingDocs = TypingDocDirect::where('dossier_id', $dossierId)->get();
+
+        if ($repEntry && $typingDocs->isNotEmpty()) {
+            $repT1 = $repEntry->t1_reference;
+            foreach ($typingDocs as $doc) {
+                if (!empty($repT1) && !empty($doc->t1_reference) && $repT1 !== $doc->t1_reference) {
+                    $alerts[] = [
+                        'type' => 'contradiction_t1',
+                        'message' => "Référence T1 différente: Représentation='{$repT1}', Document direct barrière='{$doc->t1_reference}'.",
+                        'severity' => 'high',
+                    ];
+                }
+            }
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * Détecte les doublons potentiels (même plaque/châssis dans différents dossiers).
+     */
+    public function checkDuplicates(string $vehiculeReference, ?string $excludeDossierId = null): array
+    {
+        $alerts = [];
+        if (empty($vehiculeReference)) return $alerts;
+
+        $existingDocs = TypingDocDirect::where('vehicule_reference', $vehiculeReference)
+            ->when($excludeDossierId, fn($q) => $q->where('dossier_id', '!=', $excludeDossierId))
+            ->whereNotNull('dossier_id')
+            ->with('dossier')
+            ->get();
+
+        foreach ($existingDocs as $doc) {
+            $alerts[] = [
+                'type' => 'doublon_vehicule',
+                'message' => "Véhicule {$vehiculeReference} déjà enregistré sur le dossier {$doc->dossier?->reference}.",
+                'severity' => 'medium',
+            ];
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * Vérifie les incohérences entre les données de représentation et les IT entries.
+     */
+    public function checkRepresentationVsItEntries(string $dossierId): array
+    {
+        $alerts = [];
+        $repEntry = RepresentationEntry::where('dossier_id', $dossierId)->first();
+        $itEntries = ItEntry::where('dossier_id', $dossierId)->get();
+
+        if (!$repEntry || $itEntries->isEmpty()) return $alerts;
+
+        $repImmat = array_filter([$repEntry->immatriculation_avant, $repEntry->immatriculation_arriere]);
+        foreach ($itEntries as $it) {
+            if (!empty($it->chassis) && !empty($repImmat)) {
+                $match = false;
+                foreach ($repImmat as $immat) {
+                    if (str_contains($immat, $it->chassis) || str_contains($it->chassis, $immat)) {
+                        $match = true;
+                        break;
+                    }
+                }
+                if (!$match) {
+                    $alerts[] = [
+                        'type' => 'incoherence_immatriculation',
+                        'message' => "Châssis IT '{$it->chassis}' ne correspond à aucune immatriculation déclarée en représentation.",
+                        'severity' => 'medium',
+                    ];
+                }
+            }
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * Vérifie la cohérence de l'importateur entre la représentation et les docs barrière.
+     */
+    public function checkImportateurConsistency(string $dossierId): array
+    {
+        $alerts = [];
+        $repEntry = RepresentationEntry::where('dossier_id', $dossierId)->first();
+        if (!$repEntry || empty($repEntry->importateur)) return $alerts;
+
+        $typingDocs = TypingDocDirect::where('dossier_id', $dossierId)->get();
+        foreach ($typingDocs as $doc) {
+            if (!empty($doc->importateur) && strcasecmp($repEntry->importateur, $doc->importateur) !== 0) {
+                $alerts[] = [
+                    'type' => 'incoherence_importateur',
+                    'message' => "Importateur différent: Représentation='{$repEntry->importateur}', Document barrière='{$doc->importateur}'.",
+                    'severity' => 'high',
+                ];
+            }
+        }
+        return $alerts;
+    }
+
+    /**
+     * Vérifie la cohérence du pays de provenance entre modules.
+     */
+    public function checkPaysConsistency(string $dossierId): array
+    {
+        $alerts = [];
+        $repEntry = RepresentationEntry::where('dossier_id', $dossierId)->first();
+        $dossier = Dossier::find($dossierId);
+        if (!$repEntry || !$dossier) return $alerts;
+
+        if (!empty($repEntry->pays_provenance_nom) && !empty($dossier->pays)) {
+            $repPays = strtolower(trim($repEntry->pays_provenance_nom));
+            $dosPays = strtolower(trim($dossier->pays));
+            if ($repPays !== $dosPays) {
+                $alerts[] = [
+                    'type' => 'incoherence_pays',
+                    'message' => "Pays de provenance différent: Représentation='{$repEntry->pays_provenance_nom}', Dossier='{$dossier->pays}'.",
+                    'severity' => 'high',
+                ];
+            }
+        }
+        return $alerts;
+    }
+
+    /**
+     * Vérifie la cohérence du bureau entre les données de représentation et les docs barrière.
+     */
+    public function checkBureauConsistency(string $dossierId): array
+    {
+        $alerts = [];
+        $repEntry = RepresentationEntry::where('dossier_id', $dossierId)->first();
+        $typingDocs = TypingDocDirect::where('dossier_id', $dossierId)->get();
+
+        if (!$repEntry || $typingDocs->isEmpty()) return $alerts;
+
+        $repBureau = $repEntry->bureau_etranger_nom;
+        foreach ($typingDocs as $doc) {
+            if (!empty($repBureau) && !empty($doc->bureau_origine) && $repBureau !== $doc->bureau_origine) {
+                $alerts[] = [
+                    'type' => 'incoherence_bureau',
+                    'message' => "Bureau différent: Représentation='{$repBureau}', Document barrière='{$doc->bureau_origine}'.",
+                    'severity' => 'high',
+                ];
+            }
+        }
+        return $alerts;
+    }
+
+    /**
+     * Exécute toutes les vérifications de cohérence pour un dossier.
+     * Retourne un tableau d'alertes créées.
+     */
+    public function runAllConsistencyChecks(string $dossierId, int $triggerUserId): array
+    {
+        $allAlerts = [];
+
+        $checks = [
+            $this->checkWeightConsistency($dossierId),
+            $this->checkContainerConsistency($dossierId),
+            $this->checkDocumentContradictions($dossierId),
+            $this->checkRepresentationVsItEntries($dossierId),
+            $this->checkImportateurConsistency($dossierId),
+            $this->checkPaysConsistency($dossierId),
+            $this->checkBureauConsistency($dossierId),
+        ];
+
+        $targetRoles = ['inspecteur_chef', 'inspecteur'];
+
+        foreach ($checks as $checkAlerts) {
+            foreach ($checkAlerts as $alertData) {
+                foreach ($targetRoles as $role) {
+                    try {
+                        $alert = Alerte::create([
+                            'recipient_id' => null,
+                            'dossier_id' => $dossierId,
+                            'type' => $alertData['type'],
+                            'title' => "[{$alertData['type']}] Dossier #{$dossierId}",
+                            'message' => $alertData['message'],
+                            'hierarchy_level' => 0,
+                            'target_role' => $role,
+                            'is_read' => false,
+                            'triggered_by' => $triggerUserId,
+                        ]);
+                        $allAlerts[] = $alert;
+                    } catch (\Exception $e) {
+                        Log::error("AlerteService: " . $e->getMessage());
+                    }
+                }
+            }
+        }
+
+        return $allAlerts;
     }
 }
 

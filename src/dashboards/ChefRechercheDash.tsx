@@ -3,19 +3,23 @@ import { DashHeader, StatCard, Panel } from "./_shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { DOSSIERS, DOSSIERS_TRAITES } from "@/lib/mock";
+import { useApi, apiGetDossiers } from "@/lib/api";
+import { DOSSIERS_TRAITES } from "@/lib/mock";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 export default function ChefRechercheDash() {
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const activeDossiers = rawDossiers as any[] || [];
+
   const traites = DOSSIERS_TRAITES;
-  const apures = DOSSIERS.filter((d) => d.status === "apure");
+  const apures = activeDossiers.filter((d) => d.status === "apure");
 
   return (
     <div>
       <DashHeader subtitle="Chef Bureau Recherche — appurement et dossiers traités" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard icon={FolderKanban} label="Dossiers" value={DOSSIERS.length} />
+        <StatCard icon={FolderKanban} label="Dossiers" value={activeDossiers.length} />
         <StatCard icon={FileCheck} label="Dossiers traités" value={traites.length} />
         <StatCard icon={Search} label="Apurés" value={apures.length} />
       </div>

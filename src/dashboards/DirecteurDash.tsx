@@ -55,14 +55,14 @@ export default function DirecteurDash() {
   const directeursProvinciaux = ACCOUNTS.filter((a) => a.role === "directeur_provincial");
 
   const generate = () => {
-    setPwd(Math.random().toString(36).slice(2, 10) + "!");
+    setPwd("SGDT@" + Math.random().toString(36).slice(2, 6).toUpperCase() + Math.floor(1000 + Math.random() * 9000));
   };
 
   const allowedRoles = ["directeur", "chef_bureau_repr", "operateur_saisie"] as const;
 
   return (
     <div>
-      <DashHeader subtitle="Espace Directeur Général — bureaux douaniers, directions provinciales, comptes et notifications" />
+      <DashHeader subtitle="Espace Directeur Général — bureaux douaniers, directions provinciales, comptes et alertes" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Building2} label="Bureaux douaniers" value={BUREAUX_DOUANIERS.length} />
         <StatCard

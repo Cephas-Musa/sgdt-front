@@ -38,7 +38,7 @@ class CompleteSystemTest extends TestCase
 
         // Setup common test actors
         $this->superadmin = User::create([
-            'phone_number' => '+243995833424',
+            'phone_number' => '+243813478556',
             'password' => bcrypt('Dragon@2004'),
             'role' => 'super_admin',
             'full_name' => 'Superadmin SGDT',

@@ -3,6 +3,7 @@ export type Role =
   | "directeur"
   | "directeur_provincial"
   | "inspecteur_chef"
+  | "inspecteur"
   | "agent_controle"
   | "chef_bureau_repr"
   | "operateur_saisie"
@@ -30,6 +31,7 @@ export const ROLE_LABELS: Record<Role, { fr: string; en: string }> = {
   directeur: { fr: "Directeur Général", en: "General Director" },
   directeur_provincial: { fr: "Directeur Provincial", en: "Provincial Director" },
   inspecteur_chef: { fr: "Inspecteur Chef de Bureau", en: "Chief Inspector" },
+  inspecteur: { fr: "Inspecteur", en: "Inspector" },
   agent_controle: { fr: "Agent Cellule Contrôle", en: "Control Cell Agent" },
   chef_bureau_repr: { fr: "Chef Bureau Représentation", en: "Representation Office Head" },
   operateur_saisie: { fr: "Opérateur Saisie", en: "Data Entry Operator" },
@@ -85,6 +87,19 @@ export const ROLE_NAV: Record<Role, NavKey[]> = {
     "profil",
   ],
   inspecteur_chef: [
+    "dashboard",
+    "dossiers",
+    "appurement",
+    "localisation",
+    "entrepots",
+    "secretariat",
+    "alertes",
+    "comptes",
+    "representation",
+    "chat",
+    "profil",
+  ],
+  inspecteur: [
     "dashboard",
     "dossiers",
     "appurement",

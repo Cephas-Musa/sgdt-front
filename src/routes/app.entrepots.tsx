@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 import { DataTable } from "@/components/DataTable";
-import { ENTREPOTS, DOSSIERS } from "@/lib/mock";
+import { useApi, apiGetWarehouses, apiCreateWarehouse, apiUpdateWarehouse, apiDeleteWarehouse } from "@/lib/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Loader2, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   ArrowDownRight,
@@ -374,7 +376,7 @@ function BrigadierEntrepotForms() {
                 <Field label="Bâtiment">
                   <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <option value="">Sélectionner bâtiment</option>
-                    {ENTREPOTS.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+                    {entrepots.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
                   </select>
                 </Field>
                 <Field label="Zone / espace spécifique">
@@ -433,6 +435,57 @@ function BrigadierEntrepotForms() {
 
 function EntrepotsPage() {
   const { user } = useAuth();
+  const { data: rawWarehouses, reload } = useApi(apiGetWarehouses);
+  const entrepots = (rawWarehouses as any[]) || [];
+  
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState("");
+  const [formData, setFormData] = useState({ nom: "", code: "", bureau: "", capacite: 0 });
+  const [loading, setLoading] = useState(false);
+
+  const openCreate = () => {
+    setEditingId("");
+    setFormData({ nom: "", code: "", bureau: "", capacite: 0 });
+    setIsDialogOpen(true);
+  };
+
+  const openEdit = (e: any) => {
+    setEditingId(e.id);
+    setFormData({ nom: e.nom, code: e.code, bureau: e.bureau, capacite: e.capacite });
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      if (editingId) {
+        await apiUpdateWarehouse(editingId, formData);
+        toast.success("Entrepôt modifié");
+      } else {
+        await apiCreateWarehouse(formData);
+        toast.success("Entrepôt créé");
+      }
+      setIsDialogOpen(false);
+      reload();
+    } catch (e: any) {
+      toast.error("Erreur: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Voulez-vous vraiment supprimer cet entrepôt ?")) {
+      try {
+        await apiDeleteWarehouse(id);
+        toast.success("Entrepôt supprimé");
+        reload();
+      } catch (e) {
+        toast.error("Erreur suppression");
+      }
+    }
+  };
+
   const navigate = useNavigate();
   const isInspecteur = user?.role === "inspecteur_chef";
   const isBrigadier = user?.role === "brigadier_entrepot";
@@ -830,25 +883,71 @@ function EntrepotsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Liste entrepôts (pour les chefs) */}
-      {(isInspecteur ||
-        isDP ||
-        user?.role === "chef_entrepot_log") && (
-        <div className="mt-6">
-          <DataTable
-            data={ENTREPOTS}
-            columns={[
-              { key: "code", header: "Code" },
-              { key: "nom", header: "Nom" },
-              { key: "bureau", header: "Bureau" },
-              { key: "capacite", header: "Capacité" },
-            ]}
-            onRowClick={(entrepot) =>
-              navigate({ to: "/app/entrepots/$entrepotId", params: { entrepotId: entrepot.id } })
-            }
-          />
+      {/* Liste complète des Entrepôts */}
+      <div className="mt-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Liste complète des Entrepôts</h2>
+          {(user?.role === "super_admin" || isDP || user?.role === "directeur_general") && (
+            <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Nouvel Entrepôt</Button>
+          )}
         </div>
-      )}
+        <div className="rounded-lg border bg-card">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-left font-bold uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">Code</th>
+                <th className="px-4 py-3">Nom</th>
+                <th className="px-4 py-3">Bureau</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {entrepots.length === 0 ? (
+                 <tr><td colSpan={4} className="text-center py-4">Aucun entrepôt. Tout est à 0.</td></tr>
+              ) : entrepots.map(e => (
+                 <tr key={e.id} className="hover:bg-muted/30">
+                    <td className="px-4 py-3 font-mono">{e.code}</td>
+                    <td className="px-4 py-3 font-medium">{e.nom}</td>
+                    <td className="px-4 py-3">{e.bureau}</td>
+                    <td className="px-4 py-3 text-right flex justify-end gap-2">
+                       <Button size="sm" variant="outline" onClick={() => openEdit(e)}><Edit className="h-4 w-4" /></Button>
+                       <Button size="sm" variant="destructive" onClick={() => handleDelete(e.id)}><Trash2 className="h-4 w-4" /></Button>
+                    </td>
+                 </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Modifier l'entrepôt" : "Créer un entrepôt"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Code</label>
+              <Input value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} placeholder="Ex: ENTR-01" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nom de l'entrepôt</label>
+              <Input value={formData.nom} onChange={e => setFormData({ ...formData, nom: e.target.value })} placeholder="Entrepôt Douanier" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Bureau rattaché</label>
+              <Input value={formData.bureau} onChange={e => setFormData({ ...formData, bureau: e.target.value })} placeholder="BOMA" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
+            <Button onClick={handleSave} disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Enregistrer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

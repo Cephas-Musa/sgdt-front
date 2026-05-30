@@ -100,6 +100,10 @@ export interface Dossier {
     statutFinal: string;
   };
   operateurSaisie?: string;
+  created_by?: string;
+  inspecteur_id?: string;
+  secretary_id?: string;
+  extra_data?: Record<string, any>;
   articles?: Article[];
   // Nouveaux champs pour Trafic et Export
   trafic?: {
@@ -666,7 +670,7 @@ export const SOLDE_VIRTUEL: SoldeVirtuel = {
   soldeNet: 0,
   devise: "USD",
   derniereMaj: new Date().toISOString(),
-  mouvements: []
+  mouvements: [],
 };
 
 // ============== Secrétaires de l'inspecteur ==============
@@ -722,7 +726,7 @@ export const CHEF_BARRIERE_OUGANDA: ChefBarriereOuganda = {
   nom: "Chef Barrière Ouganda",
   commissions: [],
   statut: "actif",
-  dateCreation: new Date().toISOString()
+  dateCreation: new Date().toISOString(),
 };
 
 export interface DossierShareAllocation {
@@ -773,14 +777,3 @@ export interface ApurementSubmission {
 }
 
 export const APUREMENT_SUBMISSIONS: ApurementSubmission[] = [];
-
-export interface NotificationItem {
-  id: string;
-  title: string;
-  message: string;
-  date: string;
-  read: boolean;
-  category: "système" | "sécurité" | "opération" | "subordonné" | "alerte";
-}
-
-export const NOTIFICATIONS: NotificationItem[] = [];

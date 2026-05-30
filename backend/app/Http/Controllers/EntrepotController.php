@@ -11,6 +11,7 @@ use App\Models\Decharge;
 use App\Models\MouvementStockage;
 use App\Services\AlerteService;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 class EntrepotController extends Controller
 {
@@ -138,6 +139,59 @@ class EntrepotController extends Controller
     {
         $entrepot = Entrepot::findOrFail($id);
         return response()->json($entrepot);
+    }
+
+    /**
+     * Création d'un entrepôt
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'nom' => 'required|string|max:255',
+            'code' => 'required|string|max:50',
+            'bureau' => 'required|string|max:100',
+            'capacite' => 'nullable|integer',
+        ]);
+
+        $entrepot = Entrepot::create([
+            'id' => (string) Str::uuid(),
+            'code' => $request->code,
+            'nom' => $request->nom,
+            'bureau' => $request->bureau,
+            'capacite' => $request->capacite ?? 0,
+        ]);
+
+        return response()->json($entrepot, 201);
+    }
+
+    /**
+     * Mise à jour d'un entrepôt
+     */
+    public function update(Request $request, $id)
+    {
+        $entrepot = Entrepot::findOrFail($id);
+
+        $request->validate([
+            'nom' => 'sometimes|required|string|max:255',
+            'code' => 'sometimes|required|string|max:50',
+            'bureau' => 'sometimes|required|string|max:100',
+            'capacite' => 'nullable|integer',
+        ]);
+
+        $entrepot->update($request->only(['nom', 'code', 'bureau', 'capacite']));
+
+        return response()->json($entrepot);
+    }
+
+    /**
+     * Suppression d'un entrepôt
+     */
+    public function destroy($id)
+    {
+        $entrepot = Entrepot::findOrFail($id);
+        $entrepot->delete();
+
+        return response()->json(['message' => 'Entrepôt supprimé avec succès.']);
     }
 
     /**

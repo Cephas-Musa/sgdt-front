@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { ENTREPOTS, EMPTY_MANIFESTS } from "@/lib/mock";
+import { EMPTY_MANIFESTS } from "@/lib/mock";
+import { useApi, apiGetWarehouses } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +22,7 @@ export default function BrigadierBarriereDash() {
   const [traversedManifests, setTraversedManifests] = useState<Set<string>>(new Set());
 
   const filteredManifests = EMPTY_MANIFESTS.filter(
-    (m) => !manifestSearch || m.reference.toLowerCase().includes(manifestSearch.toLowerCase()),
+    (m) => !manifestSearch || (m.reference || "").toLowerCase().includes(manifestSearch.toLowerCase()),
   );
 
   const handleTraverser = (id: string) => {
@@ -210,8 +211,18 @@ export default function BrigadierBarriereDash() {
                       <Field label="Agent émetteur" required>
                         <Input />
                       </Field>
-                      <Field label="Réf. dossier (RD-…)" required>
-                        <Input placeholder="RD-…" />
+                      <Field label="Réf. dossier" required>
+                        <div className="flex items-center overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
+                          <span className="flex items-center px-3 border-r border-input bg-muted/50 font-bold text-muted-foreground select-none">RD-</span>
+                          <input 
+                            className="flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/50 h-9"
+                            placeholder="0001" 
+                            inputMode="numeric"
+                            onChange={(e) => { 
+                              e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9);
+                            }}
+                          />
+                        </div>
                       </Field>
                       <Field label="Lieu de déchargement">
                         <Input />

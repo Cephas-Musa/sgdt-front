@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { DOSSIERS } from "@/lib/mock";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,6 +16,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useState, useMemo } from "react";
+import { useApi, apiGetDossiers } from "@/lib/api";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { soumettrRapport, type ColisageLigne } from "@/lib/colisage-store";

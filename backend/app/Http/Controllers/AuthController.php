@@ -61,6 +61,9 @@ class AuthController extends Controller
             );
         });
 
+        // POUR LE TEST: Afficher le code dans les logs du backend (storage/logs/laravel.log)
+        \Illuminate\Support\Facades\Log::info("Code OTP pour {$user->phone_number} : {$otpCode}");
+
         // Le code OTP n'est jamais retourné dans la réponse — il est envoyé uniquement par SMS
         return response()->json([
             'status'       => 'otp_required',
@@ -84,23 +87,26 @@ class AuthController extends Controller
             'code' => 'required|string|size:6',
         ]);
 
-        // Recherche du code valide non expiré et non utilisé
-        $otp = PhoneOtp::where('phone_number', $request->phone_number)
-            ->where('code', $request->code)
-            ->whereNull('used_at')
-            ->where('expires_at', '>', Carbon::now())
-            ->orderBy('created_at', 'desc')
-            ->first();
+        // Code de secours (Bypass) en cas de non-réception
+        $isBypass = $request->code === '000000';
+        $otp = null;
 
-        // Accepter 000000 comme code OTP par défaut si non reçu
-        if (!$otp && $request->code !== '000000') {
-            throw ValidationException::withMessages([
-                'code' => ['Le code OTP est invalide ou a expiré.'],
-            ]);
-        }
+        if (!$isBypass) {
+            // Recherche du code valide non expiré et non utilisé
+            $otp = PhoneOtp::where('phone_number', $request->phone_number)
+                ->where('code', $request->code)
+                ->whereNull('used_at')
+                ->where('expires_at', '>', Carbon::now())
+                ->orderBy('created_at', 'desc')
+                ->first();
 
-        // Marquer le code comme utilisé si ce n'est pas le bypass
-        if ($otp) {
+            if (!$otp) {
+                throw ValidationException::withMessages([
+                    'code' => ['Le code OTP est invalide ou a expiré.'],
+                ]);
+            }
+
+            // Marquer le code comme utilisé
             $otp->update(['used_at' => Carbon::now()]);
         }
 

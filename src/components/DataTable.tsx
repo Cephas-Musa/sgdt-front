@@ -107,7 +107,10 @@ export function DataTable<T extends { id: string }>({
                   <td key={c.key} className={`px-4 py-2.5 ${c.className ?? ""}`}>
                     {c.render
                       ? c.render(row, (current - 1) * pageSize + rowIndex)
-                      : ((row as Record<string, ReactNode>)[c.key] as ReactNode)}
+                      : (() => {
+                          const val = (row as Record<string, unknown>)[c.key];
+                          return (val === null || val === undefined || val === "") ? "-" : (val as ReactNode);
+                        })()}
                   </td>
                 ))}
               </tr>

@@ -27,7 +27,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { DOSSIERS, type Dossier } from "@/lib/mock";
+import { useApi, apiGetDossierDetails } from "@/lib/api";
 
 export const Route = createFileRoute("/app/dossiers/$dossierId")({
   component: DossierDetailPage,
@@ -109,18 +109,122 @@ function DossierDetailPage() {
   const { dossierId } = useParams({ from: "/app/dossiers/$dossierId" });
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<FilterKey>("barriereEtranger");
-  const [isLoading, setIsLoading] = useState(true);
   const [filterTransition, setFilterTransition] = useState(false);
   const { t } = useI18n();
   const { user } = useAuth();
 
-  const dossier = DOSSIERS.find((d) => d.id === dossierId);
+  const { data: rawDossier, loading: isLoading, error } = useApi<any>(() => apiGetDossierDetails(dossierId), [dossierId]);
 
-  // Simuler un état de chargement
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
+  // Mapping des données relationnelles du backend vers les sections UI
+  const repr = rawDossier?.representation_entry;
+  const typingDirect = rawDossier?.typing_docs_direct?.[0];
+  const typingTranship = rawDossier?.typing_docs_transhipment?.[0];
+  const itEntry = rawDossier?.it_entries?.[0];
+
+  const dossier = rawDossier ? {
+    id: rawDossier.id,
+    reference: rawDossier.reference || `RD-${rawDossier.id?.substring(0, 4)}`,
+    type: rawDossier.type || "import",
+    importateur: rawDossier.importateur || repr?.importateur || "—",
+    nif: repr?.nif || rawDossier.nif || "—",
+    bureauRepr: repr?.bureau_etranger_nom || rawDossier.bureau_repr || "—",
+    operateurSaisie: repr?.operateur?.full_name || rawDossier.secretary?.full_name || rawDossier.creator?.full_name || "Système",
+    date: new Date(rawDossier.created_at).toLocaleDateString(),
+    status: rawDossier.status,
+    typeMarchandises: rawDossier.type_marchandises || "Général",
+    quantite: rawDossier.articles?.reduce((acc: number, a: any) => acc + Number(a.quantite ?? 0), 0) || 0,
+    poids: rawDossier.articles?.reduce((acc: number, a: any) => acc + Number(a.poids ?? 0), 0) || 0,
+    colis: rawDossier.articles?.length || 0,
+    dra: rawDossier.dra || repr?.dra_reference || "—",
+    t1: rawDossier.t1 || repr?.t1_reference || typingDirect?.t1_reference || "—",
+    referenceDouane: rawDossier.reference_douane || "—",
+    declarant: rawDossier.declarant || rawDossier.importateur || "—",
+    nombreDeclarations: rawDossier.nombre_declarations || 1,
+    vehicule: rawDossier.mouvements?.[0]?.vehicule || typingDirect?.vehicule_reference || repr?.immatriculation_avant || "—",
+    plaque: rawDossier.mouvements?.[0]?.plaque || repr?.immatriculation_avant || "—",
+    provenance: rawDossier.provenance || repr?.pays_provenance_nom || "—",
+    destination: rawDossier.destination || "—",
+    localisation: rawDossier.localisation || "—",
+    barriereEtranger: {
+      entree: typingDirect?.date_entree || rawDossier.empty_manifests?.[0]?.created_at?.split('T')[0] || "—",
+      traversee: typingTranship ? `${typingTranship.nombre_vehicules} véhicule(s) → ${typingTranship.transhipped_to || '?'}` : "—",
+      validation: typingDirect?.status || rawDossier.empty_manifests?.[0]?.facture_statut || "—",
+      transport: typingDirect?.vehicule_reference || repr?.immatriculation_avant || "—",
+      conteneur: typingDirect?.container_number || repr?.numero_conteneur || "—",
+      container20: typingDirect?.container_20 ?? repr?.container_20 ?? 0,
+      container40: typingDirect?.container_40 ?? repr?.container_40 ?? 0,
+      barriere: typingDirect?.barriere_code || "—",
+      office: typingDirect?.office || "—",
+      consignee: typingDirect?.consignee || repr?.importateur || "—",
+      t1: typingDirect?.t1_reference || repr?.t1_reference || "—",
+      paysExport: typingDirect?.country_of_export || repr?.pays_provenance_nom || "—",
+    },
+    barrierePays: {
+      entree: rawDossier.barriere_entries?.[0]?.date_passage?.split('T')[0] || rawDossier.barriere_entries?.[0]?.created_at?.split('T')[0] || "—",
+      posteDouanier: rawDossier.barriere_entries?.[0]?.barriere_name || "—",
+      validation: rawDossier.barriere_entries?.[0]?.status || "—",
+      mouvementsInternes: rawDossier.mouvements?.length || "0",
+      observations: rawDossier.barriere_entries?.[0]?.observations || "—",
+    },
+    donneesRepresentation: {
+      bureau: repr?.bureau_etranger_nom ? `${repr.bureau_etranger_code} | ${repr.bureau_etranger_nom}` : "—",
+      importateur: repr?.importateur || rawDossier.importateur || "—",
+      nif: repr?.nif || "—",
+      referenceDra: repr?.dra_reference || rawDossier.dra || "—",
+      dateDra: repr?.dra_date || "—",
+      referenceT1: repr?.t1_reference || rawDossier.t1 || "—",
+      dateT1: repr?.t1_date || "—",
+      typeDossier: rawDossier.type_dossier?.libelle || "—",
+      devise: repr?.devise || rawDossier.devise || "USD",
+      paysProvenance: repr?.pays_provenance_nom || "—",
+      bureauSortie: repr?.bureau_sortie_nom ? `${repr.bureau_sortie_code} | ${repr.bureau_sortie_nom}` : "—",
+      incoterm: repr?.incoterm || "—",
+      conteneur: repr?.numero_conteneur || "—",
+      container20: repr?.container_20 ?? 0,
+      container40: repr?.container_40 ?? 0,
+      fobTotal: repr?.fob_total || 0,
+      immatAvant: repr?.immatriculation_avant || "—",
+      immatArriere: repr?.immatriculation_arriere || "—",
+    },
+    itModule: itEntry ? {
+      consignee: itEntry.consignee || "—",
+      chassis: itEntry.chassis || "—",
+      vehiculeMark: itEntry.vehicule_mark || "—",
+      manifestYear: itEntry.manifest_year || "—",
+      color: itEntry.color || "—",
+      reference: itEntry.it_reference || "—",
+      status: itEntry.status || "—",
+    } : null,
+    rapportColisage: {
+      colis: rawDossier.colisages?.length || 0,
+      denombrement: "—",
+      pointage: "—",
+      quantites: "—",
+    },
+    verificationRapport: {
+      resultat: rawDossier.validations?.[0]?.status || "—",
+      observations: rawDossier.validations?.[0]?.observation || "—",
+      anomalies: rawDossier.anomalies?.length ? `${rawDossier.anomalies.length} détectée(s)` : "Aucune",
+      commentaires: rawDossier.validations?.[0]?.validation_type || "—",
+    },
+    sortie: {
+      autorisation: rawDossier.mouvements?.find((m: any) => m.operation_type === 'sortie')?.sub_type_operation || "—",
+      bonSortie: "—",
+      dateSortie: rawDossier.mouvements?.find((m: any) => m.operation_type === 'sortie')?.created_at?.split('T')[0] || "—",
+      destinationFinale: rawDossier.destination || "—",
+    },
+    rapportDechargement: {
+      entrepot: rawDossier.colisages?.[0]?.entrepot_name || "—",
+      dechargement: "—",
+      emplacement: "—",
+      statutFinal: rawDossier.colisages?.[0]?.status || "—",
+    },
+    articles: [
+      ...(rawDossier.articles || []),
+      ...(repr?.articles || []).map((a: any) => ({ ...a, source: 'representation' }))
+    ].filter((a, idx, arr) => arr.findIndex(x => x.id === a.id) === idx), // déduplique
+    reprArticles: repr?.articles || [],
+  } : null;
 
   // Transition douce entre les filtres
   const handleFilterChange = (key: FilterKey) => {
@@ -132,28 +236,7 @@ function DossierDetailPage() {
     }, 150);
   };
 
-  /* ── Dossier non trouvé ── */
-  if (!dossier) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
-            <Info className="h-8 w-8 text-destructive" />
-          </div>
-          <h1 className="text-xl font-semibold">Dossier non trouvé</h1>
-          <p className="text-sm text-muted-foreground">
-            Le dossier demandé n'existe pas ou a été supprimé.
-          </p>
-          <Button onClick={() => router.history.back()} variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Retour aux dossiers
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  /* ── État de chargement ── */
+  /* ── État de chargement (doit être avant le check "non trouvé") ── */
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -180,6 +263,28 @@ function DossierDetailPage() {
     );
   }
 
+  /* ── Dossier non trouvé (après chargement terminé) ── */
+  if (!dossier) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
+            <Info className="h-8 w-8 text-destructive" />
+          </div>
+          <h1 className="text-xl font-semibold">Dossier non trouvé</h1>
+          <p className="text-sm text-muted-foreground">
+            Le dossier demandé n'existe pas ou a été supprimé.
+          </p>
+          <Button onClick={() => router.history.back()} variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Retour aux dossiers
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+
   const isAnalysisVisible = user?.role ? ALLOWED_ROLES.includes(user.role) : false;
 
   const renderActiveFilterContent = () => {
@@ -193,10 +298,18 @@ function DossierDetailPage() {
             iconColor="text-blue-500"
             source="Typing Operator"
           >
+            <FilterField label="Barrière" value={dossier.barriereEtranger.barriere} icon="🚧" />
+            <FilterField label="Office" value={dossier.barriereEtranger.office} icon="🏢" />
             <FilterField label="Entrée barrière" value={dossier.barriereEtranger.entree} icon="📥" />
-            <FilterField label="Traversée" value={dossier.barriereEtranger.traversee} icon="🔄" />
+            <FilterField label="Traversée (Transbordement)" value={dossier.barriereEtranger.traversee} icon="🔄" />
+            <FilterField label="Référence T1" value={dossier.barriereEtranger.t1} icon="📄" />
+            <FilterField label="Pays Export" value={dossier.barriereEtranger.paysExport} icon="🌍" />
+            <FilterField label="Véhicule" value={dossier.barriereEtranger.transport} icon="🚛" />
+            <FilterField label="Conteneur" value={dossier.barriereEtranger.conteneur} icon="📦" />
+            <FilterField label="Container 20ft" value={`${dossier.barriereEtranger.container20} unité(s)`} icon="📦" />
+            <FilterField label="Container 40ft" value={`${dossier.barriereEtranger.container40} unité(s)`} icon="📦" />
+            <FilterField label="Consignee" value={dossier.barriereEtranger.consignee} icon="👤" />
             <FilterField label="Validation" value={dossier.barriereEtranger.validation} icon="✅" />
-            <FilterField label="Statut Transport" value={dossier.barriereEtranger.transport} icon="🚛" />
           </FilterSection>
         );
       case "barrierePays":
@@ -211,23 +324,66 @@ function DossierDetailPage() {
             <FilterField label="Statut Entrée" value={dossier.barrierePays.entree} icon="📥" />
             <FilterField label="Poste Douanier" value={dossier.barrierePays.posteDouanier} icon="🏢" />
             <FilterField label="Validation" value={dossier.barrierePays.validation} icon="✅" />
-            <FilterField label="Mouvements Internes" value={dossier.barrierePays.mouvementsInternes} icon="🔄" />
+            <FilterField label="Mouvements Internes" value={String(dossier.barrierePays.mouvementsInternes)} icon="🔄" />
+            <FilterField label="Observations" value={dossier.barrierePays.observations} icon="📝" />
           </FilterSection>
         );
       case "donneesRepresentation":
         return (
           <FilterSection
             title="Données Représentation"
-            subtitle="Informations déclarées au bureau de représentation"
+            subtitle="Informations déclarées au bureau de représentation étrangère"
             icon={Building2}
             iconColor="text-violet-500"
             source="Opérateur de Saisie"
           >
             <FilterField label="Bureau de Représentation" value={dossier.donneesRepresentation.bureau} icon="🏢" />
             <FilterField label="Importateur déclaré" value={dossier.donneesRepresentation.importateur} icon="👤" />
+            <FilterField label="NIF" value={dossier.donneesRepresentation.nif} icon="🆔" />
             <FilterField label="Référence DRA" value={dossier.donneesRepresentation.referenceDra} icon="📄" />
+            <FilterField label="Date DRA" value={dossier.donneesRepresentation.dateDra} icon="📅" />
             <FilterField label="Référence T1" value={dossier.donneesRepresentation.referenceT1} icon="📑" />
+            <FilterField label="Date T1" value={dossier.donneesRepresentation.dateT1} icon="📅" />
             <FilterField label="Type Dossier" value={dossier.donneesRepresentation.typeDossier} icon="💼" />
+            <FilterField label="Devise" value={dossier.donneesRepresentation.devise} icon="💱" />
+            <FilterField label="Pays Provenance" value={dossier.donneesRepresentation.paysProvenance} icon="🌍" />
+            <FilterField label="Bureau Sortie" value={dossier.donneesRepresentation.bureauSortie} icon="🚪" />
+            <FilterField label="Incoterm" value={dossier.donneesRepresentation.incoterm} icon="📋" />
+            <FilterField label="Numéro Conteneur" value={dossier.donneesRepresentation.conteneur} icon="📦" />
+            <FilterField label="Container 20ft" value={`${dossier.donneesRepresentation.container20} unité(s)`} icon="📦" />
+            <FilterField label="Container 40ft" value={`${dossier.donneesRepresentation.container40} unité(s)`} icon="📦" />
+            <FilterField label="FOB Total" value={`${dossier.donneesRepresentation.fobTotal?.toLocaleString()} USD`} icon="💰" />
+            <FilterField label="Immat. Avant" value={dossier.donneesRepresentation.immatAvant} icon="🚘" />
+            <FilterField label="Immat. Arrière" value={dossier.donneesRepresentation.immatArriere} icon="🚘" />
+            {dossier.reprArticles && dossier.reprArticles.length > 0 && (
+              <div className="col-span-2 mt-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Articles déclarés ({dossier.reprArticles.length})</div>
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Désignation</th>
+                        <th className="px-3 py-2 text-left">Position</th>
+                        <th className="px-3 py-2 text-right">Qté</th>
+                        <th className="px-3 py-2 text-right">Poids (kg)</th>
+                        <th className="px-3 py-2 text-right">FOB (USD)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {dossier.reprArticles.map((a: any, i: number) => (
+                        <tr key={i} className="hover:bg-muted/30">
+                          <td className="px-3 py-2">{a.designation || "—"}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{a.position_tarifaire || "—"}</td>
+                          <td className="px-3 py-2 text-right">{a.quantite || "—"}</td>
+                          <td className="px-3 py-2 text-right">{a.poids ? Number(a.poids).toLocaleString() : "—"}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-accent">{a.fob ? Number(a.fob).toLocaleString() : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </FilterSection>
         );
       case "rapportColisage":
@@ -443,8 +599,9 @@ function DossierDetailPage() {
       {/* ── SECTIONS D'ANALYSE DYNAMIQUES (FILTRES ET DÉTAILS COMPLÉMENTAIRES) ── */}
       {isAnalysisVisible && (
         <div className="space-y-4 print:hidden">
-          <div className="border-b border-border">
-            <div className="flex flex-wrap -mb-px gap-2">
+          <div className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Sources d'informations & Validation</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {FILTERS.map((f) => {
                 const Icon = f.icon;
                 const isActive = activeFilter === f.key;
@@ -452,14 +609,22 @@ function DossierDetailPage() {
                   <button
                     key={f.key}
                     onClick={() => handleFilterChange(f.key)}
-                    className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold border-b-2 transition-all duration-200 cursor-pointer ${
+                    className={`flex flex-col items-start p-3 text-left rounded-xl border transition-all duration-200 cursor-pointer ${
                       isActive
-                        ? "border-accent text-accent bg-accent/5"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        ? "border-accent bg-accent/5 shadow-sm ring-1 ring-accent/20"
+                        : "border-border bg-card text-muted-foreground hover:border-accent/30 hover:bg-muted/30"
                     }`}
                   >
-                    <Icon className={`h-4 w-4 ${f.color}`} />
-                    {f.label}
+                    <div className="flex w-full items-center justify-between mb-2">
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? "bg-accent/10" : "bg-muted"} ${f.color}`}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      {isActive && <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />}
+                    </div>
+                    <span className={`text-xs font-bold leading-tight ${isActive ? "text-foreground" : ""}`}>{f.label}</span>
+                    <span className="mt-1 text-[10px] font-medium uppercase tracking-wider opacity-70 flex items-center gap-1">
+                      <User className="h-3 w-3" /> {f.source}
+                    </span>
                   </button>
                 );
               })}
@@ -500,12 +665,12 @@ function DossierDetailPage() {
               {dossier.articles?.map((art, idx) => (
                 <tr key={art.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{idx + 1}</td>
-                  <td className="px-5 py-3 font-medium">{art.designation}</td>
-                  <td className="px-5 py-3 font-mono text-xs">{art.position}</td>
-                  <td className="px-5 py-3 text-right">{art.quantite}</td>
-                  <td className="px-5 py-3 text-right">{art.poids.toLocaleString()}</td>
+                  <td className="px-5 py-3 font-medium">{art.designation || "—"}</td>
+                  <td className="px-5 py-3 font-mono text-xs">{art.position || art.position_tarifaire || "—"}</td>
+                  <td className="px-5 py-3 text-right">{art.quantite || "—"}</td>
+                  <td className="px-5 py-3 text-right">{art.poids ? Number(art.poids).toLocaleString() : "—"}</td>
                   <td className="px-5 py-3 text-right font-semibold text-accent">
-                    {art.fob.toLocaleString()}
+                    {art.fob ? Number(art.fob).toLocaleString() : "—"}
                   </td>
                 </tr>
               ))}

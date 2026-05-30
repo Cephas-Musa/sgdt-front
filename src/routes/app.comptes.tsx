@@ -172,6 +172,10 @@ interface NewAccountDialogProps {
   onShowCredentials: (creds: { phone_number: string; password: string; full_name: string }) => void;
 }
 
+// Mémoriser les derniers choix province/bureau du super_admin entre créations
+let _lastSuperProvince = "";
+let _lastSuperBureau = "";
+
 function NewAccountDialog({ onCreated, onShowCredentials }: NewAccountDialogProps) {
   const { user } = useAuth();
   const { lang } = useI18n();
@@ -187,8 +191,8 @@ function NewAccountDialog({ onCreated, onShowCredentials }: NewAccountDialogProp
   const [postnom, setPostnom] = useState("");
   const [matricule, setMatricule] = useState("");
   const [selectedRole, setSelectedRole] = useState<Role | "">("");
-  const [selectedBureau, setSelectedBureau] = useState("");
-  const [selectedProvince, setSelectedProvince] = useState("");
+  const [selectedBureau, setSelectedBureau] = useState(_lastSuperBureau || "");
+  const [selectedProvince, setSelectedProvince] = useState(_lastSuperProvince || "");
   const [phoneNum, setPhoneNum] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -197,6 +201,13 @@ function NewAccountDialog({ onCreated, onShowCredentials }: NewAccountDialogProp
   useEffect(() => {
     if (open) {
       setPassword("SGDT@" + Math.random().toString(36).slice(2, 6).toUpperCase() + Math.floor(1000 + Math.random() * 9000));
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      setSelectedBureau(_lastSuperBureau);
+      setSelectedProvince(_lastSuperProvince);
     }
   }, [open]);
 
@@ -213,8 +224,7 @@ function NewAccountDialog({ onCreated, onShowCredentials }: NewAccountDialogProp
 
   const resetForm = () => {
     setNom(""); setPostnom(""); setMatricule("");
-    setSelectedRole(""); setSelectedBureau("");
-    setSelectedProvince(""); setPhoneNum("");
+    setSelectedRole(""); setPhoneNum("");
   };
 
   const handleSubmit = useCallback(async () => {
@@ -232,6 +242,12 @@ function NewAccountDialog({ onCreated, onShowCredentials }: NewAccountDialogProp
 
     setSubmitting(true);
     try {
+      // Mémoriser le dernier choix pour le super_admin
+      if (user?.role === "super_admin") {
+        _lastSuperProvince = selectedProvince;
+        _lastSuperBureau = selectedBureau;
+      }
+
       const res = await apiCreateUser({
         phone_number: fullPhone,
         full_name: fullName,
@@ -245,6 +261,9 @@ function NewAccountDialog({ onCreated, onShowCredentials }: NewAccountDialogProp
       // Fermer le dialog d'abord
       setOpen(false);
       resetForm();
+      // Réinitialiser les sélecteurs pour la prochaine ouverture
+      setSelectedBureau("");
+      setSelectedProvince("");
 
       // Puis afficher le modal credentials
       if (res?.credentials) {

@@ -40,7 +40,7 @@ function ManifestPage() {
       (!startDate || m.date >= startDate) &&
       (!endDate || m.date <= endDate) &&
       (!search ||
-        m.reference.toLowerCase().includes(search.toLowerCase()) ||
+        (m.reference || "").toLowerCase().includes(search.toLowerCase()) ||
         m.declarant.toLowerCase().includes(search.toLowerCase())),
   );
 

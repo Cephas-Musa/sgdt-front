@@ -10,21 +10,26 @@ class AuditLog extends Model
 {
     use HasFactory;
 
+    protected $keyType = 'string';
+    public $incrementing = false;
+
     protected $fillable = [
+        'id',
         'user_id',
         'action',
         'module',
-        'ancienne_valeur',
-        'nouvelle_valeur',
+        'target_id',
+        'old_data',
+        'new_data',
         'ip_address',
-        'user_agent',
+        'device',
     ];
 
     protected function casts(): array
     {
         return [
-            'ancienne_valeur' => 'array',
-            'nouvelle_valeur' => 'array',
+            'old_data' => 'array',
+            'new_data' => 'array',
         ];
     }
 

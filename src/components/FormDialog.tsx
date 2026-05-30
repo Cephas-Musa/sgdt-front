@@ -17,6 +17,7 @@ export function FormDialog({
   submitLabel = "Enregistrer",
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
+  hideFooter = false,
 }: {
   trigger?: ReactNode;
   title: string;
@@ -25,6 +26,7 @@ export function FormDialog({
   submitLabel?: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  hideFooter?: boolean;
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -38,19 +40,21 @@ export function FormDialog({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 py-2">{children}</div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Annuler
-          </Button>
-          <Button
-            onClick={() => {
-              const result = onSubmit?.();
-              if (result !== false) setOpen(false);
-            }}
-          >
-            {submitLabel}
-          </Button>
-        </DialogFooter>
+        {!hideFooter && (
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => {
+                const result = onSubmit?.();
+                if (result !== false) setOpen(false);
+              }}
+            >
+              {submitLabel}
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

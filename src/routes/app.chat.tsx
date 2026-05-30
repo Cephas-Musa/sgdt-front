@@ -1,56 +1,52 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowLeft, Send, Search, Phone, MoreVertical, CheckCheck, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Search, Phone, MoreVertical, CheckCheck, Loader2, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useApi, apiGetConversations, apiGetMessages, apiSendMessage } from "@/lib/api";
+import { useApi, apiGetDossiers, apiGetDossierChat, apiSendDossierChat } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/app/chat")({
   component: ChatPage,
 });
 
-type Conversation = {
-  id: number;
-  name?: string;
-  participant?: { full_name?: string; phone_number?: string; role?: string };
-  last_message?: string;
-  last_message_at?: string;
-  unread_count?: number;
-  is_online?: boolean;
-};
-
 type Message = {
   id: number;
-  content: string;
+  message: string;
   sender_id: number;
   created_at: string;
-  is_mine?: boolean;
+  sender?: {
+    id: number;
+    full_name: string;
+    role: string;
+  };
 };
 
 function ChatPage() {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [newMsg, setNewMsg] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
 
-  const { data: rawConversations, loading: convsLoading } = useApi(apiGetConversations);
-  const conversations = (rawConversations as Conversation[] ?? []);
+  const { data: rawDossiers, loading: convsLoading } = useApi(apiGetDossiers);
+  const dossiers = (rawDossiers as any[] ?? []);
 
-  const selected = conversations.find((c) => c.id === selectedId);
-  const filtered = conversations.filter(
-    (c) => !search || (c.participant?.full_name ?? "").toLowerCase().includes(search.toLowerCase()),
+  const selected = dossiers.find((d) => String(d.id) === selectedId);
+  const filtered = dossiers.filter(
+    (d) => !search || (d.reference ?? "").toLowerCase().includes(search.toLowerCase()) || (d.importateur ?? "").toLowerCase().includes(search.toLowerCase()),
   );
 
   // Load messages when conversation is selected
   useEffect(() => {
     if (!selectedId) return;
     setMessagesLoading(true);
-    apiGetMessages(selectedId)
+    apiGetDossierChat(selectedId)
       .then((msgs) => setMessages(msgs as Message[]))
       .catch(() => toast.error("Erreur lors du chargement des messages"))
       .finally(() => setMessagesLoading(false));
@@ -66,8 +62,9 @@ function ChatPage() {
     setNewMsg("");
     setSending(true);
     try {
-      const msg = await apiSendMessage(selectedId, content) as Message;
-      setMessages((prev) => [...prev, { ...msg, is_mine: true }]);
+      const resp: any = await apiSendDossierChat(selectedId, content);
+      const msg = resp.data as Message;
+      setMessages((prev) => [...prev, msg]);
     } catch {
       toast.error("Erreur envoi du message");
     } finally {
@@ -75,14 +72,12 @@ function ChatPage() {
     }
   }, [newMsg, selectedId]);
 
-  const getConvName = (c: Conversation) => c.participant?.full_name ?? c.name ?? "Inconnu";
-  const getConvRole = (c: Conversation) => c.participant?.role ?? "";
-  const getConvAvatar = (c: Conversation) => (getConvName(c)[0] ?? "?").toUpperCase();
-  const getLastTime = (c: Conversation) => c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" }) : "";
-
+  const getDossierName = (d: any) => d.reference ? `Dossier ${d.reference}` : "Dossier Inconnu";
+  const getDossierAvatar = (d: any) => "📁";
+  
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-lg border border-border bg-card">
-      {/* === LISTE DES CONVERSATIONS (sidebar gauche) === */}
+      {/* === LISTE DES DOSSIERS (sidebar gauche) === */}
       <div
         className={cn(
           "flex flex-col border-r border-border bg-card",
@@ -92,11 +87,11 @@ function ChatPage() {
       >
         {/* Header */}
         <div className="border-b border-border p-3">
-          <h2 className="text-lg font-semibold mb-2">Messages</h2>
+          <h2 className="text-lg font-semibold mb-2">Chat Contextuel Dossiers</h2>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Rechercher…"
+              placeholder="Rechercher un dossier…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -111,42 +106,30 @@ function ChatPage() {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">Aucune conversation</div>
+            <div className="p-6 text-center text-sm text-muted-foreground">Aucun dossier trouvé</div>
           ) : (
-            filtered.map((conv) => (
+            filtered.map((dossier) => (
               <button
-                key={conv.id}
-                onClick={() => setSelectedId(conv.id)}
+                key={dossier.id}
+                onClick={() => setSelectedId(String(dossier.id))}
                 className={cn(
                   "flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
-                  selectedId === conv.id && "bg-accent/10",
+                  selectedId === String(dossier.id) && "bg-accent/10",
                 )}
               >
                 {/* Avatar */}
                 <div className="relative shrink-0">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold text-sm">
-                    {getConvAvatar(conv)}
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent text-xl">
+                    {getDossierAvatar(dossier)}
                   </div>
-                  {conv.is_online && (
-                    <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-card bg-success" />
-                  )}
                 </div>
 
                 {/* Info */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm truncate">{getConvName(conv)}</span>
-                    <span className="text-xs text-muted-foreground shrink-0">{getLastTime(conv)}</span>
+                    <span className="font-medium text-sm truncate">{getDossierName(dossier)}</span>
                   </div>
-                  <div className="flex items-center justify-between mt-0.5">
-                    <span className="text-xs text-muted-foreground truncate">{conv.last_message ?? "—"}</span>
-                    {(conv.unread_count ?? 0) > 0 && (
-                      <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-bold text-white">
-                        {conv.unread_count}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">{getConvRole(conv)}</div>
+                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">{dossier.importateur}</div>
                 </div>
               </button>
             ))
@@ -159,9 +142,9 @@ function ChatPage() {
         {!selected ? (
           <div className="flex flex-1 items-center justify-center text-muted-foreground">
             <div className="text-center">
-              <div className="text-4xl mb-3">💬</div>
-              <div className="text-lg font-medium">Sélectionnez une conversation</div>
-              <div className="text-sm">Choisissez un contact pour démarrer</div>
+              <div className="text-4xl mb-3"><FolderOpen className="h-12 w-12 mx-auto text-muted-foreground/50"/></div>
+              <div className="text-lg font-medium">Sélectionnez un dossier</div>
+              <div className="text-sm">Ouvrez le canal de discussion d'un dossier</div>
             </div>
           </div>
         ) : (
@@ -177,26 +160,15 @@ function ChatPage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="relative shrink-0">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold text-sm">
-                  {getConvAvatar(selected)}
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/15 text-accent text-lg">
+                  {getDossierAvatar(selected)}
                 </div>
-                {selected.is_online && (
-                  <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-card bg-success" />
-                )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm">{getConvName(selected)}</div>
+                <div className="font-medium text-sm">{getDossierName(selected)}</div>
                 <div className="text-xs text-muted-foreground">
-                  {selected.is_online ? "En ligne" : "Hors ligne"} · {getConvRole(selected)}
+                  Discussion d'équipe sur ce dossier
                 </div>
-              </div>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm">
-                  <Phone className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
               </div>
             </div>
 
@@ -213,31 +185,37 @@ function ChatPage() {
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : messages.length === 0 ? (
-                <div className="text-center text-sm text-muted-foreground py-10">Aucun message — commencez la conversation</div>
+                <div className="text-center text-sm text-muted-foreground py-10">Aucun message — commencez la discussion</div>
               ) : (
-                messages.map((msg) => (
+                messages.map((msg) => {
+                  const isMine = msg.sender_id === user?.id;
+                  return (
                   <div
                     key={msg.id}
-                    className={cn("flex", msg.is_mine ? "justify-end" : "justify-start")}
+                    className={cn("flex flex-col", isMine ? "items-end" : "items-start")}
                   >
+                    {!isMine && msg.sender && (
+                      <span className="text-[10px] text-muted-foreground mb-1 ml-1">{msg.sender.full_name} ({msg.sender.role})</span>
+                    )}
                     <div
                       className={cn(
                         "max-w-[75%] rounded-2xl px-4 py-2 shadow-sm",
-                        msg.is_mine
+                        isMine
                           ? "bg-accent text-accent-foreground rounded-br-md"
                           : "bg-muted rounded-bl-md",
                       )}
                     >
-                      <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
-                      <div className={cn("flex items-center gap-1 mt-1", msg.is_mine ? "justify-end" : "")}>
-                        <span className={cn("text-[10px]", msg.is_mine ? "text-accent-foreground/60" : "text-muted-foreground")}>
+                      <div className="text-sm whitespace-pre-wrap">{msg.message}</div>
+                      <div className={cn("flex items-center gap-1 mt-1", isMine ? "justify-end" : "")}>
+                        <span className={cn("text-[10px]", isMine ? "text-accent-foreground/60" : "text-muted-foreground")}>
                           {new Date(msg.created_at).toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" })}
                         </span>
-                        {msg.is_mine && <CheckCheck className="h-3 w-3 text-accent-foreground/60" />}
+                        {isMine && <CheckCheck className="h-3 w-3 text-accent-foreground/60" />}
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
               <div ref={endRef} />
             </div>
@@ -252,7 +230,7 @@ function ChatPage() {
                 className="flex gap-2"
               >
                 <Input
-                  placeholder="Tapez un message…"
+                  placeholder="Tapez un message pour ce dossier…"
                   value={newMsg}
                   onChange={(e) => setNewMsg(e.target.value)}
                   className="flex-1"

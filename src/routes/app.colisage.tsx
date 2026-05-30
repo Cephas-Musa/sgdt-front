@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useMatchRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
-import { DOSSIERS, type Dossier } from "@/lib/mock";
+import { type Dossier } from "@/lib/mock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
+import { useApi, apiGetDossiers } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { getDossiersAgent } from "@/lib/colisage-store";
@@ -40,8 +41,8 @@ function ColisagePage() {
       const q = search.toLowerCase();
       if (!q) return true;
       return (
-        d.reference.toLowerCase().includes(q) ||
-        d.importateur.toLowerCase().includes(q) ||
+        (d.reference || "").toLowerCase().includes(q) ||
+        (d.importateur || "").toLowerCase().includes(q) ||
         d.typeMarchandises.toLowerCase().includes(q) ||
         d.vehicule.toLowerCase().includes(q)
       );

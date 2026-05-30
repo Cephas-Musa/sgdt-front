@@ -13,7 +13,7 @@ export default function ChefManifestDash() {
   const [pwd, setPwd] = useState("");
 
   const generate = () => {
-    const p = Math.random().toString(36).slice(2, 10) + "!";
+    const p = "SGDT@" + Math.random().toString(36).slice(2, 6).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
     setPwd(p);
   };
 
@@ -133,7 +133,11 @@ export default function ChefManifestDash() {
                       <Input />
                     </Field>
                     <Field label="Numéro de téléphone">
-                      <Input />
+                      <Input 
+                        type="tel" 
+                        maxLength={9} 
+                        onChange={(e) => e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9)} 
+                      />
                     </Field>
                     <Field label="Mot de passe">
                       <div className="flex gap-2">
@@ -229,7 +233,11 @@ export default function ChefManifestDash() {
                       <Input />
                     </Field>
                     <Field label="Téléphone">
-                      <Input />
+                      <Input 
+                        type="tel" 
+                        maxLength={9} 
+                        onChange={(e) => e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9)} 
+                      />
                     </Field>
                     <Field label="Agence">
                       <Input />
