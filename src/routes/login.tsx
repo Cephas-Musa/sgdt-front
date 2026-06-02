@@ -201,6 +201,7 @@ function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   className="pr-10"
+                  noUppercase
                   required
                 />
                 <button

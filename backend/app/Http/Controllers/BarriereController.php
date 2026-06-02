@@ -122,7 +122,7 @@ class BarriereController extends Controller
 
     public function indexBarrieres(Request $request)
     {
-        $query = Barriere::withCount('mouvements');
+        $query = Barriere::withCount(['mouvements', 'revenus']);
 
         if ($request->filled('province')) {
             $query->where('province', $request->input('province'));

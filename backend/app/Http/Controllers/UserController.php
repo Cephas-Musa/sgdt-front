@@ -114,11 +114,12 @@ class UserController extends Controller
                 'unique:users,phone_number',
                 'regex:/^\+(256|243)[0-9]{9,12}$/'
             ],
-            'role'      => 'required|string',
-            'full_name' => 'required|string|max:255',
-            'bureau'    => 'nullable|string|max:100',
-            'province'  => 'nullable|string|max:100',
-            'matricule' => 'nullable|string|max:50|unique:users,matricule',
+            'role'       => 'required|string',
+            'full_name'  => 'required|string|max:255',
+            'bureau'     => 'nullable|string|max:100',
+            'province'   => 'nullable|string|max:100',
+            'matricule'  => 'nullable|string|max:50|unique:users,matricule',
+            'barriere_id'=> 'nullable|string|exists:barrieres,id',
         ], [
             'phone_number.regex'  => 'Le numéro doit commencer par +256 ou +243 suivi de 9 à 12 chiffres.',
             'phone_number.unique' => 'Ce numéro de téléphone est déjà enregistré.',
@@ -128,14 +129,8 @@ class UserController extends Controller
         $tempPassword = $request->input('password')
             ?: 'SGDT@' . Str::upper(Str::random(4)) . mt_rand(1000, 9999);
 
-        // Héritage du bureau/province du créateur sauf pour super_admin et directeur
         $bureau   = $request->bureau;
         $province = $request->province;
-
-        if (!in_array($currentUser->role, ['super_admin', 'directeur'])) {
-            if ($currentUser->province && !$province) $province = $currentUser->province;
-            if ($currentUser->bureau   && !$bureau)   $bureau   = $currentUser->bureau;
-        }
 
         // Résoudre bureau_id à partir du nom du bureau
         $bureauId = null;
@@ -156,6 +151,7 @@ class UserController extends Controller
             'phone_verified_at'=> null,
             'created_by'       => $currentUser->id,
             'parent_id'        => $currentUser->id,
+            'barriere_id'      => $request->barriere_id,
         ]);
 
         return response()->json([

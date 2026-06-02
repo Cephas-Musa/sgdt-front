@@ -18,7 +18,7 @@ function useTypeDossierId(code: string) {
   return id;
 }
 
-function useWarehouses() {
+export function useWarehouses() {
   const [warehouses, setWarehouses] = useState<any[]>([]);
   useEffect(() => {
     apiGetWarehouses().then(res => setWarehouses(res)).catch(() => { });
@@ -26,7 +26,7 @@ function useWarehouses() {
   return warehouses;
 }
 
-const CommonFields = ({ formData, setFormData }: { formData?: any, setFormData?: any }) => {
+export const CommonFields = ({ formData, setFormData, hideExtra }: { formData?: any, setFormData?: any, hideExtra?: boolean }) => {
   const [ref, setRef] = useState("Chargement...");
   useEffect(() => {
     apiGetNextReference().then(res => setRef(res.reference)).catch(() => setRef("RD-XXXX"));
@@ -35,17 +35,23 @@ const CommonFields = ({ formData, setFormData }: { formData?: any, setFormData?:
     <div className="col-span-2 grid grid-cols-2 gap-4 mb-2">
       <Field label="Référence dossier"><Input value={ref} disabled className="bg-muted text-primary font-mono font-bold" /></Field>
       <Field label="Date"><Input value={new Date().toLocaleDateString('fr-FR')} disabled className="bg-muted" /></Field>
-      {formData && setFormData && (
+      {formData && setFormData && !hideExtra && (
         <>
-          <Field label="Référence E- (DRA)"><Input placeholder="E-XXXX" value={formData.dra || ''} onChange={e => setFormData({...formData, dra: e.target.value})} /></Field>
-          <Field label="T1"><Input placeholder="T1-XXXX" value={formData.t1 || ''} onChange={e => setFormData({...formData, t1: e.target.value})} /></Field>
+          <div className="col-span-2 grid grid-cols-2 gap-4">
+            <Field label="Référence E- (DRA)"><Input placeholder="E-XXXX" value={formData.dra || ''} onChange={e => setFormData({...formData, dra: e.target.value})} /></Field>
+            <Field label="Date DRA"><Input type="date" value={formData.date_dra || ''} onChange={e => setFormData({...formData, date_dra: e.target.value})} /></Field>
+          </div>
+          <div className="col-span-2 grid grid-cols-2 gap-4">
+            <Field label="T1"><Input placeholder="T1-XXXX" value={formData.t1 || ''} onChange={e => setFormData({...formData, t1: e.target.value})} /></Field>
+            <Field label="Date T1"><Input type="date" value={formData.date_t1 || ''} onChange={e => setFormData({...formData, date_t1: e.target.value})} /></Field>
+          </div>
         </>
       )}
     </div>
   );
 };
 
-const DynamicDeclarations = ({ count, formData, setFormData }: any) => {
+export const DynamicDeclarations = ({ count, formData, setFormData }: any) => {
   const num = parseInt(count);
   
   useEffect(() => {
@@ -77,7 +83,7 @@ const DynamicDeclarations = ({ count, formData, setFormData }: any) => {
     </div>
   );
 };
-const DynamicTitres = ({ count, formData, setFormData }: any) => {
+export const DynamicTitres = ({ count, formData, setFormData }: any) => {
   const num = parseInt(count);
   
   useEffect(() => {
@@ -109,7 +115,7 @@ const DynamicTitres = ({ count, formData, setFormData }: any) => {
     </div>
   );
 };
-const LocalisationField = ({ value, onChange, warehouses }: any) => (
+export const LocalisationField = ({ value, onChange, warehouses }: any) => (
   <Field label="Localisation / Entrepôt">
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger><SelectValue placeholder="Sélectionner l'entrepôt" /></SelectTrigger>
@@ -141,8 +147,7 @@ export function DirectForm({ type, onSuccess }: { type?: any, onSuccess?: () => 
     try {
       await apiCreateDossier({
         type_dossier_id: typeId,
-        dra: formData.dra,
-        t1: formData.t1,
+        dra: formData.reference_titre,
         importateur: formData.importateur,
         declarant: formData.declarant,
         localisation: formData.localisation,
@@ -151,12 +156,9 @@ export function DirectForm({ type, onSuccess }: { type?: any, onSuccess?: () => 
           nombre_declarations_attendues: parseInt(formData.nombre_declarations_attendues) || 0,
           declarations_details: formData.declarations_details || [],
           titres_details: formData.titres_details || [],
-          reference_titre: formData.reference_titre,
           date_titre: formData.date_titre,
           reference_t1: formData.reference_t1,
           date_t1: formData.date_t1,
-          reference_douane: formData.reference_douane,
-          date_reference_douane: formData.date_reference_douane,
           date_debut: formData.date_debut,
           date_fin: formData.date_fin
         }
@@ -176,7 +178,7 @@ export function DirectForm({ type, onSuccess }: { type?: any, onSuccess?: () => 
       onSubmit={handleSubmit}
     >
       <FormGrid>
-        <CommonFields formData={formData} setFormData={setFormData} />
+        <CommonFields formData={formData} setFormData={setFormData} hideExtra />
         <Field label="Importateur" required><Input onChange={e => handleChange('importateur', e.target.value)} /></Field>
         <Field label="Nom déclarant" required><Input onChange={e => handleChange('declarant', e.target.value)} /></Field>
         <Field label="Nombre déclarations attendues" required><Input type="number" min={0} onChange={e => handleChange('nombre_declarations_attendues', e.target.value)} /></Field>
@@ -186,7 +188,7 @@ export function DirectForm({ type, onSuccess }: { type?: any, onSuccess?: () => 
         <DynamicTitres count={formData.nombre_titres} formData={formData} setFormData={setFormData} />
 
         <div className="col-span-2 grid grid-cols-2 gap-4">
-          <Field label="Référence titre (E-XXX)" required><Input placeholder="E-001" onChange={e => handleChange('reference_titre', e.target.value)} /></Field>
+          <Field label="Référence DRA (E-XXX)" required><Input placeholder="E-001" onChange={e => handleChange('reference_titre', e.target.value)} /></Field>
           <Field label="Sa date" required><Input type="date" onChange={e => handleChange('date_titre', e.target.value)} /></Field>
         </div>
 
@@ -196,10 +198,6 @@ export function DirectForm({ type, onSuccess }: { type?: any, onSuccess?: () => 
         </div>
 
         <LocalisationField warehouses={warehouses} value={formData.localisation} onChange={(v: string) => handleChange("localisation", v)} />
-        <div className="col-span-2 grid grid-cols-2 gap-4">
-          <Field label="Référence douane (E-XXX)" required><Input placeholder="E-001" onChange={e => handleChange('reference_douane', e.target.value)} /></Field>
-          <Field label="Date référence douane" required><Input type="date" onChange={e => handleChange('date_reference_douane', e.target.value)} /></Field>
-        </div>
         <div className="col-span-2 grid grid-cols-2 gap-4">
           <Field label="Date début" required><Input type="date" onChange={e => handleChange('date_debut', e.target.value)} /></Field>
           <Field label="Date fin"><Input type="date" onChange={e => handleChange('date_fin', e.target.value)} /></Field>
@@ -273,10 +271,6 @@ export function TransbordementForm({ type, onSuccess }: { type?: any, onSuccess?
         <div className="col-span-2 grid grid-cols-2 gap-4">
           <Field label="Référence titre" required><Input onChange={e => handleChange('reference_titre', e.target.value)} /></Field>
           <Field label="Sa date" required><Input type="date" onChange={e => handleChange('date_titre', e.target.value)} /></Field>
-        </div>
-        <div className="col-span-2 grid grid-cols-2 gap-4">
-          <Field label="Référence douane (E-XXX)" required><Input placeholder="E-001" onChange={e => handleChange('reference_douane', e.target.value)} /></Field>
-          <Field label="Date réf. douane" required><Input type="date" onChange={e => handleChange('date_reference_douane', e.target.value)} /></Field>
         </div>
         <Field label="Réf. lettre demande transbordement"><Input onChange={e => handleChange('lettre_demande', e.target.value)} /></Field>
       </FormGrid>
@@ -419,11 +413,6 @@ export function LotForm({ type, onSuccess }: { type?: any, onSuccess?: () => voi
 
         <DynamicDeclarations count={formData.nombre_declarations_attendues} formData={formData} setFormData={setFormData} />
         <DynamicTitres count={formData.nombre_titres} formData={formData} setFormData={setFormData} />
-
-        <div className="col-span-2 grid grid-cols-2 gap-4">
-          <Field label="Référence douane (E-XXX)" required><Input placeholder="E-001" onChange={e => handleChange('reference_douane', e.target.value)} /></Field>
-          <Field label="Date réf. douane" required><Input type="date" onChange={e => handleChange('date_reference_douane', e.target.value)} /></Field>
-        </div>
       </FormGrid>
     </FormDialog>
   );
@@ -488,10 +477,6 @@ export function PetrolierForm({ type, onSuccess }: { type?: any, onSuccess?: () 
         <div className="col-span-2 grid grid-cols-2 gap-4">
           <Field label="Référence T1" required><Input placeholder="T1-…" onChange={e => handleChange('reference_t1', e.target.value)} /></Field>
           <Field label="Sa date" required><Input type="date" onChange={e => handleChange('date_t1', e.target.value)} /></Field>
-        </div>
-        <div className="col-span-2 grid grid-cols-2 gap-4">
-          <Field label="Référence douane (E-XXX)" required><Input placeholder="E-001" onChange={e => handleChange('reference_douane', e.target.value)} /></Field>
-          <Field label="Date référence douane" required><Input type="date" onChange={e => handleChange('date_reference_douane', e.target.value)} /></Field>
         </div>
         <Field label="Véhicule"><Input onChange={e => handleChange('vehicule', e.target.value)} /></Field>
         <Field label="Provenance"><Input onChange={e => handleChange('provenance', e.target.value)} /></Field>
@@ -561,10 +546,6 @@ export function AutresForm({ type, onSuccess }: { type?: any, onSuccess?: () => 
         <div className="col-span-2 grid grid-cols-2 gap-4">
           <Field label="T1"><Input placeholder="T1-…" onChange={e => handleChange('reference_t1', e.target.value)} /></Field>
           <Field label="Sa date"><Input type="date" onChange={e => handleChange('date_t1', e.target.value)} /></Field>
-        </div>
-        <div className="col-span-2 grid grid-cols-2 gap-4">
-          <Field label="Référence douane (E-XXX)"><Input placeholder="E-001" onChange={e => handleChange('reference_douane', e.target.value)} /></Field>
-          <Field label="Date réf. douane"><Input type="date" onChange={e => handleChange('date_reference_douane', e.target.value)} /></Field>
         </div>
         <Field label="Véhicule"><Input onChange={e => handleChange('vehicule', e.target.value)} /></Field>
         <Field label="Provenance"><Input onChange={e => handleChange('provenance', e.target.value)} /></Field>

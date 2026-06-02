@@ -67,12 +67,18 @@ class DossierAccessService
                         ->where('status', '!=', 'appure');
 
         if (in_array($user->role, ['directeur_provincial'])) {
-            if ($user->province_id) {
-                $query->where('province_id', $user->province_id);
-            }
+            $query->where(function($q) use ($user) {
+                if ($user->province_id) {
+                    $q->where('province_id', $user->province_id);
+                }
+                $q->orWhereHas('creator', function($cq) {
+                    $cq->whereIn('role', ['operateur_saisie', 'chef_bureau_repr']);
+                });
+            });
         } elseif (in_array($user->role, [
             'inspecteur_chef_bureau',
             'inspecteur_chef',
+            'inspecteur',
             'agent_controle',
             'verificateur',
             'brigadier_barriere',
@@ -82,28 +88,43 @@ class DossierAccessService
             'chef_recherche',
             'chef_barriere',
         ])) {
-            if ($user->bureau_id) {
-                $query->where('bureau_id', $user->bureau_id);
-            }
-        } elseif (in_array($user->role, ['chef_bureau_repr', 'operateur_saisie'])) {
-            // Ces rôles voient les dossiers créés par operateur_saisie OU qui ont une entrée de représentation de leur bureau
             $query->where(function($q) use ($user) {
-                $q->whereHas('creator', function($creatorQ) {
-                    $creatorQ->where('role', 'operateur_saisie');
+                $q->where(function($inner) use ($user) {
+                    // Dossiers du bureau de l'utilisateur
+                    if ($user->bureau_id) {
+                        $inner->where('bureau_id', $user->bureau_id);
+                    }
+                    // Dossiers créés par l'utilisateur lui-même
+                    $inner->orWhere('created_by', $user->id);
+                    // Dossiers assignés à l'utilisateur comme inspecteur
+                    $inner->orWhere('inspecteur_id', $user->id);
                 });
                 
-                if ($user->bureau_id) {
-                    $q->orWhereHas('representationEntry', function($reprQ) use ($user) {
-                        $reprQ->where('bureau_repr_id', $user->bureau_id);
+                // Dossiers créés par operateur_saisie/chef_bureau_repr (consultation)
+                if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef', 'agent_controle'])) {
+                    $q->orWhereHas('creator', function($cq) {
+                        $cq->whereIn('role', ['operateur_saisie', 'chef_bureau_repr']);
                     });
                 }
             });
-            
+        } elseif ($user->role === 'chef_bureau_repr') {
+            // Le chef bureau représentation ne voit que les dossiers créés par la représentation
+            // (operateur_saisie / chef_bureau_repr), jamais ceux créés par un inspecteur
+            $query->where(function($q) use ($user) {
+                $q->whereHas('creator', function($cq) {
+                    $cq->whereIn('role', ['operateur_saisie', 'chef_bureau_repr']);
+                });
+                if ($user->bureau_id) {
+                    $q->orWhere(function($orQ) use ($user) {
+                        $orQ->whereHas('representationEntry', function($reprQ) use ($user) {
+                            $reprQ->where('bureau_repr_id', $user->bureau_id);
+                        })->whereHas('creator', function($cq) {
+                            $cq->whereIn('role', ['operateur_saisie', 'chef_bureau_repr']);
+                        });
+                    });
+                }
+            });
             if ($user->bureau_id) {
-                // Filter further if needed, but the OR condition above handles it.
-                // We shouldn't restrict the whole query by bureau_id if the dossier was created
-                // by the operator but later merged and the main dossier has a different bureau_id.
-                // Actually, let's ensure they only see things relevant to their bureau:
                 $query->where(function($q) use ($user) {
                     $q->where('bureau_id', $user->bureau_id)
                       ->orWhereHas('representationEntry', function($reprQ) use ($user) {
@@ -111,21 +132,32 @@ class DossierAccessService
                       });
                 });
             }
-        } elseif ($user->role === 'inspecteur') {
+        } elseif ($user->role === 'operateur_saisie') {
             $query->where(function($q) use ($user) {
-                $q->where('inspecteur_id', $user->id)
-                  ->orWhere('created_by', $user->id)  // Les dossiers créés par cet inspecteur
-                  ->orWhere(function($subQ) use ($user) {
-                      $subQ->where('bureau_id', $user->bureau_id)
-                           ->whereHas('creator', function($cq) {
-                               $cq->whereIn('role', ['operateur_saisie', 'chef_bureau_repr']);
-                           });
-                  });
+                $q->whereHas('creator', function($creatorQ) {
+                    $creatorQ->where('role', 'operateur_saisie');
+                });
+                if ($user->bureau_id) {
+                    $q->orWhereHas('representationEntry', function($reprQ) use ($user) {
+                        $reprQ->where('bureau_repr_id', $user->bureau_id);
+                    });
+                }
             });
+            if ($user->bureau_id) {
+                $query->where(function($q) use ($user) {
+                    $q->where('bureau_id', $user->bureau_id)
+                      ->orWhereHas('representationEntry', function($reprQ) use ($user) {
+                          $reprQ->where('bureau_repr_id', $user->bureau_id);
+                      });
+                });
+            }
         } elseif ($user->role === 'secretaire_inspecteur') {
             $query->where(function($q) use ($user) {
                 $q->where('secretary_id', $user->id)
-                  ->orWhere('inspecteur_id', $user->supervisor?->id);
+                  ->orWhere('inspecteur_id', $user->supervisor?->id)
+                  ->orWhereHas('creator', function($cq) {
+                      $cq->whereIn('role', ['operateur_saisie', 'chef_bureau_repr']);
+                  });
             });
         } elseif (in_array($user->role, ['super_admin', 'directeur_general'])) {
             // Superadmin et DG voient tout ce qui n'est pas appuré

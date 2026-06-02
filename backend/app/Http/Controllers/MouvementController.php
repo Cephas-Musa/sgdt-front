@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Mouvement;
+use App\Models\Dossier;
 use App\Models\TitreDocument;
 use App\Models\Alerte;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,7 @@ class MouvementController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Mouvement::with(['titreDocument', 'user']);
+        $query = Mouvement::with(['titreDocument', 'user', 'dossier']);
 
         if ($request->has('operation_type')) {
             $query->where('operation_type', $request->input('operation_type'));
@@ -23,6 +24,10 @@ class MouvementController extends Controller
 
         if ($request->has('plaque')) {
             $query->where('plaque', 'LIKE', '%' . $request->input('plaque') . '%');
+        }
+
+        if ($request->has('dossier_id')) {
+            $query->where('dossier_id', $request->input('dossier_id'));
         }
 
         $mouvements = $query->orderBy('created_at', 'desc')->get();
@@ -47,15 +52,22 @@ class MouvementController extends Controller
             'custom_fields' => 'nullable|array',
             
             // Validation pour l'entrant chargé (Titres DRA & T1)
-            'reference_dra' => 'required_if:operation_type,entrant_charge|string',
-            'date_dra' => 'required_if:operation_type,entrant_charge|date',
-            'reference_t1' => 'required_if:operation_type,entrant_charge|string',
-            'date_t1' => 'required_if:operation_type,entrant_charge|date',
+            'reference_dra' => 'nullable|string',
+            'date_dra' => 'nullable|date',
+            'reference_t1' => 'nullable|string',
+            'date_t1' => 'nullable|date',
         ]);
 
         DB::beginTransaction();
 
         try {
+            // Résoudre dossier_id à partir de reference_dra (E-XXX) si fourni
+            $dossierId = null;
+            if ($request->filled('reference_dra')) {
+                $dossier = Dossier::where('dra', $request->reference_dra)->first();
+                $dossierId = $dossier?->id;
+            }
+
             // Créer le mouvement de véhicule
             $mouvement = Mouvement::create([
                 'operation_type' => $request->operation_type,
@@ -68,6 +80,7 @@ class MouvementController extends Controller
                 'date_empty_manifest' => $request->date_empty_manifest,
                 'custom_fields' => $request->custom_fields, // Contient les détails VRAC
                 'user_id' => $request->user()->id,
+                'dossier_id' => $dossierId,
             ]);
 
             // Si c'est un entrant chargé, enregistrer les titres associés

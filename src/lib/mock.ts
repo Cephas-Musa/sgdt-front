@@ -100,7 +100,7 @@ export interface Dossier {
     statutFinal: string;
   };
   operateurSaisie?: string;
-  created_by?: string;
+  created_by?: number;
   inspecteur_id?: string;
   secretary_id?: string;
   extra_data?: Record<string, any>;

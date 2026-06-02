@@ -168,8 +168,8 @@ class RepresentationEntryController extends Controller
 
             DB::commit();
 
-            // Trigger Automatic Sync with Inspecteur Dossier if DRA matches
-            app(\App\Services\DossierSyncService::class)->syncRepresentationWithDossier($entry);
+            // Aucune synchronisation physique automatique. 
+            // La liaison se fait désormais de manière purement logique par référence DRA lors de la consultation.
 
             return response()->json([
                 'message'         => 'Données de représentation enregistrées.',

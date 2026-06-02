@@ -79,11 +79,16 @@ function ReprPage() {
     }
   }, [newDevise.codePays]);
 
-  // Le backend filtre déjà les dossiers
-  const representationDossiers = dossiers;
+  // Seuls les dossiers créés par l'opérateur de saisie (avec entrée de représentation)
+  // doivent apparaître dans cet onglet, jamais ceux créés par l'inspecteur.
+  const representationDossiers = dossiers.filter(d => {
+    const roleCreator = d.creator?.role || d.operateurSaisieRole;
+    return roleCreator === "operateur_saisie" || roleCreator === "chef_bureau_repr";
+  });
 
   const filteredDossiers = representationDossiers.filter(d => {
-    const draRef = d.representationEntry?.dra_reference || d.dra || "";
+    const repr = d.representation_entry || d.representationEntry || {};
+    const draRef = repr.dra_reference || d.dra || "";
     const matchesRef = draRef.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDate = (!dateRange.start || d.date >= dateRange.start) && (!dateRange.end || d.date <= dateRange.end);
     return matchesRef && matchesDate;

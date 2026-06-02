@@ -150,6 +150,7 @@ class EntrepotController extends Controller
             'nom' => 'required|string|max:255',
             'code' => 'required|string|max:50',
             'bureau' => 'required|string|max:100',
+            'ville' => 'nullable|string|max:100',
             'capacite' => 'nullable|integer',
         ]);
 
@@ -158,6 +159,7 @@ class EntrepotController extends Controller
             'code' => $request->code,
             'nom' => $request->nom,
             'bureau' => $request->bureau,
+            'ville' => $request->ville,
             'capacite' => $request->capacite ?? 0,
         ]);
 
@@ -175,10 +177,11 @@ class EntrepotController extends Controller
             'nom' => 'sometimes|required|string|max:255',
             'code' => 'sometimes|required|string|max:50',
             'bureau' => 'sometimes|required|string|max:100',
+            'ville' => 'nullable|string|max:100',
             'capacite' => 'nullable|integer',
         ]);
 
-        $entrepot->update($request->only(['nom', 'code', 'bureau', 'capacite']));
+        $entrepot->update($request->only(['nom', 'code', 'bureau', 'ville', 'capacite']));
 
         return response()->json($entrepot);
     }

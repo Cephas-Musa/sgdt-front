@@ -16,7 +16,9 @@ class EmptyManifest extends Model
         'date_declaration',
         'bureau_id',
         'status',
+        'facture_statut',
         'user_id',
+        'dossier_id',
     ];
 
     protected function casts(): array
@@ -29,5 +31,10 @@ class EmptyManifest extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function dossier(): BelongsTo
+    {
+        return $this->belongsTo(Dossier::class);
     }
 }

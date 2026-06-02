@@ -10,6 +10,7 @@ import {
   Truck,
   ArrowRight,
   Building2,
+  Edit,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { useApi, apiGetDossiers, apiGetBureauxRepresentation, apiGetAlertes, apiGetTypesDossiers, type ApiError } from "@/lib/api";
+import { useApi, apiGetDossiers, apiGetBureauxRepresentation, apiGetAlertes, apiGetTypesDossiers, apiUpdateDossier, type ApiError } from "@/lib/api";
 import type { Dossier, DossierStatus, DossierType } from "@/lib/mock";
 import { toast } from "sonner";
 import {
@@ -33,6 +34,11 @@ import {
   ExportForm,
   AutresForm,
   PaiementModule,
+  CommonFields,
+  DynamicDeclarations,
+  DynamicTitres,
+  LocalisationField,
+  useWarehouses,
 } from "@/dashboards/inspecteur/DossierForms";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 
@@ -137,6 +143,13 @@ function DossiersPage() {
     if (activeEndDate) {
       dossiers = dossiers.filter((d) => d.date <= activeEndDate);
     }
+
+    // On exclut de la liste principale les dossiers créés par le bureau de représentation
+    // (ils ont leur propre onglet dédié)
+    dossiers = dossiers.filter((d) => {
+      const roleCreator = d.creator?.role;
+      return roleCreator !== "operateur_saisie" && roleCreator !== "chef_bureau_repr";
+    });
 
     return dossiers;
   };
@@ -287,7 +300,7 @@ function DossiersPage() {
           className="h-8 border-accent/20 text-accent hover:bg-accent hover:text-white transition-all duration-200"
           onClick={(event) => {
             event.stopPropagation();
-            navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: r.id } });
+            navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: String(r.id) } });
           }}
         >
           Afficher
@@ -465,14 +478,19 @@ function DossiersPage() {
                   <td className="px-4 py-4 text-xs">{d.date}</td>
                   <td className="px-4 py-4 font-bold text-success">${d.montant}</td>
                   <td className="px-4 py-4 text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={() => navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: d.id } })}
-                    >
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      {d.created_by === user?.id && (
+                        <EditDossierDialog dossier={d} onSuccess={reload} />
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: String(d.id) } })}
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -491,6 +509,8 @@ function DossiersPage() {
 ════════════════════════════════════════════════════════════ */
 function SecretaireDossiersView() {
   const { t } = useI18n();
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const allDossiers = (rawDossiers || []) as Dossier[];
 
   /* ── Recherche ── */
   const [searchRD, setSearchRD] = useState("");
@@ -513,7 +533,7 @@ function SecretaireDossiersView() {
     setTimeout(() => {
       const rd = searchRD.trim().toUpperCase();
       const year = searchYear.trim();
-      const found = DOSSIERS.filter((d) => {
+      const found = allDossiers.filter((d) => {
         const matchRD = rd ? d.reference.toUpperCase().includes(rd) : true;
         const matchYear = year ? d.date.startsWith(year) : true;
         return matchRD && matchYear;
@@ -724,11 +744,13 @@ function SecretaireDossiersView() {
    ════════════════════════════════════════════════════════════ */
 function ChefReprDossiersView() {
   const { user } = useAuth();
+  const { data: rawDossiers } = useApi(apiGetDossiers);
+  const allDossiers = (rawDossiers || []) as Dossier[];
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [hasSearched, setHasSearched] = useState(false);
 
-  const filteredDossiers = DOSSIERS.filter(d => {
+  const filteredDossiers = allDossiers.filter(d => {
     const matchesRef = d.reference.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDate = (!dateRange.start || d.date >= dateRange.start) && (!dateRange.end || d.date <= dateRange.end);
     return matchesRef && matchesDate;
@@ -854,6 +876,107 @@ function ChefReprDossiersView() {
   );
 }
 
+function EditDossierDialog({ dossier, onSuccess }: { dossier: Dossier; onSuccess: () => void }) {
+  const warehouses = useWarehouses();
+  const [formData, setFormData] = useState<any>({
+    importateur: dossier.importateur || "",
+    declarant: dossier.declarant || "",
+    localisation: dossier.localisation || "",
+    dra: dossier.dra || "",
+    t1: dossier.t1 || "",
+    nif: dossier.nif || "",
+    type_marchandises: dossier.type_marchandises || "",
+    nombre_titres: dossier.extra_data?.nombre_titres || 0,
+    nombre_declarations_attendues: dossier.extra_data?.nombre_declarations_attendues || 0,
+    declarations_details: dossier.extra_data?.declarations_details || [],
+    titres_details: dossier.extra_data?.titres_details || [],
+    reference_titre: dossier.extra_data?.reference_titre || "",
+    date_titre: dossier.extra_data?.date_titre || "",
+    reference_t1: dossier.extra_data?.reference_t1 || "",
+    date_t1: dossier.extra_data?.date_t1 || "",
+    reference_douane: dossier.extra_data?.reference_douane || "",
+    date_reference_douane: dossier.extra_data?.date_reference_douane || "",
+    date_debut: dossier.extra_data?.date_debut || "",
+    date_fin: dossier.extra_data?.date_fin || "",
+  });
+
+  const handleChange = (field: string, value: any) => setFormData({ ...formData, [field]: value });
+
+  const handleSubmit = async () => {
+    try {
+      await apiUpdateDossier(dossier.id, {
+        importateur: formData.importateur,
+        declarant: formData.declarant,
+        localisation: formData.localisation,
+        dra: formData.dra,
+        t1: formData.t1,
+        nif: formData.nif,
+        type_marchandises: formData.type_marchandises,
+        extra_data: {
+          nombre_titres: parseInt(formData.nombre_titres) || 0,
+          nombre_declarations_attendues: parseInt(formData.nombre_declarations_attendues) || 0,
+          declarations_details: formData.declarations_details || [],
+          titres_details: formData.titres_details || [],
+          reference_titre: formData.reference_titre,
+          date_titre: formData.date_titre,
+          reference_t1: formData.reference_t1,
+          date_t1: formData.date_t1,
+          reference_douane: formData.reference_douane,
+          date_reference_douane: formData.date_reference_douane,
+          date_debut: formData.date_debut,
+          date_fin: formData.date_fin,
+        },
+      });
+      toast.success("Dossier modifié avec succès !");
+      onSuccess();
+    } catch (err: any) {
+      toast.error("Erreur: " + err.message);
+    }
+  };
+
+  return (
+    <FormDialog
+      trigger={
+        <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white">
+          <Edit className="h-4 w-4" />
+        </Button>
+      }
+      title={`Modifier Dossier — ${dossier.reference}`}
+      submitLabel="Enregistrer"
+      onSubmit={handleSubmit}
+    >
+      <FormGrid>
+        <CommonFields formData={formData} setFormData={setFormData} />
+        <Field label="Importateur" required><Input value={formData.importateur} onChange={e => handleChange('importateur', e.target.value)} /></Field>
+        <Field label="Nom déclarant" required><Input value={formData.declarant} onChange={e => handleChange('declarant', e.target.value)} /></Field>
+        <Field label="NIF"><Input value={formData.nif} onChange={e => handleChange('nif', e.target.value)} /></Field>
+        <Field label="Type Marchandises"><Input value={formData.type_marchandises} onChange={e => handleChange('type_marchandises', e.target.value)} /></Field>
+        <Field label="Nombre déclarations attendues"><Input type="number" min={0} value={formData.nombre_declarations_attendues} onChange={e => handleChange('nombre_declarations_attendues', e.target.value)} /></Field>
+        <Field label="Nombre de titres"><Input type="number" min={0} value={formData.nombre_titres} onChange={e => handleChange('nombre_titres', e.target.value)} /></Field>
+        <DynamicDeclarations count={formData.nombre_declarations_attendues} formData={formData} setFormData={setFormData} />
+        <DynamicTitres count={formData.nombre_titres} formData={formData} setFormData={setFormData} />
+        <div className="col-span-2 grid grid-cols-2 gap-4">
+          <Field label="Référence titre (E-XXX)"><Input placeholder="E-001" value={formData.reference_titre} onChange={e => handleChange('reference_titre', e.target.value)} /></Field>
+          <Field label="Sa date"><Input type="date" value={formData.date_titre} onChange={e => handleChange('date_titre', e.target.value)} /></Field>
+        </div>
+        <div className="col-span-2 grid grid-cols-2 gap-4">
+          <Field label="Référence T1"><Input placeholder="T1-…" value={formData.reference_t1} onChange={e => handleChange('reference_t1', e.target.value)} /></Field>
+          <Field label="Sa date"><Input type="date" value={formData.date_t1} onChange={e => handleChange('date_t1', e.target.value)} /></Field>
+        </div>
+        <LocalisationField warehouses={warehouses} value={formData.localisation} onChange={(v: string) => handleChange("localisation", v)} />
+        <div className="col-span-2 grid grid-cols-2 gap-4">
+          <Field label="Référence douane (E-XXX)"><Input placeholder="E-001" value={formData.reference_douane} onChange={e => handleChange('reference_douane', e.target.value)} /></Field>
+          <Field label="Date référence douane"><Input type="date" value={formData.date_reference_douane} onChange={e => handleChange('date_reference_douane', e.target.value)} /></Field>
+        </div>
+        <div className="col-span-2 grid grid-cols-2 gap-4">
+          <Field label="Date début"><Input type="date" value={formData.date_debut} onChange={e => handleChange('date_debut', e.target.value)} /></Field>
+          <Field label="Date fin"><Input type="date" value={formData.date_fin} onChange={e => handleChange('date_fin', e.target.value)} /></Field>
+        </div>
+      </FormGrid>
+    </FormDialog>
+  );
+}
+
 function InspecteurDossiersView() {
   const { data: rawDossiers, reload } = useApi(apiGetDossiers);
   const { data: rawTypesDossiers } = useApi(apiGetTypesDossiers);
@@ -872,8 +995,13 @@ function InspecteurDossiersView() {
   const allDossiers = (rawDossiers || []) as Dossier[];
   const typesDossiers = (rawTypesDossiers || []) as any[];
 
-  // Le backend filtre déjà selon les accès (DossierAccessService)
-  const inspecteurDossiers = allDossiers;
+  // Le backend renvoie tous les dossiers accessibles.
+  // L'Inspecteur a accès aux dossiers "Bureau Représentation" pour consultation dans l'onglet dédié.
+  // On doit donc les exclure de son onglet "Dossiers" principal.
+  const inspecteurDossiers = allDossiers.filter((d) => {
+    const roleCreator = d.creator?.role;
+    return roleCreator !== "operateur_saisie" && roleCreator !== "chef_bureau_repr";
+  });
 
   const getFilteredDossiers = () => {
     let filtered = [...inspecteurDossiers];
@@ -889,14 +1017,36 @@ function InspecteurDossiersView() {
   const filteredDossiers = getFilteredDossiers();
 
   const handleSearch = () => {
+    let rawRef = searchRef.trim().replace(/^RD-/i, '');
+    let finalRef = '';
+
+    if (rawRef) {
+      // pad with zeros up to 4 digits if needed
+      if (/^\d{1,4}$/.test(rawRef)) {
+        rawRef = rawRef.padStart(4, '0');
+      }
+      finalRef = `RD-${rawRef}`;
+      setSearchRef(rawRef); // Keep only the numbers in the input
+    }
+
     setHasSearched(true);
-    toast.success(filteredDossiers.length + " dossier(s) trouvé(s).");
+    
+    // We calculate manually with finalRef so toast shows the correct number immediately
+    let count = [...inspecteurDossiers];
+    if (finalRef) count = count.filter((d) => d.reference.toLowerCase().includes(finalRef.toLowerCase()));
+    if (searchDra) count = count.filter((d) => d.dra?.toLowerCase().includes(searchDra.toLowerCase()));
+    if (searchT1) count = count.filter((d) => d.t1?.toLowerCase().includes(searchT1.toLowerCase()));
+    if (startDate) count = count.filter((d) => (d.date ?? d.created_at) >= startDate);
+    if (endDate) count = count.filter((d) => (d.date ?? d.created_at) <= endDate);
+    if (filterStatus !== "tous") count = count.filter((d) => d.status === filterStatus);
+
+    toast.success(count.length + " dossier(s) trouvé(s).");
   };
   const handleReset = () => { setSearchRef(""); setSearchDra(""); setSearchT1(""); setStartDate(""); setEndDate(""); setFilterStatus("tous"); setHasSearched(false); };
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Mes Dossiers" description="Création, suivi et appurement final de vos dossiers douaniers." />
+      <PageHeader title="Historique Personnel" description="Mes dossiers traités et récemment consultés." />
 
       <div className="space-y-6">
         <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -937,7 +1087,15 @@ function InspecteurDossiersView() {
 
         <div className="rounded-xl border border-border bg-gradient-to-br from-card via-card to-accent/[0.03] p-6 shadow-sm">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-            <div className="xl:col-span-1"><label className="text-xs text-muted-foreground">Réf. dossier</label><Input value={searchRef} onChange={e => setSearchRef(e.target.value)} placeholder="DR-XXXX" className="h-9 mt-1.5" /></div>
+            <div className="xl:col-span-1">
+              <label className="text-xs text-muted-foreground">Réf. dossier</label>
+              <div className="relative mt-1.5 flex items-center">
+                <span className="absolute left-3 text-sm font-semibold text-muted-foreground pointer-events-none">
+                  RD-
+                </span>
+                <Input value={searchRef} onChange={e => setSearchRef(e.target.value.replace(/^RD-/i, ''))} placeholder="0045" className="h-9 pl-9 font-mono" />
+              </div>
+            </div>
             <div className="xl:col-span-1"><label className="text-xs text-muted-foreground">Référence E-</label><Input value={searchDra} onChange={e => setSearchDra(e.target.value)} placeholder="E-XXXX" className="h-9 mt-1.5" /></div>
             <div className="xl:col-span-1"><label className="text-xs text-muted-foreground">T1</label><Input value={searchT1} onChange={e => setSearchT1(e.target.value)} placeholder="T1" className="h-9 mt-1.5" /></div>
             <div className="xl:col-span-1"><label className="text-xs text-muted-foreground">Date Début</label><Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-9 mt-1.5" /></div>
@@ -959,8 +1117,11 @@ function InspecteurDossiersView() {
                   <td className="px-4 py-3 font-medium">{d.importateur}</td>
                   <td className="px-4 py-3 font-mono text-xs">{d.reference}</td>
                   <td className="px-4 py-3"><StatusBadge status={d.status} /></td>
-                  <td className="px-4 py-3 text-right">
-                    <Button size="sm" variant="outline" className="h-8 border-accent text-accent hover:bg-accent hover:text-white" onClick={() => navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: d.id } })}>Ouvrir</Button>
+                  <td className="px-4 py-3 text-right flex items-center justify-end gap-2">
+                    {d.created_by === user?.id && (
+                      <EditDossierDialog dossier={d} onSuccess={reload} />
+                    )}
+                    <Button size="sm" variant="outline" className="h-8 border-accent text-accent hover:bg-accent hover:text-white" onClick={() => navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: String(d.id) } })}>Ouvrir</Button>
                   </td>
                 </tr>
               ))}

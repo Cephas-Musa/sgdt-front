@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Enums\DossierStatus;
 
 class Dossier extends Model
@@ -152,9 +153,44 @@ class Dossier extends Model
         return $this->hasMany(Mouvement::class);
     }
 
+    public function vracs(): HasMany
+    {
+        return $this->hasMany(Vrac::class);
+    }
+
+    public function decharges(): HasMany
+    {
+        return $this->hasMany(Decharge::class);
+    }
+
+    public function mouvementsStockage(): HasMany
+    {
+        return $this->hasMany(MouvementStockage::class);
+    }
+
     public function colisages(): HasMany
     {
         return $this->hasMany(RapportColisage::class);
+    }
+
+    public function representationEntry(): HasOne
+    {
+        return $this->hasOne(RepresentationEntry::class);
+    }
+
+    public function typingDocsDirect(): HasMany
+    {
+        return $this->hasMany(TypingDocDirect::class);
+    }
+
+    public function typingDocsTranshipment(): HasMany
+    {
+        return $this->hasMany(TypingDocTranshipment::class);
+    }
+
+    public function itEntries(): HasMany
+    {
+        return $this->hasMany(ItEntry::class);
     }
 
     /**

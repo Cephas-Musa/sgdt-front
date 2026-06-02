@@ -19,6 +19,7 @@ class Mouvement extends Model
         'date_empty_manifest',
         'custom_fields',
         'user_id',
+        'dossier_id',
     ];
 
     protected function casts(): array
@@ -38,5 +39,10 @@ class Mouvement extends Model
     public function titreDocument(): HasOne
     {
         return $this->hasOne(TitreDocument::class);
+    }
+
+    public function dossier(): BelongsTo
+    {
+        return $this->belongsTo(Dossier::class);
     }
 }

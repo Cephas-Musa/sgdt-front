@@ -112,6 +112,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dossiers/history', [DossierController::class, 'history']);
     Route::get('/dossiers/next-reference', [DossierController::class, 'nextReference']);
     Route::get('/dossiers/{id}/details', [DossierController::class, 'details']);
+    Route::get('/dossiers/{id}/aggregate', [DossierController::class, 'aggregate']);
     Route::apiResource('dossiers', DossierController::class);
     Route::patch('/dossiers/{id}/status', [DossierController::class, 'updateStatus']);
     
@@ -257,6 +258,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ─── Typing Docs (Barrière Étranger) ─────────────────────────────────────
     Route::prefix('typing-docs')->group(function () {
+        Route::get('/', [\App\Http\Controllers\TypingDocController::class, 'indexDirect']);
         Route::get('/stats', [\App\Http\Controllers\TypingDocController::class, 'getDashboardStats']);
         Route::get('/dossier/{dossierId}', [\App\Http\Controllers\TypingDocController::class, 'indexByDossier']);
         Route::post('/direct', [\App\Http\Controllers\TypingDocController::class, 'storeDirect']);
@@ -270,6 +272,58 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [\App\Http\Controllers\ItEntryController::class, 'store']);
         Route::get('/dossier/{dossierId}', [\App\Http\Controllers\ItEntryController::class, 'showByDossier']);
     });
+
+    // ─── Barrière — Commissions ─────────────────────────────────────────
+    Route::prefix('commissions')->group(function () {
+        Route::get('/', [\App\Http\Controllers\CommissionController::class, 'index']);
+        Route::post('/calculate', [\App\Http\Controllers\CommissionController::class, 'calculate']);
+        Route::post('/{id}/approve', [\App\Http\Controllers\CommissionController::class, 'approve']);
+        Route::post('/{id}/pay', [\App\Http\Controllers\CommissionController::class, 'pay']);
+        Route::post('/{id}/cancel', [\App\Http\Controllers\CommissionController::class, 'cancel']);
+        Route::get('/stats', [\App\Http\Controllers\CommissionController::class, 'stats']);
+        Route::get('/operator/{operatorId}/balance', [\App\Http\Controllers\CommissionController::class, 'operatorBalance']);
+    });
+});
+
+// Routes versionnées /api/v1/barrier/*
+Route::prefix('v1/barrier')->middleware('auth:sanctum')->group(function () {
+    // Barrières (master)
+    Route::get('/barrieres', [\App\Http\Controllers\BarriereController::class, 'indexBarrieres']);
+    Route::get('/barrieres/{id}', [\App\Http\Controllers\BarriereController::class, 'showBarriere']);
+    Route::get('/barrieres/{id}/balance', [\App\Http\Controllers\BarriereController::class, 'getBalance']);
+    Route::get('/barrieres/{id}/movements', [\App\Http\Controllers\BarriereController::class, 'getMovements']);
+
+    // Mouvements (entrées/sorties)
+    Route::post('/barrieres/{id}/entry', [\App\Http\Controllers\BarriereController::class, 'recordEntry']);
+    Route::post('/barrieres/{id}/exit', [\App\Http\Controllers\BarriereController::class, 'recordExit']);
+
+    // Typing Docs
+    Route::get('/typing-docs/dossier/{dossierId}', [\App\Http\Controllers\TypingDocController::class, 'indexByDossier']);
+    Route::post('/typing-docs/direct', [\App\Http\Controllers\TypingDocController::class, 'storeDirect']);
+    Route::post('/typing-docs/transhipment', [\App\Http\Controllers\TypingDocController::class, 'storeTranshipment']);
+    Route::patch('/typing-docs/{docId}/link', [\App\Http\Controllers\TypingDocController::class, 'linkToDossier']);
+
+    // IT Entries
+    Route::get('/it-entries', [\App\Http\Controllers\ItEntryController::class, 'index']);
+    Route::post('/it-entries', [\App\Http\Controllers\ItEntryController::class, 'store']);
+    Route::get('/it-entries/dossier/{dossierId}', [\App\Http\Controllers\ItEntryController::class, 'showByDossier']);
+
+    // Empty Manifests
+    Route::get('/empty-manifests', [\App\Http\Controllers\ManifestController::class, 'index']);
+    Route::post('/empty-manifests', [\App\Http\Controllers\ManifestController::class, 'store']);
+    Route::post('/empty-manifests/{id}/pay', [\App\Http\Controllers\ManifestController::class, 'pay']);
+
+    // Commissions
+    Route::get('/commissions', [\App\Http\Controllers\CommissionController::class, 'index']);
+    Route::post('/commissions/calculate', [\App\Http\Controllers\CommissionController::class, 'calculate']);
+    Route::post('/commissions/{id}/approve', [\App\Http\Controllers\CommissionController::class, 'approve']);
+    Route::post('/commissions/{id}/pay', [\App\Http\Controllers\CommissionController::class, 'pay']);
+    Route::post('/commissions/{id}/cancel', [\App\Http\Controllers\CommissionController::class, 'cancel']);
+    Route::get('/commissions/stats', [\App\Http\Controllers\CommissionController::class, 'stats']);
+    Route::get('/commissions/operator/{operatorId}/balance', [\App\Http\Controllers\CommissionController::class, 'operatorBalance']);
+
+    // Stats
+    Route::get('/typing-docs/stats', [\App\Http\Controllers\TypingDocController::class, 'getDashboardStats']);
 });
 
 

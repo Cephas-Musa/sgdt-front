@@ -175,8 +175,12 @@ export async function apiUploadAttachment(file: File): Promise<{ url: string; pa
   });
 }
 
-export async function apiGetDossierDetails(id: string): Promise<unknown> {
-  return request<unknown>(`/dossiers/${id}/details`);
+export async function apiGetDossierDetails(id: string): Promise<any> {
+  return request<any>(`/dossiers/${id}/details`);
+}
+
+export async function apiGetDossierAggregate(id: string): Promise<any> {
+  return request<any>(`/dossiers/${id}/aggregate`);
 }
 
 export async function apiActionUpdateInfos(id: string, data: unknown): Promise<unknown> {
@@ -215,6 +219,39 @@ export async function apiGetAlertes(): Promise<unknown[]> {
 
 export async function apiMarkAlerteRead(id: number): Promise<unknown> {
   return request<unknown>(`/alertes/${id}/read`, { method: "PATCH" });
+}
+
+// ─── MOUVEMENTS (Brigadier) ──────────────────────────────────────────────────
+
+export async function apiGetMouvements(params?: Record<string, string>): Promise<any[]> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<any[]>(`/mouvements${qs}`);
+}
+
+export async function apiCreateMouvement(data: unknown): Promise<any> {
+  return request<any>("/mouvements", { method: "POST", body: JSON.stringify(data) });
+}
+
+// ─── VRACS ───────────────────────────────────────────────────────────────────
+
+export async function apiGetVracs(params?: Record<string, string>): Promise<any[]> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<any[]>(`/vracs${qs}`);
+}
+
+export async function apiCreateVrac(data: unknown): Promise<any> {
+  return request<any>("/vracs", { method: "POST", body: JSON.stringify(data) });
+}
+
+// ─── MOUVEMENTS STOCKAGE ─────────────────────────────────────────────────────
+
+export async function apiGetMouvementsStockage(params?: Record<string, string>): Promise<any[]> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<any[]>(`/stockage-movements${qs}`);
+}
+
+export async function apiCreateStockageMouvement(data: unknown): Promise<any> {
+  return request<any>("/stockage-movements", { method: "POST", body: JSON.stringify(data) });
 }
 
 // ─── BARRIÈRE ENTRIES ────────────────────────────────────────────────────────
@@ -499,6 +536,10 @@ export async function apiGetRepresentationStats(): Promise<any> {
 
 // ─── TYPING DOCS (BARRIERE ETRANGER) ─────────────────────────────────────────
 
+export async function apiGetTypingDocsDirect(): Promise<any[]> {
+  return request<any[]>("/typing-docs");
+}
+
 export async function apiCreateTypingDocDirect(data: unknown): Promise<any> {
   return request<any>("/typing-docs/direct", {
     method: "POST",
@@ -522,7 +563,7 @@ export async function apiGetTypingDocStats(params?: Record<string, string>): Pro
   return request<any>(`/typing-docs/stats${qs}`);
 }
 
-export async function apiLinkTypingDocToDossier(docId: string, data: { dossier_reference: string; doc_type: "direct" | "transhipment" }): Promise<any> {
+export async function apiLinkTypingDocToDossier(docId: string, data: { dossier_dra: string; doc_type: "direct" | "transhipment" }): Promise<any> {
   return request<any>(`/typing-docs/${docId}/link`, {
     method: "PATCH",
     body: JSON.stringify(data),
@@ -581,5 +622,59 @@ export async function apiUpdateExitPoint(id: string, data: any): Promise<any> {
 
 export async function apiDeleteExitPoint(id: string): Promise<any> {
   return request<any>(`/config/exit-points/${id}`, { method: "DELETE" });
+}
+
+// ── Barrière Commissions / V1 Barrier ────────────────────────────────────
+
+export async function apiGetCommissions(params?: Record<string, string>): Promise<any> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<any>(`/commissions${qs}`);
+}
+
+export async function apiCalculateCommission(data: {
+  barriere_code: string;
+  typing_operator_id: string;
+  document_type: string;
+  reference_document: string;
+  montant_base: number;
+}): Promise<any> {
+  return request<any>("/commissions/calculate", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiApproveCommission(id: string): Promise<any> {
+  return request<any>(`/commissions/${id}/approve`, { method: "POST" });
+}
+
+export async function apiPayCommission(id: string): Promise<any> {
+  return request<any>(`/commissions/${id}/pay`, { method: "POST" });
+}
+
+export async function apiCancelCommission(id: string, notes?: string): Promise<any> {
+  return request<any>(`/commissions/${id}/cancel`, { method: "POST", body: JSON.stringify({ notes }) });
+}
+
+export async function apiGetCommissionStats(params?: Record<string, string>): Promise<any> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<any>(`/commissions/stats${qs}`);
+}
+
+export async function apiGetOperatorCommissionBalance(operatorId: string): Promise<any> {
+  return request<any>(`/commissions/operator/${operatorId}/balance`);
+}
+
+export async function apiGetBarrieres(): Promise<any[]> {
+  return request<any[]>("/v1/barrier/barrieres");
+}
+
+export async function apiGetBarriere(id: string): Promise<any> {
+  return request<any>(`/v1/barrier/barrieres/${id}`);
+}
+
+export async function apiGetBarriereBalance(id: string): Promise<any> {
+  return request<any>(`/v1/barrier/barrieres/${id}/balance`);
+}
+
+export async function apiGetBarriereMovements(id: string): Promise<any[]> {
+  return request<any[]>(`/v1/barrier/barrieres/${id}/movements`);
 }
 

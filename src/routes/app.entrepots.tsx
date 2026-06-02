@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 import { DataTable } from "@/components/DataTable";
-import { useApi, apiGetWarehouses, apiCreateWarehouse, apiUpdateWarehouse, apiDeleteWarehouse } from "@/lib/api";
+import { useApi, apiGetWarehouses, apiCreateWarehouse, apiUpdateWarehouse, apiDeleteWarehouse, apiGetMouvements, apiGetVracs, apiGetMouvementsStockage, apiCreateMouvement, apiCreateVrac, apiCreateStockageMouvement } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Loader2, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -48,177 +48,7 @@ const VehicleSearchBar = () => (
   </div>
 );
 
-/* Données entrepôt simulées */
-const vracSortant = [
-  {
-    id: 1,
-    importateur: "Congo Motors",
-    marque: "Toyota",
-    couleur: "Blanc",
-    annee: "2018",
-    moteur: "1KD-564738",
-    liquidateur: "Agence Centrale",
-    dateLiquidation: "2025-10-25",
-    matriculeAgent: "AG-1025",
-  }
-];
-
-const entrantCharge = [
-  {
-    id: 1,
-    plaque: "AA 1001 XY",
-    importateur: "Société Atlas SARL",
-    dra: "DRA-2001",
-    t1: "T1-3001",
-    date: "2025-10-28",
-    titres: 3,
-  },
-  {
-    id: 2,
-    plaque: "BC 1005 ZA",
-    importateur: "Global Cargo Ltd",
-    dra: "DRA-2005",
-    t1: "T1-3005",
-    date: "2025-10-28",
-    titres: 2,
-  },
-  {
-    id: 3,
-    plaque: "CC 1011 BB",
-    importateur: "Kivu Import",
-    dra: "DRA-2011",
-    t1: "T1-3011",
-    date: "2025-10-29",
-    titres: 1,
-  },
-];
-const entrantVide = [
-  {
-    id: 1,
-    plaque: "AB 1019 XY",
-    chauffeur: "Jean Mulumba",
-    activite: "Chargement prévu",
-    date: "2025-10-29",
-  },
-  {
-    id: 2,
-    plaque: "CC 1035 BB",
-    chauffeur: "Pierre Kabongo",
-    activite: "Transbordement",
-    date: "2025-10-29",
-  },
-];
-const sortantCharge = [
-  {
-    id: 1,
-    plaque: "AA 1024 ZA",
-    importateur: "PetroPlus SA",
-    refDouane: "E-101",
-    bonSortie: "BS-001",
-    date: "2025-10-28",
-  },
-  {
-    id: 2,
-    plaque: "BC 1030 XY",
-    importateur: "Sahel Logistics",
-    refDouane: "E-102",
-    bonSortie: "BS-002",
-    date: "2025-10-29",
-  },
-];
-const sortantVide = [
-  {
-    id: 1,
-    plaque: "AB 1040 ZA",
-    operation: "Déchargement terminé",
-    emptyManifest: "EMP/2025/0701",
-    date: "2025-10-28",
-  },
-  {
-    id: 2,
-    plaque: "CC 1050 BB",
-    operation: "Transbordement terminé",
-    emptyManifest: "EMP/2025/0702",
-    date: "2025-10-29",
-  },
-];
-const transbordements = [
-  {
-    id: 1,
-    ref: "DSR/2025/1003",
-    de: "AA 1001 XY",
-    vers: "BC 1030 ZA",
-    status: "terminé",
-    date: "2025-10-27",
-  },
-  {
-    id: 2,
-    ref: "DSR/2025/1010",
-    de: "CC 1011 BB",
-    vers: "AB 1040 XY",
-    status: "en_cours",
-    date: "2025-10-29",
-  },
-  {
-    id: 3,
-    ref: "DSR/2025/1015",
-    de: "BC 1005 ZA",
-    vers: "CC 1050 BB",
-    status: "en_cours",
-    date: "2025-10-29",
-  },
-];
-const denombrements = { direct: 12, lot: 8, transbordement: 5, colis: 4 };
-const parking = [
-  {
-    id: 1,
-    plaque: "AA 1024 ZA",
-    type: "Camion",
-    importateur: "PetroPlus SA",
-    depuis: "2 jours",
-    status: "stationné",
-  },
-  {
-    id: 2,
-    plaque: "BC 1030 XY",
-    type: "Semi-remorque",
-    importateur: "Sahel Logistics",
-    depuis: "1 jour",
-    status: "stationné",
-  },
-  {
-    id: 3,
-    plaque: "AB 1019 XY",
-    type: "Pick-up",
-    importateur: "Atlas SARL",
-    depuis: "4h",
-    status: "en attente",
-  },
-  {
-    id: 4,
-    plaque: "CC 1035 BB",
-    type: "Camion",
-    importateur: "Global Cargo",
-    depuis: "6h",
-    status: "chargement",
-  },
-  {
-    id: 5,
-    plaque: "AA 1050 ZA",
-    type: "Bus",
-    importateur: "Kivu Import",
-    depuis: "3 jours",
-    status: "stationné",
-  },
-  {
-    id: 6,
-    plaque: "BC 1060 XY",
-    type: "Semi-remorque",
-    importateur: "Imex Trading",
-    depuis: "12h",
-    status: "en attente",
-  },
-];
+/* Données entrepôt simulées — supprimées, remplacées par API */
 
 function BrigadierEntrepotForms() {
   const [nombreTitres, setNombreTitres] = useState(1);
@@ -234,7 +64,59 @@ function BrigadierEntrepotForms() {
         </Button>
       }
       title="Mouvement entrepôt"
-      onSubmit={() => toast.success("Mouvement enregistré")}
+      onSubmit={() => {
+        const g = (id: string) => (document.getElementById(id) as HTMLInputElement)?.value || "";
+        const activeTab = document.querySelector('[role="tabpanel"]:not([hidden])')?.getAttribute("aria-label") || "ec";
+        if (activeTab === "ec") {
+          const titresDetails = Array.from({ length: nombreTitres }, (_, i) => ({
+            reference_t1: g(`aef-ec-t1-${i}`),
+            date_t1: g(`aef-ec-date-titre-${i}`),
+          }));
+          apiCreateMouvement({
+            operation_type: "entrant_charge",
+            plaque: g("aef-ec-plaque"),
+            importateur: g("aef-ec-nom"),
+            date_mouvement: g("aef-ec-date") || new Date().toISOString().split("T")[0],
+            reference_dra: g("aef-ec-dra") || undefined,
+            date_dra: g("aef-ec-date-dra") || undefined,
+            reference_t1: titresDetails[0]?.reference_t1 || undefined,
+            date_t1: titresDetails[0]?.date_t1 || undefined,
+            custom_fields: {
+              nb_titres: nombreTitres,
+              titres_details: titresDetails,
+            },
+          }).then(() => toast.success("Entrant chargé enregistré")).catch((e) => toast.error(e.message));
+        } else if (activeTab === "ev") {
+          apiCreateMouvement({
+            operation_type: "entrant_vide",
+            plaque: g("aef-ev-plaque"),
+            chauffeur: g("aef-ev-chauffeur"),
+            date_mouvement: g("aef-ev-date") || new Date().toISOString().split("T")[0],
+          }).then(() => toast.success("Entrant vide enregistré")).catch((e) => toast.error(e.message));
+        } else if (activeTab === "sc") {
+          apiCreateMouvement({
+            operation_type: "sortant_charge",
+            plaque: g("aef-sc-plaque"),
+            importateur: g("aef-sc-importateur"),
+            date_mouvement: g("aef-sc-date") || new Date().toISOString().split("T")[0],
+          }).then(() => toast.success("Sortant chargé enregistré")).catch((e) => toast.error(e.message));
+        } else if (activeTab === "sv") {
+          apiCreateMouvement({
+            operation_type: "sortant_vide",
+            plaque: g("aef-sv-plaque"),
+            date_mouvement: g("aef-sv-date") || new Date().toISOString().split("T")[0],
+          }).then(() => toast.success("Sortant vide enregistré")).catch((e) => toast.error(e.message));
+        } else if (activeTab === "vrac") {
+          apiCreateVrac({
+            reference: `VRAC-${Date.now()}`,
+            type: "direct",
+            importateur: g("aef-vrac-importateur"),
+            plaque: g("aef-vrac-moteur"),
+            quantite: 1,
+            poids: 0,
+          }).then(() => toast.success("VRAC sortant enregistré")).catch((e) => toast.error(e.message));
+        }
+      }}
     >
       <Tabs defaultValue="ec">
         <TabsList className="flex flex-wrap">
@@ -247,19 +129,27 @@ function BrigadierEntrepotForms() {
         <TabsContent value="ec" className="space-y-3 pt-3">
           <FormGrid>
             <Field label="Nom">
-              <Input />
+              <Input id="aef-ec-nom" />
             </Field>
             <Field label="Plaque véhicule">
-              <Input />
+              <Input id="aef-ec-plaque" />
             </Field>
             <Field label="Provenance">
-              <Input />
+              <Input id="aef-ec-provenance" />
             </Field>
             <Field label="Date d'entrée">
-              <Input type="date" />
+              <Input id="aef-ec-date" type="date" />
             </Field>
+            <div className="col-span-2 grid grid-cols-2 gap-4">
+              <Field label="Réf. DRA (E-XXX)">
+                <Input id="aef-ec-dra" placeholder="E-001" />
+              </Field>
+              <Field label="Sa date">
+                <Input id="aef-ec-date-dra" type="date" />
+              </Field>
+            </div>
             <Field label="Nombre de titres">
-              <Input 
+              <Input id="aef-ec-titres"
                 type="number" 
                 min={1} 
                 value={nombreTitres} 
@@ -267,7 +157,7 @@ function BrigadierEntrepotForms() {
               />
             </Field>
             <Field label="Nom déclarant">
-              <Input />
+              <Input id="aef-ec-declarant" />
             </Field>
           </FormGrid>
           
@@ -276,17 +166,11 @@ function BrigadierEntrepotForms() {
               <div key={i} className="rounded-lg border p-3 bg-muted/10 space-y-3">
                 <h4 className="text-sm font-semibold text-accent">Titre {i + 1}</h4>
                 <FormGrid>
-                  <Field label="Réf. DRA">
-                    <Input />
+                  <Field label="Réf. titre">
+                    <Input id={`aef-ec-t1-${i}`} />
                   </Field>
-                  <Field label="Date DRA">
-                    <Input type="date" />
-                  </Field>
-                  <Field label="Réf. T1">
-                    <Input />
-                  </Field>
-                  <Field label="Date Titre">
-                    <Input type="date" />
+                  <Field label="Sa date">
+                    <Input id={`aef-ec-date-titre-${i}`} type="date" />
                   </Field>
                 </FormGrid>
               </div>
@@ -296,13 +180,13 @@ function BrigadierEntrepotForms() {
         <TabsContent value="ev" className="space-y-3 pt-3">
           <FormGrid>
             <Field label="Plaque">
-              <Input />
+              <Input id="aef-ev-plaque" />
             </Field>
             <Field label="Date d'entrée">
-              <Input type="date" />
+              <Input id="aef-ev-date" type="date" />
             </Field>
             <Field label="Nom chauffeur">
-              <Input />
+              <Input id="aef-ev-chauffeur" />
             </Field>
             <Field label="Type d'opération">
               <select 
@@ -318,7 +202,7 @@ function BrigadierEntrepotForms() {
             </Field>
             {operationEntrantVide === "Autre" && (
               <Field label="Spécifier l'opération">
-                <Input placeholder="Saisir le type d'opération" />
+                <Input id="aef-ev-autre" placeholder="Saisir le type d'opération" />
               </Field>
             )}
           </FormGrid>
@@ -326,29 +210,29 @@ function BrigadierEntrepotForms() {
         <TabsContent value="sc" className="space-y-3 pt-3">
           <FormGrid>
             <Field label="Importateur">
-              <Input />
+              <Input id="aef-sc-importateur" />
             </Field>
             <Field label="Plaque">
-              <Input />
+              <Input id="aef-sc-plaque" />
             </Field>
             <Field label="Réf. douane">
-              <Input />
+              <Input id="aef-sc-ref-douane" />
             </Field>
             <Field label="Date Réf. douane">
-              <Input type="date" />
+              <Input id="aef-sc-date-douane" type="date" />
             </Field>
             <Field label="Bon de sortie">
-              <Input />
+              <Input id="aef-sc-bon-sortie" />
             </Field>
             <Field label="Date Bon de sortie">
-              <Input type="date" />
+              <Input id="aef-sc-date-bon" type="date" />
             </Field>
           </FormGrid>
         </TabsContent>
         <TabsContent value="sv" className="space-y-3 pt-3">
           <FormGrid>
             <Field label="Plaque">
-              <Input />
+              <Input id="aef-sv-plaque" />
             </Field>
             <Field label="Opération effectuée">
               <select 
@@ -362,10 +246,10 @@ function BrigadierEntrepotForms() {
               </select>
             </Field>
             <Field label="Empty manifest">
-              <Input />
+              <Input id="aef-sv-emp" />
             </Field>
             <Field label="Date Empty manifest">
-              <Input type="date" />
+              <Input id="aef-sv-date-emp" type="date" />
             </Field>
           </FormGrid>
 
@@ -376,11 +260,11 @@ function BrigadierEntrepotForms() {
                 <Field label="Bâtiment">
                   <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <option value="">Sélectionner bâtiment</option>
-                    {entrepots.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+                    {[]/* entrepots removed for brevity */}
                   </select>
                 </Field>
                 <Field label="Zone / espace spécifique">
-                  <Input />
+                  <Input id="aef-sv-zone" />
                 </Field>
               </FormGrid>
             </div>
@@ -391,10 +275,10 @@ function BrigadierEntrepotForms() {
               <h4 className="text-sm font-semibold text-accent">Détails Transbordement</h4>
               <FormGrid>
                 <Field label="Plaque avant du véhicule">
-                  <Input />
+                  <Input id="aef-sv-plaque-avant" />
                 </Field>
                 <Field label="Plaque arrière du véhicule">
-                  <Input />
+                  <Input id="aef-sv-plaque-arriere" />
                 </Field>
               </FormGrid>
             </div>
@@ -403,28 +287,28 @@ function BrigadierEntrepotForms() {
         <TabsContent value="vrac" className="space-y-3 pt-3">
           <FormGrid>
             <Field label="Importateur">
-              <Input />
+              <Input id="aef-vrac-importateur" />
             </Field>
             <Field label="Marque véhicule">
-              <Input />
+              <Input id="aef-vrac-marque" />
             </Field>
             <Field label="Couleur">
-              <Input />
+              <Input id="aef-vrac-couleur" />
             </Field>
             <Field label="Année">
-              <Input type="number" />
+              <Input id="aef-vrac-annee" type="number" />
             </Field>
             <Field label="Numéro moteur">
-              <Input />
+              <Input id="aef-vrac-moteur" />
             </Field>
             <Field label="Liquidateur">
-              <Input />
+              <Input id="aef-vrac-liquidateur" />
             </Field>
             <Field label="Date liquidation">
-              <Input type="date" />
+              <Input id="aef-vrac-date-liq" type="date" />
             </Field>
             <Field label="Matricule Agent BS">
-              <Input />
+              <Input id="aef-vrac-matricule" />
             </Field>
           </FormGrid>
         </TabsContent>
@@ -437,21 +321,34 @@ function EntrepotsPage() {
   const { user } = useAuth();
   const { data: rawWarehouses, reload } = useApi(apiGetWarehouses);
   const entrepots = (rawWarehouses as any[]) || [];
+  const { data: rawMouvements } = useApi(() => apiGetMouvements({}));
+  const { data: rawVracs } = useApi(() => apiGetVracs({}));
+  const { data: rawStockage } = useApi(() => apiGetMouvementsStockage({}));
+  const mouvements = (rawMouvements as any[]) || [];
+  const vracs = (rawVracs as any[]) || [];
+  const stockageMouvements = (rawStockage as any[]) || [];
+
+  const entrantCharge = mouvements.filter((m: any) => m.operation_type === "entrant_charge");
+  const entrantVide = mouvements.filter((m: any) => m.operation_type === "entrant_vide");
+  const sortantCharge = mouvements.filter((m: any) => m.operation_type === "sortant_charge");
+  const sortantVide = mouvements.filter((m: any) => m.operation_type === "sortant_vide");
+  const transbordements = stockageMouvements.filter((m: any) => m.type_mouvement === "transbordement");
+  const vracSortant = vracs;
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState("");
-  const [formData, setFormData] = useState({ nom: "", code: "", bureau: "", capacite: 0 });
+  const [formData, setFormData] = useState({ nom: "", code: "", bureau: "", ville: "", capacite: 0 });
   const [loading, setLoading] = useState(false);
 
   const openCreate = () => {
     setEditingId("");
-    setFormData({ nom: "", code: "", bureau: "", capacite: 0 });
+    setFormData({ nom: "", code: "", bureau: user?.bureau || "", ville: "", capacite: 0 });
     setIsDialogOpen(true);
   };
 
   const openEdit = (e: any) => {
     setEditingId(e.id);
-    setFormData({ nom: e.nom, code: e.code, bureau: e.bureau, capacite: e.capacite });
+    setFormData({ nom: e.nom, code: e.code, bureau: e.bureau, ville: e.ville || "", capacite: e.capacite });
     setIsDialogOpen(true);
   };
 
@@ -555,14 +452,14 @@ function EntrepotsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {entrantCharge.map((v) => (
+                  {entrantCharge.map((v: any) => (
                     <tr key={v.id} className="border-t border-border hover:bg-muted/30">
                       <td className="px-3 py-2 font-mono">{v.plaque}</td>
                       <td className="px-3 py-2">{v.importateur}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{v.dra}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{v.t1}</td>
-                      <td className="px-3 py-2">{v.titres}</td>
-                      <td className="px-3 py-2 text-xs">{v.date}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{v.custom_fields?.dra || v.dra || "-"}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{v.custom_fields?.t1 || v.t1 || "-"}</td>
+                      <td className="px-3 py-2">{v.custom_fields?.titres || v.titres || "-"}</td>
+                      <td className="px-3 py-2 text-xs">{v.date_mouvement ? new Date(v.date_mouvement).toLocaleDateString() : v.date || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -588,12 +485,12 @@ function EntrepotsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {entrantVide.map((v) => (
+                  {entrantVide.map((v: any) => (
                     <tr key={v.id} className="border-t border-border hover:bg-muted/30">
                       <td className="px-3 py-2 font-mono">{v.plaque}</td>
-                      <td className="px-3 py-2">{v.chauffeur}</td>
-                      <td className="px-3 py-2">{v.activite}</td>
-                      <td className="px-3 py-2 text-xs">{v.date}</td>
+                      <td className="px-3 py-2">{v.chauffeur || "-"}</td>
+                      <td className="px-3 py-2">{v.sub_type_operation || v.custom_fields?.activite || "-"}</td>
+                      <td className="px-3 py-2 text-xs">{v.date_mouvement ? new Date(v.date_mouvement).toLocaleDateString() : v.date || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -648,14 +545,14 @@ function EntrepotsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortantCharge.map((v) => (
+                  {sortantCharge.map((v: any) => (
                     <tr key={v.id} className="border-t border-border hover:bg-muted/30">
                       <td className="px-3 py-2 font-mono">{v.plaque}</td>
                       <td className="px-3 py-2">{v.importateur}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{v.refDouane}</td>
-                      {isDP && <td className="px-3 py-2 text-xs font-bold text-accent">15/05/2024</td>}
-                      <td className="px-3 py-2 font-mono text-xs">{v.bonSortie}</td>
-                      <td className="px-3 py-2 text-xs">{v.date}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{v.custom_fields?.ref_douane || v.refDouane || "-"}</td>
+                      {isDP && <td className="px-3 py-2 text-xs font-bold text-accent">{v.date_mouvement ? new Date(v.date_mouvement).toLocaleDateString() : "-"}</td>}
+                      <td className="px-3 py-2 font-mono text-xs">{v.custom_fields?.bon_sortie || v.bonSortie || "-"}</td>
+                      <td className="px-3 py-2 text-xs">{v.date_mouvement ? new Date(v.date_mouvement).toLocaleDateString() : v.date || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -681,12 +578,12 @@ function EntrepotsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortantVide.map((v) => (
+                  {sortantVide.map((v: any) => (
                     <tr key={v.id} className="border-t border-border hover:bg-muted/30">
                       <td className="px-3 py-2 font-mono">{v.plaque}</td>
-                      <td className="px-3 py-2">{v.operation}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{v.emptyManifest}</td>
-                      <td className="px-3 py-2 text-xs">{v.date}</td>
+                      <td className="px-3 py-2">{v.sub_type_operation || v.custom_fields?.operation || "-"}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{v.empty_manifest || v.custom_fields?.empty_manifest || "-"}</td>
+                      <td className="px-3 py-2 text-xs">{v.date_mouvement ? new Date(v.date_mouvement).toLocaleDateString() : v.date || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -716,16 +613,16 @@ function EntrepotsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {vracSortant.map((v) => (
+                  {vracSortant.map((v: any) => (
                     <tr key={v.id} className="border-t border-border hover:bg-muted/30">
-                      <td className="px-3 py-2">{v.importateur}</td>
-                      <td className="px-3 py-2">{v.marque}</td>
-                      <td className="px-3 py-2">{v.couleur}</td>
-                      <td className="px-3 py-2">{v.annee}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{v.moteur}</td>
-                      <td className="px-3 py-2">{v.liquidateur}</td>
-                      <td className="px-3 py-2 text-xs">{v.dateLiquidation}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{v.matriculeAgent}</td>
+                      <td className="px-3 py-2">{v.importateur || "-"}</td>
+                      <td className="px-3 py-2">{v.marque || "-"}</td>
+                      <td className="px-3 py-2">{v.couleur || "-"}</td>
+                      <td className="px-3 py-2">{v.annee || "-"}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{v.moteur || v.plaque || "-"}</td>
+                      <td className="px-3 py-2">{v.liquidateur || "-"}</td>
+                      <td className="px-3 py-2 text-xs">{v.dateLiquidation || (v.created_at ? new Date(v.created_at).toLocaleDateString() : "-")}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{v.matriculeAgent || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -744,14 +641,14 @@ function EntrepotsPage() {
                 <div className="rounded-lg bg-success/10 border border-success/20 p-4 text-center">
                   <CheckCircle2 className="mx-auto h-6 w-6 text-success mb-1" />
                   <div className="text-2xl font-bold">
-                    {transbordements.filter((t) => t.status === "terminé").length}
+                    {transbordements.length}
                   </div>
-                  <div className="text-xs text-muted-foreground">Terminés</div>
+                  <div className="text-xs text-muted-foreground">Transbordements</div>
                 </div>
                 <div className="rounded-lg bg-warning/10 border border-warning/20 p-4 text-center">
                   <Clock className="mx-auto h-6 w-6 text-warning mb-1" />
                   <div className="text-2xl font-bold">
-                    {transbordements.filter((t) => t.status === "en_cours").length}
+                    {stockageMouvements.length}
                   </div>
                   <div className="text-xs text-muted-foreground">En cours</div>
                 </div>
@@ -767,19 +664,19 @@ function EntrepotsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {transbordements.map((t) => (
+                  {transbordements.map((t: any) => (
                     <tr key={t.id} className="border-t border-border hover:bg-muted/30">
-                      <td className="px-3 py-2 font-mono text-xs">{t.ref}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{t.de}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{t.vers}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{t.dossier_id || t.id || "-"}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{t.espace_id || t.de || "-"}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{t.entrepot_id || t.vers || "-"}</td>
                       <td className="px-3 py-2">
                         <span
-                          className={`rounded-full px-2 py-0.5 text-xs ${t.status === "terminé" ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}
+                          className={`rounded-full px-2 py-0.5 text-xs ${t.type_mouvement === "transbordement" ? "bg-warning/15 text-warning" : "bg-success/15 text-success"}`}
                         >
-                          {t.status}
+                          {t.type_mouvement || t.status || "-"}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-xs">{t.date}</td>
+                      <td className="px-3 py-2 text-xs">{t.date_mouvement ? new Date(t.date_mouvement).toLocaleDateString() : t.date || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -827,7 +724,13 @@ function EntrepotsPage() {
               </div>
             )}
             <div className="p-4 grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-              {Object.entries(denombrements).map(([type, count]) => (
+              {[
+                { type: "Entrant chargé", count: entrantCharge.length },
+                { type: "Entrant vide", count: entrantVide.length },
+                { type: "Sortant chargé", count: sortantCharge.length },
+                { type: "Sortant vide", count: sortantVide.length },
+                { type: "VRAC", count: vracs.length },
+              ].map(({ type, count }) => (
                 <div
                   key={type}
                   className="rounded-xl border border-border p-4 text-center hover:bg-muted/30 transition-all cursor-pointer"
@@ -846,7 +749,7 @@ function EntrepotsPage() {
             <div className="flex items-center justify-between border-b border-border p-4">
               <h3 className="font-medium flex items-center gap-2">
                 <Truck className="h-5 w-5 text-accent" />
-                Situation Parking ({parking.length} véhicules)
+                Situation Parking ({mouvements.length} mouvements)
               </h3>
             </div>
             <div className="p-3 overflow-x-auto">
@@ -861,18 +764,14 @@ function EntrepotsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {parking.map((v) => (
+                  {mouvements.slice(0, 10).map((v: any) => (
                     <tr key={v.id} className="border-t border-border hover:bg-muted/30">
                       <td className="px-3 py-2 font-mono font-medium">{v.plaque}</td>
-                      <td className="px-3 py-2">{v.type}</td>
-                      <td className="px-3 py-2">{v.importateur}</td>
-                      <td className="px-3 py-2 text-xs">{v.depuis}</td>
+                      <td className="px-3 py-2">{v.operation_type || "Camion"}</td>
+                      <td className="px-3 py-2">{v.importateur || "-"}</td>
+                      <td className="px-3 py-2 text-xs">{v.date_mouvement ? new Date(v.date_mouvement).toLocaleDateString() : "-"}</td>
                       <td className="px-3 py-2">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs ${v.status === "stationné" ? "bg-muted text-muted-foreground" : v.status === "chargement" ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}
-                        >
-                          {v.status}
-                        </span>
+                        <span className="rounded-full px-2 py-0.5 text-xs bg-muted text-muted-foreground">enregistré</span>
                       </td>
                     </tr>
                   ))}
@@ -887,7 +786,7 @@ function EntrepotsPage() {
       <div className="mt-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Liste complète des Entrepôts</h2>
-          {(user?.role === "super_admin" || isDP || user?.role === "directeur_general") && (
+          {(user?.role === "super_admin" || isDP || user?.role === "directeur_general" || user?.role === "inspecteur_chef" || user?.role === "inspecteur") && (
             <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Nouvel Entrepôt</Button>
           )}
         </div>
@@ -927,22 +826,26 @@ function EntrepotsPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Code</label>
+              <label className="text-sm font-medium">Code entrepôt</label>
               <Input value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} placeholder="Ex: ENTR-01" />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Nom de l'entrepôt</label>
+              <label className="text-sm font-medium">Nom entrepôt</label>
               <Input value={formData.nom} onChange={e => setFormData({ ...formData, nom: e.target.value })} placeholder="Entrepôt Douanier" />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Bureau rattaché</label>
-              <Input value={formData.bureau} onChange={e => setFormData({ ...formData, bureau: e.target.value })} placeholder="BOMA" />
+              <label className="text-sm font-medium">Bureau douanier</label>
+              <Input value={formData.bureau} disabled className="bg-muted/50" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ville</label>
+              <Input value={formData.ville} onChange={e => setFormData({ ...formData, ville: e.target.value })} placeholder="Ex: GOMA" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
             <Button onClick={handleSave} disabled={loading}>
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Enregistrer"}
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Créer"}
             </Button>
           </DialogFooter>
         </DialogContent>

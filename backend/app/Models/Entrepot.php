@@ -14,6 +14,7 @@ class Entrepot extends Model
         'code',
         'nom',
         'bureau',
+        'ville',
         'capacite',
     ];
 }

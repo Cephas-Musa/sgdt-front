@@ -22,7 +22,7 @@ class ItEntryController extends Controller
         }
 
         $validated = $request->validate([
-            'dossier_reference' => 'nullable|string',
+            'reference_dra'     => 'nullable|string',
             'dossier_id'        => 'nullable|uuid|exists:dossiers,id',
             'consignee'         => 'nullable|string|max:255',
             'chassis'           => 'nullable|string|max:100',
@@ -32,14 +32,14 @@ class ItEntryController extends Controller
             'it_reference'      => 'nullable|string|max:100',
         ]);
 
-        // Résoudre le dossier par référence si dossier_id absent
+        // Résoudre le dossier par DRA (E-XXX) si dossier_id absent
         $dossierId = $validated['dossier_id'] ?? null;
-        if (!$dossierId && !empty($validated['dossier_reference'])) {
-            $dossierId = Dossier::where('reference', $validated['dossier_reference'])->value('id');
+        if (!$dossierId && !empty($validated['reference_dra'])) {
+            $dossierId = Dossier::where('dra', $validated['reference_dra'])->value('id');
         }
 
         $entry = ItEntry::create(array_merge(
-            collect($validated)->except(['dossier_reference', 'dossier_id'])->toArray(),
+            collect($validated)->except(['reference_dra', 'dossier_id'])->toArray(),
             [
                 'dossier_id'         => $dossierId,
                 'typing_operator_id' => $user->id,
@@ -91,7 +91,7 @@ class ItEntryController extends Controller
         }
 
         return response()->json(
-            $query->orderBy('created_at', 'desc')->paginate(50)
+            $query->orderBy('created_at', 'desc')->get()
         );
     }
 

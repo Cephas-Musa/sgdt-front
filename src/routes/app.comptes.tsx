@@ -252,8 +252,8 @@ function NewAccountDialog({ onCreated, onShowCredentials }: NewAccountDialogProp
         phone_number: fullPhone,
         full_name: fullName,
         role: selectedRole as Role,
-        bureau: selectedBureau || user?.bureau,
-        province: selectedProvince || user?.province,
+        bureau: selectedBureau || null,
+        province: selectedProvince || null,
         matricule: matricule.trim() || undefined,
         password: password,
       }) as { credentials?: { phone_number: string; password: string } };
@@ -464,8 +464,8 @@ function EditAccountDialog({ account, onUpdated }: EditAccountDialogProps) {
       await apiUpdateUser(account.id, {
         full_name: nom.trim(),
         role: selectedRole as Role,
-        bureau: selectedBureau || user?.bureau,
-        province: selectedProvince || user?.province,
+        bureau: selectedBureau || null,
+        province: selectedProvince || null,
         matricule: matricule.trim() || undefined,
       });
 

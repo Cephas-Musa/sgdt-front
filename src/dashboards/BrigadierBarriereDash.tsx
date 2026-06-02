@@ -12,41 +12,46 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { EMPTY_MANIFESTS } from "@/lib/mock";
-import { useApi, apiGetWarehouses } from "@/lib/api";
+import { useApi, apiGetWarehouses, apiGetMouvements, apiGetEmptyManifests, apiCreateBarriereEntry, apiCreateMouvement } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function BrigadierBarriereDash() {
   const [manifestSearch, setManifestSearch] = useState("");
   const [traversedManifests, setTraversedManifests] = useState<Set<string>>(new Set());
+  const [ecTitres, setEcTitres] = useState(1);
+  const [vracTitres, setVracTitres] = useState(1);
 
-  const filteredManifests = EMPTY_MANIFESTS.filter(
-    (m) => !manifestSearch || (m.reference || "").toLowerCase().includes(manifestSearch.toLowerCase()),
+  const { data: rawMouvements } = useApi(() => apiGetMouvements({}));
+  const { data: rawManifests } = useApi(apiGetEmptyManifests);
+  const { data: rawWarehouses } = useApi(apiGetWarehouses);
+  const mouvements = (rawMouvements as any[]) || [];
+  const manifests = (rawManifests as any[]) || [];
+  const ENTREPOTS = (rawWarehouses as any[]) || [];
+
+  const filteredManifests = manifests.filter(
+    (m: any) => !manifestSearch || (m.reference || "").toLowerCase().includes(manifestSearch.toLowerCase()),
   );
 
-  const handleTraverser = (id: string) => {
+  const handleTraverser = async (id: string) => {
     if (traversedManifests.has(id)) return;
-    
-    // Simulating manifest verification
-    const manifestExists = EMPTY_MANIFESTS.some(m => m.id === id);
-    if (!manifestExists) {
-      toast.error("Le manifeste n'existe pas.");
-      return;
+    try {
+      await apiCreateBarriereEntry({ empty_manifest_id: id });
+      setTraversedManifests((prev) => new Set(prev).add(id));
+      toast.success("Véhicule autorisé à traverser");
+    } catch (e: any) {
+      toast.error(e?.message || "Erreur lors du passage");
     }
-
-    setTraversedManifests((prev) => new Set(prev).add(id));
-    toast.success("Véhicule autorisé à traverser (Vérification effectuée < 4 min)");
   };
 
   return (
     <div>
       <DashHeader subtitle="Brigadier Barrière — véhicules entrée/sortie, vrac, empty manifest" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={ArrowDownToLine} label="Entrées" value={18} />
-        <StatCard icon={ArrowUpFromLine} label="Sorties" value={14} />
-        <StatCard icon={Truck} label="VRAC" value={6} />
-        <StatCard icon={FileText} label="Manifests" value={EMPTY_MANIFESTS.length} />
+        <StatCard icon={ArrowDownToLine} label="Entrées" value={mouvements.filter((m: any) => m.operation_type === "entrant_charge").length} />
+        <StatCard icon={ArrowUpFromLine} label="Sorties" value={mouvements.filter((m: any) => m.operation_type === "sortant_charge").length} />
+        <StatCard icon={Truck} label="VRAC" value={mouvements.filter((m: any) => m.operation_type === "vrac_sortant").length} />
+        <StatCard icon={FileText} label="Manifests" value={manifests.length} />
       </div>
       <div className="mt-6">
         <Tabs defaultValue="vehicule">
@@ -65,42 +70,64 @@ export default function BrigadierBarriereDash() {
                   <FormDialog
                     trigger={<Button size="sm">Nouveau</Button>}
                     title="Entrée véhicule chargé"
-                    onSubmit={() => toast.success("Enregistré")}
+                    onSubmit={() => {
+                      const get = (id: string) => (document.getElementById(id) as HTMLInputElement)?.value || "";
+                      const titresDetails = Array.from({ length: ecTitres }, (_, i) => ({
+                        reference_t1: get(`ec-t1-${i}`),
+                        date_t1: get(`ec-date-t1-${i}`),
+                      }));
+                      apiCreateMouvement({
+                        operation_type: "entrant_charge",
+                        plaque: get("ec-plaque"),
+                        chauffeur: get("ec-chauffeur"),
+                        importateur: get("ec-importateur"),
+                        date_mouvement: new Date().toISOString().split("T")[0],
+                        reference_dra: get("ec-dra") || undefined,
+                        date_dra: get("ec-date-dra") || undefined,
+                        reference_t1: titresDetails[0]?.reference_t1 || undefined,
+                        date_t1: titresDetails[0]?.date_t1 || undefined,
+                        custom_fields: {
+                          chassis: get("ec-chassis"),
+                          nb_titres: ecTitres,
+                          titres_details: titresDetails,
+                        },
+                      }).then(() => toast.success("Entrée enregistrée")).catch((e) => toast.error(e.message));
+                    }}
                   >
                     <FormGrid>
                       <Field label="Nom du déclarant" required>
-                        <Input placeholder="Nom obligatoire" />
+                        <Input id="ec-declarant" placeholder="Nom obligatoire" />
                       </Field>
                       <Field label="Nom importateur" required>
-                        <Input />
+                        <Input id="ec-importateur" />
                       </Field>
                       <Field label="Plaque véhicule" required>
-                        <Input />
+                        <Input id="ec-plaque" />
                       </Field>
                       <Field label="Numéro du châssis" required>
-                        <Input />
+                        <Input id="ec-chassis" />
                       </Field>
                       <div className="col-span-2 grid grid-cols-2 gap-4">
-                        <Field label="Référence DRA (E-XXX)" required>
-                          <Input placeholder="E-001" />
+                        <Field label="Réf. DRA (E-XXX)" required>
+                          <Input id="ec-dra" placeholder="E-001" />
                         </Field>
                         <Field label="Sa date" required>
-                          <Input type="date" />
+                          <Input id="ec-date-dra" type="date" />
                         </Field>
                       </div>
                       <Field label="Nombre de titres" required>
-                        <Input type="number" />
+                        <Input id="ec-titres" type="number" min={1} value={ecTitres} onChange={(e) => setEcTitres(Math.max(1, parseInt(e.target.value) || 1))} />
                       </Field>
                       <div className="col-span-2 grid grid-cols-2 gap-4">
                         <Field label="Du">
-                          <Input type="date" />
+                          <Input id="ec-date-du" type="date" />
                         </Field>
                         <Field label="Au">
-                          <Input type="date" />
+                          <Input id="ec-date-au" type="date" />
                         </Field>
                       </div>
                       <Field label="Bureau émission doc">
-                        <Input />
+                        <Input id="ec-bureau" />
                       </Field>
                       <Field label="Destination">
                         <div className="space-y-2">
@@ -110,14 +137,14 @@ export default function BrigadierBarriereDash() {
                           <div className="ml-6 space-y-2">
                             <div className="grid grid-cols-2 gap-4">
                               <Field label="Réf. douane (E-XXX)">
-                                <Input placeholder="E-001" />
+                                <Input id="ec-ref-douane" placeholder="E-001" />
                               </Field>
                               <Field label="Date">
-                                <Input type="date" />
+                                <Input id="ec-date-douane" type="date" />
                               </Field>
                             </div>
                             <Field label="Réf. DRA">
-                              <Input />
+                              <Input id="ec-dra-passage" />
                             </Field>
                           </div>
                           <label className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -129,7 +156,7 @@ export default function BrigadierBarriereDash() {
                                 <SelectValue placeholder="Sélectionner entrepôt" />
                               </SelectTrigger>
                               <SelectContent>
-                                {ENTREPOTS?.map((e) => (
+                                {ENTREPOTS?.map((e: any) => (
                                   <SelectItem key={e.id} value={e.id}>
                                     {e.nom}
                                   </SelectItem>
@@ -139,13 +166,22 @@ export default function BrigadierBarriereDash() {
                           </div>
                         </div>
                       </Field>
-                      <Field label="Documents d'importation validés" required>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" id="docs_check" />
-                          <label htmlFor="docs_check" className="text-sm">Vérifier la cohérence des données</label>
-                        </div>
-                      </Field>
                     </FormGrid>
+                    <div className="space-y-4 mt-4 border-t pt-4">
+                      {Array.from({ length: ecTitres }).map((_, i) => (
+                        <div key={i} className="rounded-lg border p-3 bg-muted/10 space-y-3">
+                          <h4 className="text-sm font-semibold text-accent">Titre {i + 1}</h4>
+                          <FormGrid>
+                            <Field label="Réf. titre" required>
+                              <Input id={`ec-t1-${i}`} placeholder="T1-..." />
+                            </Field>
+                            <Field label="Sa date" required>
+                              <Input id={`ec-date-t1-${i}`} type="date" />
+                            </Field>
+                          </FormGrid>
+                        </div>
+                      ))}
+                    </div>
                   </FormDialog>
                 }
               >
@@ -161,11 +197,32 @@ export default function BrigadierBarriereDash() {
                   <FormDialog
                     trigger={<Button size="sm">Nouveau</Button>}
                     title="Sortie véhicule chargé"
-                    onSubmit={() => toast.success("Enregistré")}
+                    onSubmit={() => {
+                      const get = (id: string) => (document.getElementById(id) as HTMLInputElement)?.value || "";
+                      apiCreateMouvement({
+                        operation_type: "sortant_charge",
+                        plaque: get("sc-plaque"),
+                        importateur: get("sc-importateur"),
+                        date_mouvement: new Date().toISOString().split("T")[0],
+                        reference_dra: get("sc-dra") || undefined,
+                        custom_fields: {
+                          declarant: get("sc-declarant"),
+                          etat_sortie: get("sc-etat"),
+                          dra: get("sc-dra"),
+                          date_dra: get("sc-date-dra"),
+                          ref_douane: get("sc-ref-douane"),
+                          date_douane: get("sc-date-douane"),
+                          bon_sortie: get("sc-bon-sortie"),
+                          date_bon: get("sc-date-bon"),
+                          agent: get("sc-agent"),
+                          lieu_dechargement: get("sc-lieu"),
+                        },
+                      }).then(() => toast.success("Sortie enregistrée")).catch((e) => toast.error(e.message));
+                    }}
                   >
                     <FormGrid>
                       <Field label="Nom du déclarant" required>
-                        <Input />
+                        <Input id="sc-declarant" />
                       </Field>
                       <Field label="État de sortie" required>
                         <Select defaultValue="meaningful">
@@ -179,53 +236,40 @@ export default function BrigadierBarriereDash() {
                         </Select>
                       </Field>
                       <Field label="Importateur" required>
-                        <Input />
+                        <Input id="sc-importateur" />
                       </Field>
                       <Field label="Plaque véhicule" required>
-                        <Input />
+                        <Input id="sc-plaque" />
                       </Field>
                       <div className="col-span-2 grid grid-cols-2 gap-4">
                         <Field label="Référence DRA" required>
-                          <Input placeholder="DRA-…" />
+                          <Input id="sc-dra" placeholder="DRA-…" />
                         </Field>
                         <Field label="Sa date" required>
-                          <Input type="date" />
+                          <Input id="sc-date-dra" type="date" />
                         </Field>
                       </div>
                       <div className="col-span-2 grid grid-cols-2 gap-4">
                         <Field label="Réf. douane (E-XXX)" required>
-                          <Input placeholder="E-001" />
+                          <Input id="sc-ref-douane" placeholder="E-001" />
                         </Field>
                         <Field label="Sa date" required>
-                          <Input type="date" />
+                          <Input id="sc-date-douane" type="date" />
                         </Field>
                       </div>
                       <div className="col-span-2 grid grid-cols-2 gap-4">
                         <Field label="Réf. bon de sortie" required>
-                          <Input />
+                          <Input id="sc-bon-sortie" />
                         </Field>
                         <Field label="Sa date" required>
-                          <Input type="date" />
+                          <Input id="sc-date-bon" type="date" />
                         </Field>
                       </div>
                       <Field label="Agent émetteur" required>
-                        <Input />
-                      </Field>
-                      <Field label="Réf. dossier" required>
-                        <div className="flex items-center overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-                          <span className="flex items-center px-3 border-r border-input bg-muted/50 font-bold text-muted-foreground select-none">RD-</span>
-                          <input 
-                            className="flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/50 h-9"
-                            placeholder="0001" 
-                            inputMode="numeric"
-                            onChange={(e) => { 
-                              e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9);
-                            }}
-                          />
-                        </div>
+                        <Input id="sc-agent" />
                       </Field>
                       <Field label="Lieu de déchargement">
-                        <Input />
+                        <Input id="sc-lieu" />
                       </Field>
                     </FormGrid>
                   </FormDialog>
@@ -248,39 +292,44 @@ export default function BrigadierBarriereDash() {
                     <FormDialog
                       trigger={<Button size="sm">Nouveau</Button>}
                       title="Entrée véhicule automobile (VRAC)"
-                      onSubmit={() => toast.success("Enregistré")}
+                      onSubmit={() => {
+                        const get = (id: string) => (document.getElementById(id) as HTMLInputElement)?.value || "";
+                        const titresDetails = Array.from({ length: vracTitres }, (_, i) => ({
+                          reference_t1: get(`vrac-t1-${i}`),
+                          date_t1: get(`vrac-date-t1-${i}`),
+                        }));
+                        apiCreateMouvement({
+                          operation_type: "vrac_sortant",
+                          plaque: get("vrac-plaque"),
+                          chauffeur: get("vrac-declarant"),
+                          importateur: get("vrac-importateur"),
+                          date_mouvement: new Date().toISOString().split("T")[0],
+                          custom_fields: {
+                            chassis: get("vrac-chassis"),
+                            nb_titres: vracTitres,
+                            titres_details: titresDetails,
+                            couleur: get("vrac-couleur"),
+                            marque: get("vrac-marque"),
+                            annee: get("vrac-annee"),
+                          },
+                        }).then(() => toast.success("VRAC enregistré")).catch((e) => toast.error(e.message));
+                      }}
                     >
                       <FormGrid>
                         <Field label="Nom du déclarant" required>
-                          <Input />
+                          <Input id="vrac-declarant" />
                         </Field>
                         <Field label="Importateur" required>
-                          <Input />
+                          <Input id="vrac-importateur" />
                         </Field>
                         <Field label="Numéro châssis" required>
-                          <Input />
+                          <Input id="vrac-chassis" />
                         </Field>
                         <Field label="Nombre de titres" required>
-                          <Input type="number" />
+                          <Input id="vrac-titres" type="number" min={1} value={vracTitres} onChange={(e) => setVracTitres(Math.max(1, parseInt(e.target.value) || 1))} />
                         </Field>
-                        <div className="col-span-2 grid grid-cols-2 gap-4">
-                          <Field label="Référence DRA (E-XXX)" required>
-                            <Input placeholder="E-001" />
-                          </Field>
-                          <Field label="Sa date" required>
-                            <Input type="date" />
-                          </Field>
-                        </div>
-                        <div className="col-span-2 grid grid-cols-2 gap-4">
-                          <Field label="T1" required>
-                            <Input placeholder="T1-…" />
-                          </Field>
-                          <Field label="Sa date" required>
-                            <Input type="date" />
-                          </Field>
-                        </div>
                         <Field label="Couleur véhicule">
-                          <Input />
+                          <Input id="vrac-couleur" />
                         </Field>
                         <Field label="Entrepôt destination">
                           <Select>
@@ -288,7 +337,7 @@ export default function BrigadierBarriereDash() {
                               <SelectValue placeholder="Sélectionner" />
                             </SelectTrigger>
                             <SelectContent>
-                              {ENTREPOTS?.map((e) => (
+                              {ENTREPOTS?.map((e: any) => (
                                 <SelectItem key={e.id} value={e.id}>
                                   {e.nom}
                                 </SelectItem>
@@ -297,12 +346,27 @@ export default function BrigadierBarriereDash() {
                           </Select>
                         </Field>
                         <Field label="Marque véhicule">
-                          <Input />
+                          <Input id="vrac-marque" />
                         </Field>
                         <Field label="Année" required>
-                          <Input type="number" placeholder="2025" />
+                          <Input id="vrac-annee" type="number" placeholder="2025" />
                         </Field>
                       </FormGrid>
+                      <div className="space-y-4 mt-4 border-t pt-4">
+                        {Array.from({ length: vracTitres }).map((_, i) => (
+                          <div key={i} className="rounded-lg border p-3 bg-muted/10 space-y-3">
+                            <h4 className="text-sm font-semibold text-accent">Titre {i + 1}</h4>
+                            <FormGrid>
+                              <Field label="Réf. titre" required>
+                                <Input id={`vrac-t1-${i}`} placeholder="T1-..." />
+                              </Field>
+                              <Field label="Sa date" required>
+                                <Input id={`vrac-date-t1-${i}`} type="date" />
+                              </Field>
+                            </FormGrid>
+                          </div>
+                        ))}
+                      </div>
                     </FormDialog>
                   </div>
                 }

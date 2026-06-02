@@ -17,18 +17,13 @@ class DossierController extends Controller
         protected \App\Services\DossierAccessService $accessService
     ) {}
 
-    /**
-     * Liste des dossiers actifs (non appurés) selon les privilèges du rôle.
-     * Les dossiers appurés disparaissent de cette vue par défaut (ils restent dans l'historique).
-     */
     public function index(Request $request)
     {
         $dossiers = $this->accessService->getActiveDossiers($request->user());
 
-        // toArray() already includes formatted_data through the accessor
         $dossiers = $dossiers->map(function($dossier) {
             return $dossier->toArray();
-        });
+        })->values();
 
         return response()->json($dossiers);
     }
@@ -59,9 +54,11 @@ class DossierController extends Controller
     /**
      * Obtenir la prochaine référence générée
      */
-    public function nextReference()
+    public function nextReference(Request $request)
     {
-        return response()->json(['reference' => \App\Services\ReferenceGeneratorService::generate()]);
+        $user = $request->user();
+        $prefix = $user->role === 'operateur_saisie' ? 'RD-OP-' : 'RD-';
+        return response()->json(['reference' => \App\Services\ReferenceGeneratorService::generate($prefix)]);
     }
 
     /**
@@ -71,9 +68,10 @@ class DossierController extends Controller
     {
         $user = $request->user();
 
-        // On permet à l'inspecteur chef, inspecteur, secrétaire, operateur de saisie de créer le dossier
-        if (!in_array($user->role, ['inspecteur_chef', 'inspecteur', 'secretaire_inspecteur', 'super_admin', 'operateur_saisie', 'chef_bureau_repr'])) {
-            return response()->json(['message' => 'Non autorisé. Seul un inspecteur, son secrétaire ou le bureau de représentation peut créer un dossier.'], 403);
+        // On permet à l'inspecteur chef, inspecteur, super_admin, operateur de saisie de créer le dossier
+        // Le secretaire_inspecteur n'a pas le droit de créer des dossiers (règle stricte)
+        if (!in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef', 'inspecteur', 'super_admin', 'operateur_saisie', 'chef_bureau_repr'])) {
+            return response()->json(['message' => 'Non autorisé. Seul un inspecteur ou le bureau de représentation peut créer un dossier.'], 403);
         }
 
         $request->validate([
@@ -85,7 +83,7 @@ class DossierController extends Controller
             'quantite' => 'nullable|integer',
             'poids' => 'nullable|numeric',
             'colis' => 'nullable|integer',
-            'devise' => 'nullable|string|size:3',
+            'devise' => 'nullable|string|max:3',
             'bureau_id' => 'nullable|string',
             'metadata' => 'nullable|array',
             'attachments' => 'nullable|array',
@@ -128,7 +126,8 @@ class DossierController extends Controller
             $dossierData['extra_data']['declarations_details'] = $request->input('declarations_details');
         }
 
-        $dossierData['reference'] = \App\Services\ReferenceGeneratorService::generate('RD-');
+        $prefix = $user->role === 'operateur_saisie' ? 'RD-OP-' : 'RD-';
+        $dossierData['reference'] = \App\Services\ReferenceGeneratorService::generate($prefix);
 
         DB::beginTransaction();
 
@@ -148,23 +147,24 @@ class DossierController extends Controller
 
                 // Création de la transaction pour traçabilité du paiement
                 \App\Models\Transaction::create([
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'dossier_id' => $dossier->id,
                     'user_id' => $user->id,
-                    'reference' => 'PAY-' . $dossier->reference . '-' . time(),
-                    'type' => 'debit',
                     'amount' => $tarif,
-                    'currency' => $typeDossier->devise ?? 'USD',
+                    'currency' => $dossierData['devise'],
+                    'type' => 'frais_creation_dossier',
                     'status' => 'completed',
-                    'description' => 'Paiement pour la création du dossier ' . $dossier->reference,
+                    'reference' => 'TXN-' . strtoupper(uniqid()),
                 ]);
             }
 
             // Historiser la création
             \App\Services\AuditLogService::log('dossier', 'create', $dossier->id, null, $dossier->toArray());
 
-            DB::commit();
+            // Update User History
+            app(\App\Services\DossierAccessService::class)->logHistory($user->id, $dossier, 'creation', 'dossier');
 
-            // Trigger Automatic Sync with Representation data
-            app(\App\Services\DossierSyncService::class)->syncDossierWithRepresentation($dossier);
+            DB::commit();
 
             return response()->json($dossier->load('articles'), 201);
         } catch (\Exception $e) {
@@ -200,14 +200,16 @@ class DossierController extends Controller
             'articles',
             'timelines.user',
             'workflows',
-            'validations.validatedBy',
+            'validations.validator',
             'anomalies',
             'documents',
             'mouvements',
+            'vracs',
+            'decharges',
+            'mouvementsStockage',
             'colisages',
+            'empty_manifests',
             'barriere_entries',
-            'representationEntry.articles',
-            'representationEntry.operateur',
             'typingDocsDirect.typingOperator',
             'typingDocsTranshipment.typingOperator',
             'itEntries.typingOperator',
@@ -217,7 +219,7 @@ class DossierController extends Controller
 
         $allowedRoles = [
             'super_admin', 'directeur', 'directeur_provincial',
-            'inspecteur_chef', 'secretaire_inspecteur', 'agent_controle',
+            'inspecteur_chef', 'inspecteur', 'secretaire_inspecteur', 'agent_controle',
             'verificateur', 'chef_bureau_repr', 'operateur_saisie',
             'agent_pointage', 'typing_operator', 'chef_barriere',
         ];
@@ -227,6 +229,56 @@ class DossierController extends Controller
         }
 
         return response()->json($dossier);
+    }
+
+    /**
+     * "Aggregate Endpoint" : Retourne le dossier inspecteur combiné aux données logiques du Bureau Représentation
+     */
+    public function aggregate(Request $request, $id)
+    {
+        $dossier = Dossier::with([
+            'creator',
+            'inspecteur',
+            'secretary',
+            'typeDossier',
+            'articles',
+            'timelines.user',
+            'workflows',
+            'validations.validator',
+            'anomalies',
+            'documents',
+            'mouvements',
+            'vracs',
+            'decharges',
+            'mouvementsStockage',
+            'colisages',
+            'empty_manifests',
+            'barriere_entries',
+            'typingDocsDirect.typingOperator',
+            'typingDocsTranshipment.typingOperator',
+            'itEntries.typingOperator',
+        ])->findOrFail($id);
+
+        $user = $request->user();
+        $allowedRoles = [
+            'super_admin', 'directeur', 'directeur_provincial',
+            'inspecteur_chef', 'inspecteur', 'secretaire_inspecteur', 'agent_controle',
+            'verificateur', 'chef_bureau_repr', 'operateur_saisie',
+            'agent_pointage', 'typing_operator', 'chef_barriere',
+        ];
+
+        if (!in_array($user->role, $allowedRoles)) {
+            return response()->json(['message' => 'Non autorisé.'], 403);
+        }
+
+        $representationData = app(\App\Services\DossierSyncService::class)->findRepresentationDataByDra($dossier->dra);
+
+        return response()->json([
+            'dossier' => $dossier,
+            'representation_data' => $representationData ? $representationData['representation_data'] : null,
+            'representation_articles' => $representationData ? $representationData['representation_articles'] : [],
+            'representation_history' => $representationData ? $representationData['representation_history'] : []
+        ]);
     }
 
     /**
@@ -259,10 +311,13 @@ class DossierController extends Controller
 
         $dossier->update($payload);
 
-        // Trigger Automatic Sync in case DRA was updated
-        app(\App\Services\DossierSyncService::class)->syncDossierWithRepresentation($dossier);
+        // Run all consistency checks and trigger alerts if inconsistencies are found
+        app(\App\Services\AlerteService::class)->runAllConsistencyChecks($dossier->id, $user->id);
 
         \App\Services\AuditLogService::log('dossier', 'update', $dossier->id, $oldData, $dossier->toArray());
+
+        // Update User History
+        app(\App\Services\DossierAccessService::class)->logHistory($user->id, $dossier, 'modification', 'dossier');
 
         return response()->json($dossier->load('articles'));
     }
@@ -284,8 +339,17 @@ class DossierController extends Controller
             return response()->json(['message' => 'Statut invalide.'], 400);
         }
 
+        // Le secrétaire ne peut pas clôturer un dossier
+        if ($request->user()->role === 'secretaire_inspecteur' && in_array($newStatus->value, [\App\Enums\DossierStatus::TERMINE->value, \App\Enums\DossierStatus::APPUREMENT_FINAL->value])) {
+            return response()->json(['message' => 'Action non autorisée. Seul l\'inspecteur peut clôturer un dossier.'], 403);
+        }
+
         try {
             $this->workflowService->transition($dossier, $newStatus, $request->user()->id, $request->input('commentaire'));
+            
+            // Update User History
+            app(\App\Services\DossierAccessService::class)->logHistory($request->user()->id, $dossier, 'status_update', 'dossier');
+
             return response()->json([
                 'message' => 'Statut mis à jour avec succès.',
                 'dossier' => $dossier->fresh()
@@ -301,8 +365,8 @@ class DossierController extends Controller
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
-        if (!in_array($user->role, ['directeur_provincial', 'directeur_general'])) {
-            return response()->json(['message' => 'Action non autorisée. Seuls le DP et le DG peuvent supprimer un dossier.'], 403);
+        if (!in_array($user->role, ['directeur_provincial', 'directeur_general', 'inspecteur_chef', 'inspecteur', 'super_admin'])) {
+            return response()->json(['message' => 'Action non autorisée. Seul l\'inspecteur, DP, et le DG peuvent supprimer un dossier.'], 403);
         }
 
         $request->validate(['delete_reason' => 'required|string']);

@@ -21,13 +21,17 @@ import {
   Download,
   User,
   MapPin,
+  Edit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { useApi, apiGetDossierDetails } from "@/lib/api";
+import { useApi, apiGetDossierAggregate, apiUpdateDossier } from "@/lib/api";
+import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/dossiers/$dossierId")({
   component: DossierDetailPage,
@@ -101,6 +105,7 @@ const ALLOWED_ROLES = [
   "directeur_provincial",
   "agent_controle",
   "inspecteur_chef",
+  "inspecteur",
   "secretaire_inspecteur",
   "chef_bureau_repr",
 ];
@@ -113,10 +118,31 @@ function DossierDetailPage() {
   const { t } = useI18n();
   const { user } = useAuth();
 
-  const { data: rawDossier, loading: isLoading, error } = useApi<any>(() => apiGetDossierDetails(dossierId), [dossierId]);
+  const { data: aggregateData, loading: isLoading, error, reload } = useApi<any>(() => apiGetDossierAggregate(dossierId), [dossierId]);
+
+  const rawDossier = aggregateData?.dossier;
+  const repr = aggregateData?.representation_data;
+  const reprArticles = aggregateData?.representation_articles || [];
+
+  const [editForm, setEditForm] = useState({
+    importateur: "",
+    nif: "",
+    declarant: "",
+    type_marchandises: "",
+  });
+
+  useEffect(() => {
+    if (rawDossier) {
+      setEditForm({
+        importateur: rawDossier.importateur || "",
+        nif: rawDossier.nif || "",
+        declarant: rawDossier.declarant || "",
+        type_marchandises: rawDossier.type_marchandises || "",
+      });
+    }
+  }, [rawDossier]);
 
   // Mapping des données relationnelles du backend vers les sections UI
-  const repr = rawDossier?.representation_entry;
   const typingDirect = rawDossier?.typing_docs_direct?.[0];
   const typingTranship = rawDossier?.typing_docs_transhipment?.[0];
   const itEntry = rawDossier?.it_entries?.[0];
@@ -221,9 +247,10 @@ function DossierDetailPage() {
     },
     articles: [
       ...(rawDossier.articles || []),
-      ...(repr?.articles || []).map((a: any) => ({ ...a, source: 'representation' }))
+      ...reprArticles.map((a: any) => ({ ...a, source: 'representation' }))
     ].filter((a, idx, arr) => arr.findIndex(x => x.id === a.id) === idx), // déduplique
-    reprArticles: repr?.articles || [],
+    reprArticles: reprArticles,
+    hasRepresentationData: !!repr
   } : null;
 
   // Transition douce entre les filtres
@@ -329,6 +356,22 @@ function DossierDetailPage() {
           </FilterSection>
         );
       case "donneesRepresentation":
+        if (!dossier.hasRepresentationData) {
+          return (
+            <FilterSection
+              title="Données Représentation"
+              subtitle="Informations déclarées au bureau de représentation étrangère"
+              icon={Building2}
+              iconColor="text-violet-500"
+              source="Opérateur de Saisie"
+            >
+              <div className="col-span-2 text-center py-8 text-muted-foreground">
+                <Info className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                <p>Aucune donnée Bureau de Représentation trouvée pour cette référence DRA ({dossier.dra}).</p>
+              </div>
+            </FilterSection>
+          );
+        }
         return (
           <FilterSection
             title="Données Représentation"
@@ -473,6 +516,49 @@ function DossierDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 print:hidden">
+          {["inspecteur", "inspecteur_chef", "secretaire_inspecteur", "super_admin"].includes(user?.role || "") && (
+            <FormDialog
+              trigger={
+                <Button variant="default" size="sm" className="gap-2 bg-accent hover:bg-accent/90 text-white">
+                  <Edit className="h-4 w-4" />
+                  Modifier
+                </Button>
+              }
+              title={`Modifier Dossier — ${dossier.reference}`}
+              onSubmit={async () => {
+                await apiUpdateDossier(dossierId, editForm);
+                toast.success("Dossier modifié avec succès");
+                reload();
+              }}
+            >
+              <FormGrid>
+                <Field label="Importateur">
+                  <Input 
+                    value={editForm.importateur}
+                    onChange={e => setEditForm({ ...editForm, importateur: e.target.value })}
+                  />
+                </Field>
+                <Field label="NIF">
+                  <Input 
+                    value={editForm.nif}
+                    onChange={e => setEditForm({ ...editForm, nif: e.target.value })}
+                  />
+                </Field>
+                <Field label="Déclarant">
+                  <Input 
+                    value={editForm.declarant}
+                    onChange={e => setEditForm({ ...editForm, declarant: e.target.value })}
+                  />
+                </Field>
+                <Field label="Type Marchandises">
+                  <Input 
+                    value={editForm.type_marchandises}
+                    onChange={e => setEditForm({ ...editForm, type_marchandises: e.target.value })}
+                  />
+                </Field>
+              </FormGrid>
+            </FormDialog>
+          )}
           <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
             <Printer className="h-4 w-4" />
             Imprimer / PDF

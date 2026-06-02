@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { useState, createFileRoute } from "@tanstack/react-router";
 import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { useApi, apiGetBarriereEntries, apiGetEmptyManifests, apiGetLocodes } from "@/lib/api";
+import { useApi, apiGetBarriereEntries, apiGetEmptyManifests, apiGetLocodes, apiCreateMouvement, apiCreateVrac, apiCreateBarriereEntry } from "@/lib/api";
 import type { BarriereEntry } from "@/lib/mock";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -22,6 +22,8 @@ function BrigadierForms() {
   const { data: rawManifests } = useApi(apiGetEmptyManifests);
   type Manifest = { id: number | string; reference: string; vehicule: string; marque: string; destination?: string; receveur?: string; barriereEntree?: string; barriereSortie?: string };
   const manifests = (rawManifests as Manifest[] ?? []);
+  const [bfVcTitres, setBfVcTitres] = useState(1);
+  const [bfVracTitres, setBfVracTitres] = useState(1);
 
   return (
     <FormDialog
@@ -32,7 +34,47 @@ function BrigadierForms() {
         </Button>
       }
       title="Mouvement barrière"
-      onSubmit={() => toast.success("Mouvement enregistré")}
+      onSubmit={() => {
+        const g = (id: string) => (document.getElementById(id) as HTMLInputElement)?.value || "";
+        const activeTab = document.querySelector('[role="tabpanel"]:not([hidden])')?.getAttribute("aria-label") || "vc";
+        if (activeTab === "vc") {
+          const titresDetails = Array.from({ length: bfVcTitres }, (_, i) => ({
+            reference_t1: g(`bf-vc-t1-${i}`),
+            date_t1: g(`bf-vc-date-t1-${i}`),
+          }));
+          apiCreateMouvement({
+            operation_type: "entrant_charge",
+            plaque: g("bf-vc-plaque"),
+            importateur: g("bf-vc-importateur"),
+            date_mouvement: new Date().toISOString().split("T")[0],
+            reference_dra: g("bf-vc-dra") || undefined,
+            date_dra: g("bf-vc-date-dra") || undefined,
+            reference_t1: titresDetails[0]?.reference_t1 || undefined,
+            date_t1: titresDetails[0]?.date_t1 || undefined,
+            custom_fields: {
+              nb_titres: bfVcTitres,
+              titres_details: titresDetails,
+              bureau: g("bf-vc-bureau"),
+              declarant: g("bf-vc-declarant"),
+              passage_direct: g("bf-vc-dra-passage"),
+              entrepot: g("bf-vc-entrepot"),
+            },
+          }).then(() => toast.success("Véhicule chargé enregistré")).catch((e) => toast.error(e.message));
+        } else if (activeTab === "vrac") {
+          const titresDetails = Array.from({ length: bfVracTitres }, (_, i) => ({
+            reference_t1: g(`bf-vrac-t1-${i}`),
+            date_t1: g(`bf-vrac-date-t1-${i}`),
+          }));
+          apiCreateVrac({
+            reference: `VRAC-${Date.now()}`,
+            type: "direct",
+            importateur: g("bf-vrac-importateur"),
+            plaque: g("bf-vrac-chassis"),
+            quantite: parseInt(g("bf-vrac-titres") || "1"),
+            poids: 0,
+          }).then(() => toast.success("VRAC enregistré")).catch((e) => toast.error(e.message));
+        }
+      }}
     >
       <Tabs defaultValue="vc">
         <TabsList className="grid grid-cols-3">
@@ -43,25 +85,30 @@ function BrigadierForms() {
         <TabsContent value="vc" className="space-y-3 pt-3">
           <FormGrid>
             <Field label="Nom importateur" required>
-              <Input />
+              <Input id="bf-vc-importateur" />
             </Field>
             <Field label="Plaque véhicule">
-              <Input />
+              <Input id="bf-vc-plaque" />
             </Field>
-            <Field label="Référence DRA">
-              <Input />
-            </Field>
-            <Field label="Nombre de titres">
-              <Input type="number" />
+            <div className="col-span-2 grid grid-cols-2 gap-4">
+              <Field label="Réf. DRA (E-XXX)" required>
+                <Input id="bf-vc-dra" placeholder="E-001" />
+              </Field>
+              <Field label="Sa date" required>
+                <Input id="bf-vc-date-dra" type="date" />
+              </Field>
+            </div>
+            <Field label="Nombre de titres" required>
+              <Input id="bf-vc-titres" type="number" min={1} value={bfVcTitres} onChange={(e) => setBfVcTitres(Math.max(1, parseInt(e.target.value) || 1))} />
             </Field>
             <Field label="Du">
-              <Input type="date" />
+              <Input id="bf-vc-date-du" type="date" />
             </Field>
             <Field label="Au">
-              <Input type="date" />
+              <Input id="bf-vc-date-au" type="date" />
             </Field>
             <Field label="Bureau émission Doc">
-              <Input />
+              <Input id="bf-vc-bureau" />
             </Field>
             <Field label="Entrepôt destination">
               <div className="flex gap-2">
@@ -74,46 +121,70 @@ function BrigadierForms() {
               </div>
             </Field>
             <Field label="Référence DRA passage direct (ex: E-435 du 3/4/2026)">
-              <Input />
+              <Input id="bf-vc-dra-passage" />
             </Field>
             <Field label="Sélection entrepôt">
-              <Input placeholder="Liste créée par l'inspecteur" />
+              <Input id="bf-vc-entrepot" placeholder="Liste créée par l'inspecteur" />
             </Field>
             <Field label="Nom déclarant">
-              <Input />
+              <Input id="bf-vc-declarant" />
             </Field>
           </FormGrid>
+          <div className="space-y-4 mt-4 border-t pt-4">
+            {Array.from({ length: bfVcTitres }).map((_, i) => (
+              <div key={i} className="rounded-lg border p-3 bg-muted/10 space-y-3">
+                <h4 className="text-sm font-semibold text-accent">Titre {i + 1}</h4>
+                <FormGrid>
+                  <Field label="Réf. titre" required>
+                    <Input id={`bf-vc-t1-${i}`} placeholder="T1-..." />
+                  </Field>
+                  <Field label="Sa date" required>
+                    <Input id={`bf-vc-date-t1-${i}`} type="date" />
+                  </Field>
+                </FormGrid>
+              </div>
+            ))}
+          </div>
         </TabsContent>
         <TabsContent value="vrac" className="space-y-3 pt-3">
           <FormGrid>
             <Field label="Importateur">
-              <Input />
+              <Input id="bf-vrac-importateur" />
             </Field>
             <Field label="Numéro châssis">
-              <Input />
+              <Input id="bf-vrac-chassis" />
             </Field>
-            <Field label="Nombre de titres">
-              <Input type="number" />
-            </Field>
-            <Field label="Référence DRA">
-              <Input />
-            </Field>
-            <Field label="T1">
-              <Input />
+            <Field label="Nombre de titres" required>
+              <Input id="bf-vrac-titres" type="number" min={1} value={bfVracTitres} onChange={(e) => setBfVracTitres(Math.max(1, parseInt(e.target.value) || 1))} />
             </Field>
             <Field label="Couleur véhicule">
-              <Input />
+              <Input id="bf-vrac-couleur" />
             </Field>
             <Field label="Marque véhicule">
-              <Input />
+              <Input id="bf-vrac-marque" />
             </Field>
             <Field label="Année">
-              <Input />
+              <Input id="bf-vrac-annee" />
             </Field>
             <Field label="Entrepôt de destination">
-              <Input />
+              <Input id="bf-vrac-entrepot" />
             </Field>
           </FormGrid>
+          <div className="space-y-4 mt-4 border-t pt-4">
+            {Array.from({ length: bfVracTitres }).map((_, i) => (
+              <div key={i} className="rounded-lg border p-3 bg-muted/10 space-y-3">
+                <h4 className="text-sm font-semibold text-accent">Titre {i + 1}</h4>
+                <FormGrid>
+                  <Field label="Réf. titre" required>
+                    <Input id={`bf-vrac-t1-${i}`} placeholder="T1-..." />
+                  </Field>
+                  <Field label="Sa date" required>
+                    <Input id={`bf-vrac-date-t1-${i}`} type="date" />
+                  </Field>
+                </FormGrid>
+              </div>
+            ))}
+          </div>
         </TabsContent>
         <TabsContent value="emp" className="space-y-3 pt-3">
           <div className="flex gap-2">

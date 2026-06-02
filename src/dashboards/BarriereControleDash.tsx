@@ -5,9 +5,6 @@ import {
   Search,
   Plus,
   ArrowRight,
-  Truck,
-  Calendar,
-  Hash,
   CheckCircle2,
 } from "lucide-react";
 import { DashHeader, StatCard, Panel } from "./_shared";
@@ -15,28 +12,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { useApi, apiGetDossiers } from "@/lib/api";
-import { EMPTY_MANIFESTS } from "@/lib/mock";
+import { useApi, apiGetDossiers, apiGetEmptyManifests, apiGetMouvements, apiCreateDossier, apiCreateBarriereEntry } from "@/lib/api";
 import { DataTable, type Column } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { toast } from "sonner";
 
 export default function BarriereControleDash() {
   const { data: rawDossiers } = useApi(apiGetDossiers);
-  const activeDossiers = rawDossiers as any[] || [];
+  const { data: rawManifests } = useApi(apiGetEmptyManifests);
+  const { data: rawMouvements } = useApi(() => apiGetMouvements({}));
+  const activeDossiers = (rawDossiers as any[]) || [];
+  const manifests = (rawManifests as any[]) || [];
+  const mouvements = (rawMouvements as any[]) || [];
 
   const [dossierSearch, setDossierSearch] = useState("");
   const [manifestSearch, setManifestSearch] = useState("");
 
-  const filteredDossiers = (DOSSIERS || []).filter(
-    (d) =>
+  const filteredDossiers = (activeDossiers || []).filter(
+    (d: any) =>
       !dossierSearch ||
       (d.reference || "").toLowerCase().includes(`rd-${dossierSearch}`.toLowerCase()) ||
       (d.importateur || "").toLowerCase().includes(dossierSearch.toLowerCase()),
   );
 
-  const filteredManifests = (EMPTY_MANIFESTS || []).filter(
-    (m) => !manifestSearch || (m.reference || "").toLowerCase().includes(manifestSearch.toLowerCase()),
+  const filteredManifests = (manifests || []).filter(
+    (m: any) => !manifestSearch || (m.reference || "").toLowerCase().includes(manifestSearch.toLowerCase()),
   );
 
   const dossierColumns: Column<any>[] = [
@@ -73,7 +73,14 @@ export default function BarriereControleDash() {
           size="sm"
           variant="outline"
           className="h-8 gap-1 border-accent/30 text-accent hover:bg-accent/10"
-          onClick={() => toast.success(`Manifeste ${r.reference} passé avec succès`)}
+          onClick={async () => {
+            try {
+              await apiCreateBarriereEntry({ empty_manifest_id: r.id });
+              toast.success(`Manifeste ${r.reference} passé avec succès`);
+            } catch (e: any) {
+              toast.error(e?.message || "Erreur");
+            }
+          }}
         >
           Passer
           <ArrowRight className="h-3.5 w-3.5" />
@@ -87,10 +94,10 @@ export default function BarriereControleDash() {
       <DashHeader subtitle="Barrière Contrôle — Gestion des dossiers et manifests" />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={FolderKanban} label="Dossiers" value={DOSSIERS?.length || 0} />
-        <StatCard icon={FileText} label="Manifests" value={EMPTY_MANIFESTS?.length || 0} />
-        <StatCard icon={CheckCircle2} label="Traités aujourd'hui" value={12} />
-        <StatCard icon={Plus} label="Nouveaux" value={4} />
+        <StatCard icon={FolderKanban} label="Dossiers" value={activeDossiers.length} />
+        <StatCard icon={FileText} label="Manifests" value={manifests.length} />
+        <StatCard icon={CheckCircle2} label="Mouvements" value={mouvements.length} />
+        <StatCard icon={Plus} label="Nouveaux" value={activeDossiers.filter((d: any) => d.status === "en_cours").length} />
       </div>
 
       <Tabs defaultValue="dossiers" className="w-full">
@@ -129,20 +136,36 @@ export default function BarriereControleDash() {
                 </Button>
               }
               title="Créer un nouveau dossier"
-              onSubmit={() => toast.success("Dossier créé avec succès")}
+              onSubmit={() => {
+                const g = (id: string) => (document.getElementById(id) as HTMLInputElement)?.value || "";
+                apiCreateDossier({
+                  importateur: g("bc-importateur"),
+                  plaque: g("bc-plaque"),
+                  type_marchandises: g("bc-marchandises"),
+                  localisation: g("bc-destination"),
+                  metadata: {
+                    reference: g("bc-reference"),
+                    date_reference: g("bc-date-ref"),
+                    reference_douane: g("bc-ref-douane"),
+                    date_reference_douane: g("bc-date-ref-douane"),
+                    bon_sortie: g("bc-bon-sortie"),
+                    date_bon_sortie: g("bc-date-bon-sortie"),
+                  },
+                }).then(() => toast.success("Dossier créé avec succès")).catch((e) => toast.error(e.message));
+              }}
             >
               <FormGrid>
                 <Field label="Importateur" required>
-                  <Input placeholder="Nom de l'importateur" />
+                  <Input id="bc-importateur" placeholder="Nom de l'importateur" />
                 </Field>
                 <Field label="Plaque" required>
-                  <Input placeholder="ABC-1234" />
+                  <Input id="bc-plaque" placeholder="ABC-1234" />
                 </Field>
                 <Field label="Description marchandises" required>
-                  <Input placeholder="Nature des biens" />
+                  <Input id="bc-marchandises" placeholder="Nature des biens" />
                 </Field>
                 <Field label="Destination finale" required>
-                  <Input placeholder="Ville / Entrepôt" />
+                  <Input id="bc-destination" placeholder="Ville / Entrepôt" />
                 </Field>
 
                 <div className="col-span-2 grid grid-cols-2 gap-4">
@@ -151,11 +174,11 @@ export default function BarriereControleDash() {
                       <span className="flex items-center rounded-l-md border border-r-0 bg-muted px-3 text-xs font-mono">
                         RD-
                       </span>
-                      <Input className="rounded-l-none" placeholder="0001" />
+                      <Input id="bc-reference" className="rounded-l-none" placeholder="0001" />
                     </div>
                   </Field>
                   <Field label="Date réf dossier" required>
-                    <Input type="date" />
+                    <Input id="bc-date-ref" type="date" />
                   </Field>
                 </div>
                 <div className="col-span-2 grid grid-cols-2 gap-4">
@@ -164,20 +187,20 @@ export default function BarriereControleDash() {
                       <span className="flex items-center rounded-l-md border border-r-0 bg-muted px-3 text-xs font-mono">
                         E-
                       </span>
-                      <Input className="rounded-l-none" placeholder="123" />
+                      <Input id="bc-ref-douane" className="rounded-l-none" placeholder="123" />
                     </div>
                   </Field>
                   <Field label="Sa date" required>
-                    <Input type="date" />
+                    <Input id="bc-date-ref-douane" type="date" />
                   </Field>
                 </div>
 
                 <div className="col-span-2 grid grid-cols-2 gap-4">
                   <Field label="Référence bon de sortie" required>
-                    <Input placeholder="BS-456" />
+                    <Input id="bc-bon-sortie" placeholder="BS-456" />
                   </Field>
                   <Field label="Sa date" required>
-                    <Input type="date" />
+                    <Input id="bc-date-bon-sortie" type="date" />
                   </Field>
                 </div>
               </FormGrid>

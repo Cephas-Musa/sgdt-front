@@ -24,15 +24,15 @@ class TypingDocController extends Controller
     }
 
     /**
-     * Résout un dossier_id à partir de dossier_reference si dossier_id absent.
+     * Résout un dossier_id à partir de dossier_dra (E-XXX) si dossier_id absent.
      */
-    private function resolveDossierId(?string $dossierId, ?string $dossierReference): ?string
+    private function resolveDossierId(?string $dossierId, ?string $dossierDra): ?string
     {
         if ($dossierId) {
             return $dossierId;
         }
-        if ($dossierReference) {
-            return Dossier::where('reference', $dossierReference)->value('id');
+        if ($dossierDra) {
+            return Dossier::where('dra', $dossierDra)->value('id');
         }
         return null;
     }
@@ -45,7 +45,7 @@ class TypingDocController extends Controller
         $user = $this->requireTypingOperator($request);
 
         $validated = $request->validate([
-            'dossier_reference'  => 'nullable|string',
+            'dossier_dra'        => 'nullable|string',
             'dossier_id'         => 'nullable|uuid|exists:dossiers,id',
             'barriere_code'      => 'required|string|max:50',
             'office'             => 'nullable|string|max:100',
@@ -64,11 +64,11 @@ class TypingDocController extends Controller
 
         $dossierId = $this->resolveDossierId(
             $validated['dossier_id'] ?? null,
-            $validated['dossier_reference'] ?? null
+            $validated['dossier_dra'] ?? null
         );
 
         $doc = TypingDocDirect::create(array_merge(
-            collect($validated)->except(['dossier_reference', 'dossier_id'])->toArray(),
+            collect($validated)->except(['dossier_dra', 'dossier_id'])->toArray(),
             [
                 'dossier_id'          => $dossierId,
                 'typing_operator_id'  => $user->id,
@@ -100,7 +100,7 @@ class TypingDocController extends Controller
         $user = $this->requireTypingOperator($request);
 
         $validated = $request->validate([
-            'dossier_reference'  => 'nullable|string',
+            'dossier_dra'        => 'nullable|string',
             'dossier_id'         => 'nullable|uuid|exists:dossiers,id',
             'nombre_vehicules'   => 'nullable|integer|min:1',
             'transhipped_to'     => 'nullable|string|max:255',
@@ -113,11 +113,11 @@ class TypingDocController extends Controller
 
         $dossierId = $this->resolveDossierId(
             $validated['dossier_id'] ?? null,
-            $validated['dossier_reference'] ?? null
+            $validated['dossier_dra'] ?? null
         );
 
         $doc = TypingDocTranshipment::create(array_merge(
-            collect($validated)->except(['dossier_reference', 'dossier_id'])->toArray(),
+            collect($validated)->except(['dossier_dra', 'dossier_id'])->toArray(),
             [
                 'dossier_id'         => $dossierId,
                 'typing_operator_id' => $user->id,
@@ -168,11 +168,11 @@ class TypingDocController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'dossier_reference' => 'required|string|exists:dossiers,reference',
-            'doc_type'          => 'required|in:direct,transhipment',
+            'dossier_dra' => 'required|string|exists:dossiers,dra',
+            'doc_type'    => 'required|in:direct,transhipment',
         ]);
 
-        $dossier = Dossier::where('reference', $validated['dossier_reference'])->firstOrFail();
+        $dossier = Dossier::where('dra', $validated['dossier_dra'])->firstOrFail();
 
         if ($validated['doc_type'] === 'direct') {
             $doc = TypingDocDirect::findOrFail($docId);
@@ -194,6 +194,23 @@ class TypingDocController extends Controller
             'message' => 'Document lié au dossier.',
             'dossier' => $dossier->reference,
         ]);
+    }
+
+    /**
+     * Liste des docs directs du typing operator connecté.
+     */
+    public function indexDirect(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $query = TypingDocDirect::with('typingOperator', 'dossier');
+
+        if ($user->role === 'typing_operator') {
+            $query->where('typing_operator_id', $user->id);
+        }
+
+        return response()->json(
+            $query->orderBy('created_at', 'desc')->get()
+        );
     }
 
     /**

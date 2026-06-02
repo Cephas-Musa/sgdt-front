@@ -40,6 +40,11 @@ class Barriere extends Model
 
     public function mouvements()
     {
-        return $this->hasMany(BarriereEntry::class, 'barriere_id', 'id');
+        return $this->hasMany(BarriereEntry::class, 'barriere_name', 'nom');
+    }
+
+    public function revenus(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BarrierRevenue::class, 'barriere_code', 'code');
     }
 }

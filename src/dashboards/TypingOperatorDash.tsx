@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { useApi, apiGetDossiers, apiGetEmptyManifests, apiCreateTypingDocDirect, apiCreateTypingDocTranshipment, apiCreateItEntry, apiGetItEntries } from "@/lib/api";
+import { useApi, apiGetDossiers, apiGetEmptyManifests, apiCreateTypingDocDirect, apiCreateTypingDocTranshipment, apiCreateItEntry, apiGetItEntries, apiGetTypingDocsDirect } from "@/lib/api";
 import { toast } from "sonner";
 
 interface TransshippedVehicle {
@@ -30,13 +30,16 @@ interface TranshippedDocument {
 
 export default function TypingOperatorDash() {
   const { data: rawDossiers } = useApi(apiGetDossiers);
-  const activeDossiers = (rawDossiers as any[]) || [];
+  const activeDossiers = Array.isArray(rawDossiers) ? rawDossiers : [];
 
   const { data: rawManifests } = useApi(apiGetEmptyManifests);
-  const allManifests = (rawManifests as any[]) || [];
+  const allManifests = Array.isArray(rawManifests) ? rawManifests : [];
 
   const { data: rawItEntries, reload: reloadIt } = useApi(apiGetItEntries);
-  const allItEntries = (rawItEntries as any[]) || [];
+  const allItEntries = Array.isArray(rawItEntries) ? rawItEntries : [];
+
+  const { data: rawDirectDocs, reload: reloadDirect } = useApi(apiGetTypingDocsDirect);
+  const directDocs = Array.isArray(rawDirectDocs) ? rawDirectDocs : [];
 
   const [manifestSearch, setManifestSearch] = useState("");
   const [numberOfVehicles, setNumberOfVehicles] = useState<number>(0);
@@ -46,6 +49,8 @@ export default function TypingOperatorDash() {
 
   // Form state for Load Direct
   const directFormRef = useRef<{ [key: string]: string }>({});
+  const [containerTypes, setContainerTypes] = useState<{ [key: string]: boolean }>({});
+  const containerOptions = ["1x20", "1x40", "conventionnal"];
   
   const [itSearch, setItSearch] = useState("");
   const [itChassisSearch, setItChassisSearch] = useState("");
@@ -123,7 +128,7 @@ export default function TypingOperatorDash() {
     <div>
       <DashHeader subtitle="Typing Operator — Docs, Empty Manifest, IT" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard icon={FileText} label="Docs Directs" value={activeDossiers.length} />
+        <StatCard icon={FileText} label="Docs Directs" value={directDocs.length} />
         <StatCard icon={FileText} label="Empty Manifests" value={allManifests.length} />
         <StatCard icon={Truck} label="IT Entries" value={allItEntries.length} />
       </div>
@@ -149,7 +154,7 @@ export default function TypingOperatorDash() {
                       </Button>
                     }
                     title="Créer un Nouveau Document Direct"
-                    onSubmit={async (formData?: Record<string, string>) => {
+                    onSubmit={async () => {
                       try {
                         await apiCreateTypingDocDirect({
                           barriere_code: directFormRef.current.barriere_code || "UGMPO",
@@ -162,30 +167,25 @@ export default function TypingOperatorDash() {
                           country_of_export: directFormRef.current.country_of_export,
                           vehicule_reference: directFormRef.current.vehicule_reference,
                           container_number: directFormRef.current.container_number,
-                          dossier_reference: directFormRef.current.dossier_reference,
+                          container_20: containerTypes["1x20"] ? 1 : 0,
+                          container_40: containerTypes["1x40"] ? 1 : 0,
+                          dossier_dra: directFormRef.current.dossier_dra,
                         });
                         toast.success("Document Direct créé et enregistré.");
                         directFormRef.current = {};
+                        setContainerTypes({});
+                        reloadDirect();
                       } catch (e: any) {
                         toast.error(e?.message || "Erreur lors de la création.");
                       }
                     }}
                   >
                     <FormGrid>
-                      <Field label="Référence Dossier (optionnel)">
-                        <div className="flex items-center overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-                          <span className="flex items-center px-3 border-r border-input bg-muted/50 font-bold text-muted-foreground select-none">RD-</span>
-                          <input 
-                            className="flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/50 h-9"
-                            placeholder="0001" 
-                            inputMode="numeric"
-                            onChange={(e) => { 
-                              const val = e.target.value.replace(/\D/g, "").slice(0, 9);
-                              e.target.value = val;
-                              directFormRef.current.dossier_reference = val ? "RD-" + val : ""; 
-                            }}
-                          />
-                        </div>
+                      <Field label="Réf. DRA (E-XXX) (optionnel)">
+                        <Input 
+                          placeholder="E-001"
+                          onChange={(e) => { directFormRef.current.dossier_dra = e.target.value; }}
+                        />
                       </Field>
                       <Field label="Code Barrière" required>
                         <Input 
@@ -200,9 +200,9 @@ export default function TypingOperatorDash() {
                         />
                       </Field>
                       <div className="grid grid-cols-2 gap-4">
-                        <Field label="Référence d'entrée" required>
+                        <Field label="Référence DRA" required>
                           <Input 
-                            placeholder="Ex: RD-001" 
+                            placeholder="Ex: E-001" 
                             onChange={(e) => { directFormRef.current.entree_reference = e.target.value; }}
                           />
                         </Field>
@@ -246,18 +246,19 @@ export default function TypingOperatorDash() {
                         />
                       </Field>
                       <Field label="Type de conteneur" required>
-                        <Select defaultValue="conventional">
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner le type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ref">Entry reference</SelectItem>
-                            <SelectItem value="ref_date">sa date</SelectItem>
-                            <SelectItem value="t1">T1</SelectItem>
-                            <SelectItem value="t1_date">sa date</SelectItem>
-                            <SelectItem value="conventional">Conventional</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="flex flex-wrap gap-4 mt-1">
+                          {containerOptions.map(opt => (
+                            <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-border accent-accent"
+                                checked={containerTypes[opt] || false}
+                                onChange={e => setContainerTypes({...containerTypes, [opt]: e.target.checked})}
+                              />
+                              <span className="text-sm font-medium">{opt}</span>
+                            </label>
+                          ))}
+                        </div>
                       </Field>
                       <Field label="Nº de Conteneur">
                         <Input 
@@ -285,7 +286,7 @@ export default function TypingOperatorDash() {
                 title="Docs — Direct"
                 actions={
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="h-8 text-xs">
+                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={reloadDirect}>
                       Actualiser
                     </Button>
                   </div>
@@ -293,41 +294,47 @@ export default function TypingOperatorDash() {
               >
                   <div className="space-y-4">
                     <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                      Données de l'importateur
+                      Documents Directs
                     </div>
                     <div className="overflow-x-auto rounded-md border border-border">
                       <table className="w-full text-xs">
                         <thead className="bg-muted/50 text-muted-foreground">
                           <tr>
-                            <th className="px-3 py-2 text-left">Réf</th>
+                            <th className="px-3 py-2 text-left">Barrière</th>
+                            <th className="px-3 py-2 text-left">DRA</th>
                             <th className="px-3 py-2 text-left">Importateur</th>
+                            <th className="px-3 py-2 text-left">Véhicule</th>
+                            <th className="px-3 py-2 text-left">Conteneur</th>
                             <th className="px-3 py-2 text-left">Status</th>
                             <th className="px-3 py-2 text-left">Créé le</th>
-                            <th className="px-3 py-2 text-right">Action</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {activeDossiers.slice(0, 5).map((d: any) => (
+                          {directDocs.map((d: any) => (
                             <tr key={d.id} className="border-t border-border hover:bg-muted/30">
-                              <td className="px-3 py-2 font-mono">{d.reference}</td>
-                              <td className="px-3 py-2 font-medium">{d.importateur || "—"}</td>
+                              <td className="px-3 py-2 font-mono font-bold text-accent">{d.barriere_code}</td>
+                              <td className="px-3 py-2 font-mono">{d.entree_reference || "—"}</td>
+                              <td className="px-3 py-2 font-medium">{d.consignee || "—"}</td>
+                              <td className="px-3 py-2">{d.vehicule_reference || "—"}</td>
+                              <td className="px-3 py-2 text-xs">
+                                {[d.container_20 > 0 && "1x20", d.container_40 > 0 && "1x40", d.container_number && "Conv."].filter(Boolean).join(", ") || "—"}
+                              </td>
                               <td className="px-3 py-2">
                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                  d.status === "paye" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
+                                  d.status === "linked" ? "bg-success/10 text-success" :
+                                  d.status === "pending" ? "bg-warning/10 text-warning" :
+                                  "bg-muted text-muted-foreground"
                                 }`}>
                                   {d.status}
                                 </span>
                               </td>
                               <td className="px-3 py-2 text-muted-foreground">
-                                {new Date(d.created_at || d.createdAt || Date.now()).toLocaleDateString()}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                <span className="text-[10px] text-muted-foreground">Verrouillé</span>
+                                {new Date(d.created_at).toLocaleDateString()}
                               </td>
                             </tr>
                           ))}
-                          {activeDossiers.length === 0 && (
-                            <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-muted-foreground">Aucun dossier trouvé</td></tr>
+                          {directDocs.length === 0 && (
+                            <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-muted-foreground">Aucun document direct trouvé</td></tr>
                           )}
                         </tbody>
                       </table>
@@ -583,11 +590,11 @@ export default function TypingOperatorDash() {
                   <FormDialog
                     trigger={<Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> New IT</Button>}
                     title="Créer une Entrée IT"
-                    onSubmit={async (fd?: Record<string, string>) => {
+                    onSubmit={async () => {
                       try {
-                        // collect from refs via form
                         const form = document.querySelector('[data-it-form]') as HTMLFormElement;
-                        const inputs = form ? Object.fromEntries(new FormData(form)) : {};
+                        if (!form) throw new Error("Formulaire non trouvé");
+                        const inputs = Object.fromEntries(new FormData(form));
                         await apiCreateItEntry(inputs);
                         if (reloadIt) reloadIt();
                         toast.success("IT Entry enregistrée.");
@@ -596,26 +603,28 @@ export default function TypingOperatorDash() {
                       }
                     }}
                   >
-                    <FormGrid>
-                      <Field label="Consignee" required>
-                        <Input />
-                      </Field>
-                      <Field label="Chassis" required>
-                        <Input />
-                      </Field>
-                      <Field label="Vehicle Mark" required>
-                        <Input />
-                      </Field>
-                      <Field label="Manifest Year" required>
-                        <Input type="number" placeholder="2025" />
-                      </Field>
-                      <Field label="Color" required>
-                        <Input />
-                      </Field>
-                      <Field label="IT Ref" required>
-                        <Input />
-                      </Field>
-                    </FormGrid>
+                    <form data-it-form onSubmit={e => e.preventDefault()}>
+                      <FormGrid>
+                        <Field label="Consignee" required>
+                          <Input name="consignee" autoComplete="off" />
+                        </Field>
+                        <Field label="Chassis" required>
+                          <Input name="chassis" autoComplete="off" />
+                        </Field>
+                        <Field label="Vehicle Mark" required>
+                          <Input name="vehicule_mark" autoComplete="off" />
+                        </Field>
+                        <Field label="Manifest Year" required>
+                          <Input type="number" name="manifest_year" placeholder="2025" autoComplete="off" />
+                        </Field>
+                        <Field label="Color" required>
+                          <Input name="color" autoComplete="off" />
+                        </Field>
+                        <Field label="IT Ref" required>
+                          <Input name="it_reference" autoComplete="off" />
+                        </Field>
+                      </FormGrid>
+                    </form>
                   </FormDialog>
                 </div>
               }

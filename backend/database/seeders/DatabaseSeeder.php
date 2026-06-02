@@ -12,6 +12,7 @@ use App\Models\BureauRepresentation;
 use App\Models\Locode;
 use App\Models\Pays;
 use App\Models\Devise;
+use Database\Seeders\BarriereSeeder;
 use App\Models\Entrepot;
 use App\Models\Dossier;
 use App\Models\Article;
@@ -41,8 +42,8 @@ class DatabaseSeeder extends Seeder
                 'password'          => Hash::make('Dragon@2004'),
                 'role'              => 'super_admin',
                 'full_name'         => 'Super Administrateur SGDT',
-                'bureau'            => 'DIRECTION GENERALE',
-                'province'          => 'KINSHASA',
+                'bureau'            => null,
+                'province'          => null,
                 'matricule'         => 'SA-2026-0001',
                 'phone_verified_at' => now(),
                 'wallet_balance'    => 0.00,
@@ -87,6 +88,9 @@ class DatabaseSeeder extends Seeder
         }
 
         // Aucun dossier, aucune transaction — base vierge pour démarrage réel
+        // ─── Barrières Étrangères ────────────────────────────────────────────
+        $this->call(BarriereSeeder::class);
+
         $this->command->info('✅ Base de données réinitialisée. Seul le Superadmin (+243813478556) est présent.');
     }
 }

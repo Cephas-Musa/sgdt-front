@@ -227,11 +227,11 @@ export default function OperateurSaisieDash() {
   const { data: rawBureaux } = useApi(apiGetBureauxRepresentation);
 
   // Fallback to empty array if data isn't loaded yet
-  const safeDossiers = DOSSIERS || [];
-  const safeLocodes = rawLocodes || [];
-  const safePays = rawPays || [];
-  const safeDevises = rawDevises || [];
-  const safeBureaux = rawBureaux || [];
+  const safeDossiers = Array.isArray(DOSSIERS) ? DOSSIERS : [];
+  const safeLocodes = Array.isArray(rawLocodes) ? rawLocodes : [];
+  const safePays = Array.isArray(rawPays) ? rawPays : [];
+  const safeDevises = Array.isArray(rawDevises) ? rawDevises : [];
+  const safeBureaux = Array.isArray(rawBureaux) ? rawBureaux : [];
 
   const [searchRef, setSearchRef] = useState("");
   const [searchDra, setSearchDra] = useState("");
@@ -243,6 +243,7 @@ export default function OperateurSaisieDash() {
 
   // States for Locode, Pays, Devises
   const [newLocode, setNewLocode] = useState({ code: "", designation: "", codePays: "", denomination: "" });
+  const [newPays, setNewPays] = useState({ code: "", designation: "" });
   const [newDevise, setNewDevise] = useState({ codePays: "", codeDevise: "", denominationPays: "", denominationDevise: "" });
   const [editingItem, setEditingItem] = useState<any>(null);
 
@@ -659,10 +660,10 @@ export default function OperateurSaisieDash() {
                   onSubmit={async () => {
                     try {
                       if (editingItem) {
-                        await apiUpdateLocode(editingItem.id, newLocode);
+                        await apiUpdateLocode(editingItem.id, { ...newLocode, code_pays: newLocode.codePays });
                         toast.success("Locode mis à jour");
                       } else {
-                        await apiCreateLocode(newLocode);
+                        await apiCreateLocode({ code: newLocode.code, designation: newLocode.designation, code_pays: newLocode.codePays, denomination: newLocode.denomination, id: "loc-" + Date.now() });
                         toast.success("Locode ajouté");
                       }
                       reloadLocodes();
@@ -704,34 +705,35 @@ export default function OperateurSaisieDash() {
                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                      <Input placeholder="Filtrer pays..." className="pl-9 h-9 text-xs" />
                   </div>
-                  <FormDialog
-                    trigger={<Button size="sm" className="gap-2 h-9 text-[10px] font-black uppercase" onClick={() => setEditingItem(null)}><Plus className="h-4 w-4" />Nouveau Pays</Button>}
-                    title={editingItem ? "Editer Pays" : "Enregistrer un pays"}
-                    onSubmit={async (fd?: Record<string, string>) => {
-                      try {
-                        const payload = {
-                          code: (fd?.code || editingItem?.code || "").toUpperCase(),
-                          designation: fd?.designation || editingItem?.designation || ""
-                        };
-                        if (editingItem) {
-                          await apiUpdateCountry(editingItem.id, payload);
-                          toast.success("Pays mis à jour");
-                        } else {
-                          await apiCreateCountry(payload);
-                          toast.success("Pays ajouté");
-                        }
-                        reloadPays();
-                      } catch (e: any) {
-                        toast.error(e?.message || "Erreur");
-                      }
-                    }}
-                  >
-                     <FormGrid>
-                       <Field label="Code ISO 2"><Input name="code" placeholder="UG" defaultValue={editingItem?.code} /></Field>
-                       <Field label="Désignation"><Input name="designation" placeholder="OUGANDA" defaultValue={editingItem?.designation} /></Field>
-                     </FormGrid>
-                     <Button className="w-full h-11 mt-4 font-black uppercase text-[10px]">{editingItem ? "Mettre à jour" : "Ajouter"}</Button>
-                  </FormDialog>
+                   <FormDialog
+                     trigger={<Button size="sm" className="gap-2 h-9 text-[10px] font-black uppercase" onClick={() => { setEditingItem(null); setNewPays({ code: "", designation: "" }); }}><Plus className="h-4 w-4" />Nouveau Pays</Button>}
+                     title={editingItem ? "Editer Pays" : "Enregistrer un pays"}
+                     onSubmit={async () => {
+                       try {
+                         const payload: Record<string, any> = {
+                           id: "p-" + Date.now(),
+                           code: (newPays.code || editingItem?.code || "").toUpperCase(),
+                           designation: newPays.designation || editingItem?.designation || ""
+                         };
+                         if (editingItem) {
+                           await apiUpdateCountry(editingItem.id, payload);
+                           toast.success("Pays mis à jour");
+                         } else {
+                           await apiCreateCountry(payload);
+                           toast.success("Pays ajouté");
+                         }
+                         reloadPays();
+                       } catch (e: any) {
+                         toast.error(e?.message || "Erreur");
+                       }
+                     }}
+                   >
+                      <FormGrid>
+                        <Field label="Code ISO 2"><Input placeholder="UG" value={newPays.code} onChange={e => setNewPays({...newPays, code: e.target.value.toUpperCase()})} /></Field>
+                        <Field label="Désignation"><Input placeholder="OUGANDA" value={newPays.designation} onChange={e => setNewPays({...newPays, designation: e.target.value})} /></Field>
+                      </FormGrid>
+                      <Button className="w-full h-11 mt-4 font-black uppercase text-[10px]">{editingItem ? "Mettre à jour" : "Ajouter"}</Button>
+                   </FormDialog>
                </div>
                <Panel title="Liste des Pays" className="flex-1 min-h-0">
                   <div className="h-full overflow-y-auto">
@@ -740,7 +742,7 @@ export default function OperateurSaisieDash() {
                       columns={[
                         { key: "code", header: "ISO", render: (r) => <Badge variant="secondary" className="font-mono">{r.code}</Badge> },
                         { key: "designation", header: "Dénomination", render: (r) => <span className="font-bold">{r.designation}</span> },
-                        { key: "actions", header: "", render: (r) => <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditingItem(r)}><Edit2 className="h-3.5 w-3.5" /></Button> }
+                        { key: "actions", header: "", render: (r) => <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditingItem(r); setNewPays({ code: r.code, designation: r.designation }); }}><Edit2 className="h-3.5 w-3.5" /></Button> }
                       ]}
                     />
                   </div>
@@ -762,8 +764,9 @@ export default function OperateurSaisieDash() {
                     onSubmit={async () => {
                       try {
                         const payload = {
-                          codePays: newDevise.codePays,
-                          codeDevise: newDevise.codeDevise,
+                          id: "dev-" + Date.now(),
+                          code_pays: newDevise.codePays,
+                          code_devise: newDevise.codeDevise,
                           denomination: newDevise.denominationDevise
                         };
                         if (editingItem) {
