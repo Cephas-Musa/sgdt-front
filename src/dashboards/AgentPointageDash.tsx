@@ -1,17 +1,25 @@
-import { FolderKanban, Package, History, Plus } from "lucide-react";
+import { useState, useMemo } from "react";
+import { FolderKanban, Package, History, Plus, Loader2, UserCheck } from "lucide-react";
 import { DashHeader, StatCard, Panel } from "./_shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { useApi, apiGetDossiers } from "@/lib/api";
-import { COLISAGES } from "@/lib/mock";
+import { useApi, apiGetDossiers, apiGetColisageRapports, apiGetColisageAffectations, apiStoreColisageRapport } from "@/lib/api";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 export default function AgentPointageDash() {
   const { data: rawDossiers } = useApi(apiGetDossiers);
-  const activeDossiers = rawDossiers as any[] || [];
+  const { data: rawAffectations } = useApi(apiGetColisageAffectations);
+  const { data: rawRapports, refetch: refetchRapports } = useApi(apiGetColisageRapports);
+  const allDossiers = (rawDossiers as any[]) || [];
+  const affectations = (rawAffectations as any[]) || [];
+  const rapports = (rawRapports as any[]) || [];
+
+  // Only show dossiers assigned to this agent
+  const assignedIds = new Set(affectations.map((a: any) => a.dossier_id));
+  const activeDossiers = useMemo(() => allDossiers.filter((d) => assignedIds.has(d.id)), [allDossiers, affectations]);
 
   const direct = activeDossiers.filter((d) => d.type === "direct");
   const trans = activeDossiers.filter((d) => d.type === "transbordement");
@@ -21,53 +29,82 @@ export default function AgentPointageDash() {
   const chargement = activeDossiers.filter((d) => d.type === "chargement");
   const petrolier = activeDossiers.filter((d) => d.type === "petrolier");
 
-  const ColisageButton = ({ dossierId }: { dossierId: string }) => (
-    <FormDialog
-      trigger={
-        <Button size="sm" variant="outline">
-          <Package className="mr-1 h-3.5 w-3.5" />
-          Colisage
-        </Button>
-      }
-      title="Rapport de colisage"
-      onSubmit={() => toast.success("Colisage soumis avec succès")}
-    >
-      <FormGrid>
-        <Field label="Référence dossier">
-          <Input value={dossierId} readOnly />
-        </Field>
-        <Field label="Date" required>
-          <Input type="date" />
-        </Field>
-        <Field label="Nombre de colis" required>
-          <Input type="number" />
-        </Field>
-        <Field label="Poids total (kg)" required>
-          <Input type="number" />
-        </Field>
-        <Field label="Description marchandise" required>
-          <Input />
-        </Field>
-      </FormGrid>
-    </FormDialog>
-  );
+  const ColisageButton = ({ dossierId, dossierRef }: { dossierId: string; dossierRef: string }) => {
+    const [loading, setLoading] = useState(false);
+    return (
+      <FormDialog
+        trigger={
+          <Button size="sm" variant="outline" disabled={loading}>
+            {loading ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Package className="mr-1 h-3.5 w-3.5" />}
+            Colisage
+          </Button>
+        }
+        title="Rapport de colisage"
+        onSubmit={async (formData) => {
+          setLoading(true);
+          try {
+            const nombreColis = parseInt(formData.get("nombreColis") as string) || 1;
+            const poidsTotal = parseFloat(formData.get("poidsTotal") as string) || 0;
+            const description = (formData.get("description") as string) || "";
+            await apiStoreColisageRapport({
+              dossier_id: dossierId,
+              lignes: [{ description, quantite: nombreColis, poidsParColis: poidsTotal, poidsTotal }],
+              total_quantite: nombreColis,
+              total_poids: poidsTotal,
+              notes: "",
+            });
+            toast.success("Colisage soumis avec succès");
+            refetchRapports();
+          } catch {
+            toast.error("Erreur lors de la soumission du colisage");
+          } finally {
+            setLoading(false);
+          }
+        }}
+      >
+        <FormGrid>
+          <Field label="Référence dossier">
+            <Input value={dossierRef} readOnly />
+          </Field>
+          <Field label="Nombre de colis" required>
+            <Input name="nombreColis" type="number" min="1" defaultValue="1" />
+          </Field>
+          <Field label="Poids total (kg)" required>
+            <Input name="poidsTotal" type="number" min="0" step="0.1" />
+          </Field>
+          <Field label="Description marchandise" required>
+            <Input name="description" />
+          </Field>
+        </FormGrid>
+      </FormDialog>
+    );
+  };
 
   return (
     <div>
       <DashHeader subtitle="Agent de Pointage — dossiers, colisage et historique" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={FolderKanban} label="Dossiers directs" value={direct.length} />
-        <StatCard icon={FolderKanban} label="Transbordements" value={trans.length} />
-        <StatCard icon={Package} label="Colisages soumis" value={COLISAGES.length} />
+        <StatCard icon={UserCheck} label="Affectations" value={affectations.length} hint="dossiers assignés" />
+        <StatCard icon={FolderKanban} label="Dossiers à traiter" value={activeDossiers.length} />
+        <StatCard icon={Package} label="Colisages soumis" value={rapports.length} />
         <StatCard
           icon={History}
-          label="Historique"
-          value={COLISAGES.filter((c) => c.status === "validé").length}
-          hint="validés"
+          label="Validés"
+          value={rapports.filter((c: any) => c.statut === "valide").length}
+          hint="par le chef"
         />
       </div>
 
       <div className="mt-6">
+        {affectations.length === 0 ? (
+          <div className="rounded-2xl border border-accent/10 bg-background p-12 text-center">
+            <UserCheck className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+            <h3 className="font-bold text-lg mb-1">Aucune affectation</h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Vous n&apos;avez pas encore reçu d&apos;affectation. Le Chef Entrepôt Douane vous assignera des dossiers dès que nécessaire.
+            </p>
+          </div>
+        ) : (
         <Tabs defaultValue="direct">
           <TabsList className="flex flex-wrap">
             <TabsTrigger value="direct">Direct ({direct.length})</TabsTrigger>
@@ -116,7 +153,7 @@ export default function AgentPointageDash() {
                         <td className="px-3 py-2 font-mono text-xs">{d.dra}</td>
                         <td className="px-3 py-2 font-mono text-xs">{d.t1}</td>
                         <td className="px-3 py-2 text-right">
-                          <ColisageButton dossierId={d.reference} />
+                          <ColisageButton dossierId={d.id} dossierRef={d.reference} />
                         </td>
                       </tr>
                     ))}
@@ -162,7 +199,7 @@ export default function AgentPointageDash() {
                         <td className="px-3 py-2 font-mono text-xs">{d.dra}</td>
                         <td className="px-3 py-2 font-mono text-xs">{d.t1}</td>
                         <td className="px-3 py-2 text-right">
-                          <ColisageButton dossierId={d.reference} />
+                          <ColisageButton dossierId={d.id} dossierRef={d.reference} />
                         </td>
                       </tr>
                     ))}
@@ -212,14 +249,14 @@ export default function AgentPointageDash() {
                             <td className="px-3 py-2 font-mono text-xs">{d.dra}</td>
                             <td className="px-3 py-2 font-mono text-xs">{d.t1}</td>
                             <td className="px-3 py-2 text-right">
-                              <ColisageButton dossierId={d.reference} />
+                              <ColisageButton dossierId={d.id} dossierRef={d.reference} />
                             </td>
                           </tr>
                         ))}
                         {items.length === 0 && (
                           <tr>
                             <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                              Aucun dossier
+                              {allDossiers.length > 0 ? "Aucun dossier assigné pour cette catégorie." : "Aucune affectation reçue. En attente d\'un dossier..."}
                             </td>
                           </tr>
                         )}
@@ -257,6 +294,7 @@ export default function AgentPointageDash() {
             </Panel>
           </TabsContent>
         </Tabs>
+        )}
       </div>
 
       {/* Historique des colisages */}
@@ -264,7 +302,7 @@ export default function AgentPointageDash() {
         <Panel
           title="Historique des colisages soumis"
           actions={
-            <span className="text-xs text-muted-foreground">{COLISAGES.length} colisages</span>
+            <span className="text-xs text-muted-foreground">{rapports.length} colisages</span>
           }
         >
           <div className="overflow-x-auto">
@@ -281,34 +319,39 @@ export default function AgentPointageDash() {
                 </tr>
               </thead>
               <tbody>
-                {COLISAGES.map((c) => (
-                  <tr
-                    key={c.id}
-                    className="border-t border-border hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-3 py-2 font-mono text-xs">{c.reference}</td>
-                    <td className="px-3 py-2">
-                      <Link
-                        to="/app/dossiers/$dossierId"
-                        params={{ dossierId: c.dossierId }}
-                        className="text-accent hover:underline font-mono text-xs"
-                      >
-                        {c.dossierId}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2">{c.date}</td>
-                    <td className="px-3 py-2">{c.nombreColis}</td>
-                    <td className="px-3 py-2">{c.poidsTotal.toLocaleString()}</td>
-                    <td className="px-3 py-2 truncate max-w-[200px]">{c.description}</td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs ${c.status === "validé" ? "bg-success/15 text-success" : c.status === "rejeté" ? "bg-destructive/15 text-destructive" : "bg-warning/15 text-warning"}`}
-                      >
-                        {c.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {rapports.map((c: any) => {
+                  const premiereLigne = c.lignes?.[0];
+                  return (
+                    <tr
+                      key={c.id}
+                      className="border-t border-border hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-3 py-2 font-mono text-xs">{c.id}</td>
+                      <td className="px-3 py-2">
+                        <Link
+                          to="/app/dossiers/$dossierId"
+                          params={{ dossierId: c.dossier_id }}
+                          className="text-accent hover:underline font-mono text-xs"
+                        >
+                          {c.dossier?.reference || c.dossier_id}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2">
+                        {c.date_soumission ? new Date(c.date_soumission).toLocaleDateString("fr-FR") : "—"}
+                      </td>
+                      <td className="px-3 py-2">{c.total_quantite}</td>
+                      <td className="px-3 py-2">{c.total_poids?.toLocaleString()}</td>
+                      <td className="px-3 py-2 truncate max-w-[200px]">{premiereLigne?.description || "—"}</td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs ${c.statut === "valide" ? "bg-success/15 text-success" : c.statut === "rejete" ? "bg-destructive/15 text-destructive" : "bg-warning/15 text-warning"}`}
+                        >
+                          {c.statut}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

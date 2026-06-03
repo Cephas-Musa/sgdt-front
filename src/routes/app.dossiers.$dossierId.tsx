@@ -74,7 +74,7 @@ const FILTERS: { key: FilterKey; label: string; icon: any; color: string; source
     label: "Rapport colisage",
     icon: ClipboardList,
     color: "text-amber-500",
-    source: "Chef Entrepôt Logistique",
+    source: "Chef Entrepôt Douane",
   },
   {
     key: "verification",
@@ -95,7 +95,7 @@ const FILTERS: { key: FilterKey; label: string; icon: any; color: string; source
     label: "Rapport de déchargement",
     icon: Warehouse,
     color: "text-rose-500",
-    source: "Chef Entrepôt Logistique",
+    source: "Chef Entrepôt Douane",
   },
 ];
 
@@ -221,12 +221,22 @@ function DossierDetailPage() {
       reference: itEntry.it_reference || "—",
       status: itEntry.status || "—",
     } : null,
-    rapportColisage: {
-      colis: rawDossier.colisages?.length || 0,
-      denombrement: "—",
-      pointage: "—",
-      quantites: "—",
-    },
+    rapportColisage: (() => {
+      const rc = rawDossier.colisages?.find((c: any) => c.statut === "valide") || rawDossier.colisages?.[0];
+      if (!rc || rc.statut !== "valide") return null;
+      return {
+        id: rc.id,
+        colis: rc.total_quantite ?? (rawDossier.colisages?.length || 0),
+        poidsTotal: rc.total_poids ? `${rc.total_poids} kg` : "—",
+        pointage: rc.date_soumission ? new Date(rc.date_soumission).toLocaleDateString("fr-FR") : "—",
+        statut: rc.statut,
+        lignes: rc.lignes || [],
+        agentNom: rc.agent?.full_name || "—",
+        notes: rc.notes || "",
+        validatedBy: rc.validateur?.full_name || rc.validated_by || "—",
+        validatedAt: rc.validated_at ? new Date(rc.validated_at).toLocaleDateString("fr-FR") : "—",
+      };
+    })(),
     verificationRapport: {
       resultat: rawDossier.validations?.[0]?.status || "—",
       observations: rawDossier.validations?.[0]?.observation || "—",
@@ -239,12 +249,15 @@ function DossierDetailPage() {
       dateSortie: rawDossier.mouvements?.find((m: any) => m.operation_type === 'sortie')?.created_at?.split('T')[0] || "—",
       destinationFinale: rawDossier.destination || "—",
     },
-    rapportDechargement: {
-      entrepot: rawDossier.colisages?.[0]?.entrepot_name || "—",
-      dechargement: "—",
-      emplacement: "—",
-      statutFinal: rawDossier.colisages?.[0]?.status || "—",
-    },
+    rapportDechargement: (() => {
+      const dch = rawDossier.decharges?.[0];
+      return {
+        quantiteAttendue: dch?.quantite_attendue ?? "—",
+        quantiteReelle: dch?.quantite_reelle ?? "—",
+        observations: dch?.observations || "—",
+        statut: dch?.status || "—",
+      };
+    })(),
     articles: [
       ...(rawDossier.articles || []),
       ...reprArticles.map((a: any) => ({ ...a, source: 'representation' }))
@@ -430,18 +443,39 @@ function DossierDetailPage() {
           </FilterSection>
         );
       case "rapportColisage":
+        if (!dossier.rapportColisage) {
+          return (
+            <FilterSection
+              title="Rapport Colisage"
+              subtitle="Données de colisage validées par le Chef Entrepôt Douane"
+              icon={ClipboardList}
+              iconColor="text-amber-500"
+              source="Chef Entrepôt Douane"
+            >
+              <div className="col-span-2 py-6 text-center text-sm text-muted-foreground">
+                Aucun rapport de colisage validé pour ce dossier.
+              </div>
+            </FilterSection>
+          );
+        }
         return (
           <FilterSection
             title="Rapport Colisage"
             subtitle="Détails du colisage et du dénombrement des marchandises"
             icon={ClipboardList}
             iconColor="text-amber-500"
-            source="Chef Entrepôt Logistique"
+            source="Chef Entrepôt Douane"
           >
             <FilterField label="Nombre de Colis" value={dossier.rapportColisage.colis} icon="📦" />
-            <FilterField label="Dénombrement" value={dossier.rapportColisage.denombrement} icon="🔢" />
+            <FilterField label="Poids Total" value={dossier.rapportColisage.poidsTotal} icon="⚖️" />
             <FilterField label="Pointage" value={dossier.rapportColisage.pointage} icon="✏️" />
-            <FilterField label="Quantités" value={dossier.rapportColisage.quantites} icon="📊" />
+            <FilterField label="Statut" value={dossier.rapportColisage.statut} icon="📊" />
+            <FilterField label="Agent" value={dossier.rapportColisage.agentNom} icon="👤" />
+            <FilterField label="Validé par" value={dossier.rapportColisage.validatedBy} icon="✅" />
+            <FilterField label="Date validation" value={dossier.rapportColisage.validatedAt} icon="📅" />
+            {dossier.rapportColisage.notes && (
+              <FilterField label="Notes" value={dossier.rapportColisage.notes} icon="📝" />
+            )}
           </FilterSection>
         );
       case "verification":
@@ -481,12 +515,12 @@ function DossierDetailPage() {
             subtitle="Informations de déchargement en entrepôt"
             icon={Warehouse}
             iconColor="text-rose-500"
-            source="Chef Entrepôt Logistique"
+            source="Chef Entrepôt Douane"
           >
-            <FilterField label="Entrepôt" value={dossier.rapportDechargement.entrepot} icon="🏠" />
-            <FilterField label="Déchargement" value={dossier.rapportDechargement.dechargement} icon="🏗️" />
-            <FilterField label="Emplacement" value={dossier.rapportDechargement.emplacement} icon="📍" />
-            <FilterField label="Statut Final" value={dossier.rapportDechargement.statutFinal} icon="🏁" />
+            <FilterField label="Quantité Attendue" value={dossier.rapportDechargement.quantiteAttendue} icon="📦" />
+            <FilterField label="Quantité Réelle" value={dossier.rapportDechargement.quantiteReelle} icon="🔢" />
+            <FilterField label="Observations" value={dossier.rapportDechargement.observations} icon="📝" />
+            <FilterField label="Statut" value={dossier.rapportDechargement.statut} icon="🏁" />
           </FilterSection>
         );
       default:

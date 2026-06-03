@@ -15,8 +15,15 @@ class DossierAccessService
      */
     public function searchByReference(string $reference, User $user): ?Dossier
     {
+        // Normaliser la référence: accepter rd-0001, RD-0001, RD0001, 0001
+        $normalized = strtoupper(trim($reference));
+        $normalized = preg_replace('/^RD-?/', 'RD-', $normalized);
+        if (!str_starts_with($normalized, 'RD-')) {
+            $normalized = 'RD-' . $normalized;
+        }
+
         $dossier = Dossier::with(['articles', 'creator', 'inspecteur', 'secretary', 'workflows', 'timelines', 'documents', 'representationEntry.articles', 'typingDocsDirect', 'typingDocsTranshipment', 'itEntries'])
-            ->where('reference', $reference)
+            ->whereRaw('UPPER(reference) = ?', [$normalized])
             ->first();
 
         if (!$dossier) {
@@ -99,6 +106,15 @@ class DossierAccessService
                     // Dossiers assignés à l'utilisateur comme inspecteur
                     $inner->orWhere('inspecteur_id', $user->id);
                 });
+
+                // Dossiers affectés à cet agent via colisage_affectations
+                if ($user->role === 'agent_pointage') {
+                    $q->orWhereIn('id', function($sub) use ($user) {
+                        $sub->select('dossier_id')
+                            ->from('colisage_affectations')
+                            ->where('agent_id', $user->id);
+                    });
+                }
                 
                 // Dossiers créés par operateur_saisie/chef_bureau_repr (consultation)
                 if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef', 'agent_controle'])) {
@@ -204,10 +220,18 @@ class DossierAccessService
             'verificateur',
             'brigadier',
             'typing_operator',
-            'agent_pointage',
             'chef_recherche'
         ])) {
             return $user->bureau_id === $dossier->bureau_id;
+        }
+
+        // Agent de pointage: accès via affectation ou même bureau
+        if ($user->role === 'agent_pointage') {
+            if ($user->bureau_id === $dossier->bureau_id) return true;
+            // Vérifier si le dossier est affecté à cet agent
+            return \App\Models\ColisageAffectation::where('dossier_id', $dossier->id)
+                ->where('agent_id', $user->id)
+                ->exists();
         }
 
         // Chef bureau représentation et opérateur saisie: ne voient que les dossiers créés par la représentation
@@ -234,6 +258,11 @@ class DossierAccessService
         if ($user->role === 'secretaire_inspecteur') {
             return $user->id === $dossier->secretary_id ||
                    ($user->supervisor && $user->supervisor->id === $dossier->inspecteur_id);
+        }
+
+        // Chef Entrepôt Douane: accès à tous les dossiers via recherche (recherche par référence)
+        if (in_array($user->role, ['chef_entrepot_douane'])) {
+            return true;
         }
 
         // Autres partenaires, caissiers, etc. -> Accès global ou restreint par d'autres règles

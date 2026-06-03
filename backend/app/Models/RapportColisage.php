@@ -21,6 +21,9 @@ class RapportColisage extends Model
         'notes',
         'notes_chef',
         'statut',
+        'validated_by',
+        'validated_at',
+        'motif_rejet',
     ];
 
     protected function casts(): array
@@ -28,6 +31,7 @@ class RapportColisage extends Model
         return [
             'date_creation' => 'datetime',
             'date_soumission' => 'datetime',
+            'validated_at' => 'datetime',
             'lignes' => 'array',
             'lignes_chef' => 'array',
             'total_poids' => 'decimal:2',
@@ -42,5 +46,10 @@ class RapportColisage extends Model
     public function agent(): BelongsTo
     {
         return $this->belongsTo(User::class, 'agent_id');
+    }
+
+    public function validateur(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'validated_by');
     }
 }

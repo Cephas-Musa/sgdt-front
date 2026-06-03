@@ -109,6 +109,11 @@ class DossierController extends Controller
 
         $dossierData['bureau_id'] = $request->input('bureau_id') ?? ($user->bureau_id ?? '1');
 
+        // Propager la province et le bureau depuis l'utilisateur connecté
+        $dossierData['province'] = $user->province ?? null;
+        $dossierData['province_id'] = $user->province_id ?? null;
+        $dossierData['bureau_repr'] = $user->bureau ?? null;
+
         $dossierData['created_by'] = $user->id;
         $dossierData['inspecteur_id'] = $user->id;
         $dossierData['status'] = \App\Enums\DossierStatus::EN_COURS;
@@ -221,7 +226,7 @@ class DossierController extends Controller
             'super_admin', 'directeur', 'directeur_provincial',
             'inspecteur_chef', 'inspecteur', 'secretaire_inspecteur', 'agent_controle',
             'verificateur', 'chef_bureau_repr', 'operateur_saisie',
-            'agent_pointage', 'typing_operator', 'chef_barriere',
+            'agent_pointage', 'typing_operator', 'chef_barriere', 'chef_entrepot_douane',
         ];
 
         if (!in_array($user->role, $allowedRoles)) {
@@ -251,7 +256,7 @@ class DossierController extends Controller
             'vracs',
             'decharges',
             'mouvementsStockage',
-            'colisages',
+            'colisages.agent', 'colisages.validateur',
             'empty_manifests',
             'barriere_entries',
             'typingDocsDirect.typingOperator',
@@ -264,7 +269,7 @@ class DossierController extends Controller
             'super_admin', 'directeur', 'directeur_provincial',
             'inspecteur_chef', 'inspecteur', 'secretaire_inspecteur', 'agent_controle',
             'verificateur', 'chef_bureau_repr', 'operateur_saisie',
-            'agent_pointage', 'typing_operator', 'chef_barriere',
+            'agent_pointage', 'typing_operator', 'chef_barriere', 'chef_entrepot_douane',
         ];
 
         if (!in_array($user->role, $allowedRoles)) {

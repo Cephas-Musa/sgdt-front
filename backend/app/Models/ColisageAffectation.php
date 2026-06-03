@@ -12,7 +12,9 @@ class ColisageAffectation extends Model
     protected $fillable = [
         'dossier_id',
         'agent_id',
+        'chef_entrepot_douane_id',
         'date_affectation',
+        'statut',
     ];
 
     protected function casts(): array
@@ -30,5 +32,10 @@ class ColisageAffectation extends Model
     public function agent(): BelongsTo
     {
         return $this->belongsTo(User::class, 'agent_id');
+    }
+
+    public function chef(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'chef_entrepot_douane_id');
     }
 }

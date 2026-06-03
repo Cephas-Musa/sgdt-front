@@ -1,19 +1,16 @@
 import { createFileRoute, Link, Outlet, useMatchRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
-import { type Dossier } from "@/lib/mock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Search, ListChecks, History, Package, Weight, FileText,
   FolderOpen, Eye, X, Truck, MapPin, Calendar, Hash,
-  FileCheck, Scale, CheckCircle2
+  FileCheck, Scale, CheckCircle2, Loader2
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
-import { useApi, apiGetDossiers } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/lib/auth";
-import { getDossiersAgent } from "@/lib/colisage-store";
+import { useApi, apiGetDossiers } from "@/lib/api";
 
 export const Route = createFileRoute("/app/colisage")({
   component: ColisageLayout,
@@ -32,25 +29,33 @@ function ColisageLayout() {
 
 function ColisagePage() {
   const [search, setSearch] = useState("");
-  const [dossierDetails, setDossierDetails] = useState<Dossier | null>(null);
-  const { user } = useAuth();
+  const [dossierDetails, setDossierDetails] = useState<any>(null);
+  const { data: rawDossiers, loading } = useApi(apiGetDossiers);
+  const dossiers = (rawDossiers as any[]) || [];
 
-  const filtered = DOSSIERS.filter(
-    (d) => {
-      // Filtrage par recherche
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    );
+  }
+
+  const filtered = dossiers.filter(
+    (d: any) => {
       const q = search.toLowerCase();
       if (!q) return true;
       return (
         (d.reference || "").toLowerCase().includes(q) ||
         (d.importateur || "").toLowerCase().includes(q) ||
-        d.typeMarchandises.toLowerCase().includes(q) ||
-        d.vehicule.toLowerCase().includes(q)
+        (d.type_marchandises || "").toLowerCase().includes(q) ||
+        (d.vehicule || "").toLowerCase().includes(q)
       );
     }
   );
 
-  const actifs = filtered.filter((d) => d.status !== "apure");
-  const historique = filtered.filter((d) => d.status === "apure");
+  const actifs = filtered.filter((d: any) => d.status !== "apure");
+  const historique = filtered.filter((d: any) => d.status === "apure");
 
   return (
     <div className="space-y-6">
@@ -119,9 +124,9 @@ function TableauDossiers({
   avecBouton,
   onVoirDetails,
 }: {
-  dossiers: typeof DOSSIERS;
+  dossiers: any[];
   avecBouton: boolean;
-  onVoirDetails: ((d: Dossier) => void) | null;
+  onVoirDetails: ((d: any) => void) | null;
 }) {
   if (dossiers.length === 0) {
     return (
@@ -132,6 +137,16 @@ function TableauDossiers({
       </div>
     );
   }
+
+  const fmtDate = (d: any) => d.created_at ? new Date(d.created_at).toLocaleDateString("fr-FR") : d.date || "—";
+  const fmtPoids = (d: any) => {
+    const p = d.poids_total ?? d.poids;
+    return typeof p === "number" ? p.toLocaleString() : p || "0";
+  };
+  const fmtQuantite = (d: any) => {
+    const q = d.quantite;
+    return q ?? "0";
+  };
 
   return (
     <div className="rounded-2xl border border-accent/10 bg-background overflow-hidden shadow-xl shadow-accent/5">
@@ -160,7 +175,7 @@ function TableauDossiers({
             </tr>
           </thead>
           <tbody className="divide-y divide-accent/5">
-            {dossiers.map((d) => (
+            {dossiers.map((d: any) => (
               <tr key={d.id} className="hover:bg-accent/[0.03] transition-colors group">
                 {/* Infos dossier */}
                 <td className="px-5 py-4">
@@ -168,13 +183,13 @@ function TableauDossiers({
                     <div className="flex items-center gap-2 font-bold text-foreground">
                       {d.reference}
                       <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-accent/30 text-accent font-semibold">
-                        {d.type.toUpperCase()}
+                        {d.type?.toUpperCase() || "—"}
                       </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground font-medium">{d.importateur}</div>
                     <div className="text-[10px] text-muted-foreground/60 flex items-center gap-1 mt-0.5">
                       <History className="h-3 w-3" />
-                      {d.date}
+                      {fmtDate(d)}
                     </div>
                   </div>
                 </td>
@@ -183,7 +198,7 @@ function TableauDossiers({
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-accent/50 shrink-0" />
-                    <span className="font-medium text-foreground/80">{d.typeMarchandises}</span>
+                    <span className="font-medium text-foreground/80">{d.type_marchandises || d.type || "—"}</span>
                   </div>
                   {d.articles && d.articles.length > 0 && (
                     <div className="text-[10px] text-muted-foreground mt-1 ml-6">
@@ -196,7 +211,7 @@ function TableauDossiers({
                 <td className="px-5 py-4 text-right">
                   <div className="flex items-center justify-end gap-1">
                     <Weight className="h-3.5 w-3.5 text-accent/50" />
-                    <span className="font-bold text-accent">{d.poids.toLocaleString()}</span>
+                    <span className="font-bold text-accent">{fmtPoids(d)}</span>
                     <span className="text-[10px] text-muted-foreground">kg</span>
                   </div>
                 </td>
@@ -204,7 +219,7 @@ function TableauDossiers({
                 {/* Quantité */}
                 <td className="px-5 py-4 text-center">
                   <span className="inline-flex items-center justify-center h-7 min-w-[2.5rem] rounded-lg bg-muted/60 font-bold text-foreground/80 text-sm px-2">
-                    {d.quantite}
+                    {fmtQuantite(d)}
                   </span>
                 </td>
 
@@ -217,9 +232,11 @@ function TableauDossiers({
                       ? "bg-blue-500/10 text-blue-600"
                       : d.status === "paye"
                       ? "bg-violet-500/10 text-violet-600"
+                      : d.status === "verifie"
+                      ? "bg-cyan-500/10 text-cyan-600"
                       : "bg-muted text-muted-foreground"
                   }`}>
-                    {d.status.replace("_", " ")}
+                    {d.status?.replace("_", " ") || "—"}
                   </span>
                 </td>
 
@@ -256,11 +273,11 @@ function TableauDossiers({
         <span>
           Poids total :{" "}
           <strong className="text-foreground">
-            {dossiers.reduce((s, d) => s + d.poids, 0).toLocaleString()} kg
+            {dossiers.reduce((s, d) => s + (Number(d.poids_total ?? d.poids) || 0), 0).toLocaleString()} kg
           </strong>
           &nbsp;·&nbsp; Quantité totale :{" "}
           <strong className="text-foreground">
-            {dossiers.reduce((s, d) => s + d.quantite, 0).toLocaleString()}
+            {dossiers.reduce((s, d) => s + (Number(d.quantite) || 0), 0).toLocaleString()}
           </strong>
         </span>
       </div>
@@ -271,76 +288,78 @@ function TableauDossiers({
 /* ─────────────────────────────────────────
    Modal — Détails complets d'un dossier (Historique)
 ───────────────────────────────────────── */
-function ModalDetailsDossier({ dossier, onClose }: { dossier: Dossier; onClose: () => void }) {
+function ModalDetailsDossier({ dossier, onClose }: { dossier: any; onClose: () => void }) {
+  const safe = (v: any, fallback = "—") => (v !== null && v !== undefined && v !== "" ? v : fallback);
+  const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
   const sections = [
     {
       titre: "Informations générales",
       icon: <FileCheck className="h-4 w-4 text-accent" />,
       champs: [
-        { label: "Référence", value: dossier.reference },
-        { label: "Référence Douane", value: dossier.referenceDouane },
-        { label: "Type de dossier", value: dossier.type },
-        { label: "Statut", value: dossier.status },
-        { label: "Date", value: dossier.date },
-        { label: "Province", value: dossier.province },
+        { label: "Référence", value: safe(dossier.reference) },
+        { label: "Référence Douane", value: safe(dossier.reference_douane) },
+        { label: "Type de dossier", value: safe(dossier.type) },
+        { label: "Statut", value: safe(dossier.status) },
+        { label: "Date", value: fmtDate(dossier.created_at) || safe(dossier.date) },
+        { label: "Province", value: safe(dossier.province) },
       ],
     },
     {
       titre: "Parties impliquées",
       icon: <Hash className="h-4 w-4 text-accent" />,
       champs: [
-        { label: "Importateur", value: dossier.importateur },
-        { label: "Déclarant", value: dossier.declarant },
-        { label: "NIF", value: dossier.nif },
-        { label: "Bureau Repr.", value: dossier.bureauRepr },
-        { label: "Opérateur saisie", value: dossier.operateurSaisie ?? "—" },
+        { label: "Importateur", value: safe(dossier.importateur) },
+        { label: "Déclarant", value: safe(dossier.declarant) },
+        { label: "NIF", value: safe(dossier.nif) },
+        { label: "Bureau Repr.", value: safe(dossier.bureau_repr) },
+        { label: "Opérateur saisie", value: safe(dossier.creator?.full_name || dossier.operateur_saisie) },
       ],
     },
     {
       titre: "Transport & Marchandises",
       icon: <Truck className="h-4 w-4 text-accent" />,
       champs: [
-        { label: "Véhicule", value: dossier.vehicule },
-        { label: "Plaque", value: dossier.plaque },
-        { label: "Pays", value: dossier.pays },
-        { label: "Provenance", value: dossier.provenance },
-        { label: "Destination", value: dossier.destination },
-        { label: "Type marchandises", value: dossier.typeMarchandises },
+        { label: "Véhicule", value: safe(dossier.vehicule) },
+        { label: "Plaque", value: safe(dossier.plaque) },
+        { label: "Pays", value: safe(dossier.pays) },
+        { label: "Provenance", value: safe(dossier.provenance) },
+        { label: "Destination", value: safe(dossier.destination) },
+        { label: "Type marchandises", value: safe(dossier.type_marchandises) },
       ],
     },
     {
       titre: "Références douanières",
       icon: <Calendar className="h-4 w-4 text-accent" />,
       champs: [
-        { label: "DRA", value: dossier.dra },
-        { label: "T1", value: dossier.t1 },
-        { label: "Mode déclaration", value: dossier.modeDeclaration ?? "—" },
-        { label: "Nb déclarations", value: String(dossier.nombreDeclarations) },
+        { label: "DRA", value: safe(dossier.dra) },
+        { label: "T1", value: safe(dossier.t1) },
+        { label: "Mode déclaration", value: safe(dossier.mode_declaration) },
+        { label: "Nb déclarations", value: safe(dossier.nombre_declarations) },
       ],
     },
     {
       titre: "Colisage & Poids",
       icon: <Scale className="h-4 w-4 text-accent" />,
       champs: [
-        { label: "Poids total", value: `${dossier.poids.toLocaleString()} kg` },
-        { label: "Quantité", value: String(dossier.quantite) },
-        { label: "Colis", value: String(dossier.colis) },
-        { label: "Dénombrement", value: dossier.rapportColisage.denombrement },
-        { label: "Pointage", value: dossier.rapportColisage.pointage },
-        { label: "Quantités", value: dossier.rapportColisage.quantites },
+        { label: "Poids total", value: `${Number(dossier.poids_total ?? dossier.poids ?? 0).toLocaleString()} kg` },
+        { label: "Quantité", value: String(dossier.quantite ?? 0) },
+        { label: "Colis", value: String(dossier.articles?.length || 0) },
+        { label: "Dénombrement", value: dossier.rapportColisage?.denombrement || "—" },
+        { label: "Pointage", value: dossier.rapportColisage?.pointage || "—" },
+        { label: "Quantités", value: dossier.rapportColisage?.quantites || "—" },
       ],
     },
     {
       titre: "Localisation & Sortie",
       icon: <MapPin className="h-4 w-4 text-accent" />,
       champs: [
-        { label: "Localisation", value: dossier.localisation },
-        { label: "Entrepôt", value: dossier.rapportDechargement.entrepot },
-        { label: "Emplacement", value: dossier.rapportDechargement.emplacement },
-        { label: "Statut final", value: dossier.rapportDechargement.statutFinal },
-        { label: "Bon de sortie", value: dossier.sortie.bonSortie },
-        { label: "Date sortie", value: dossier.sortie.dateSortie },
-        { label: "Destination finale", value: dossier.sortie.destinationFinale },
+        { label: "Localisation", value: safe(dossier.localisation) },
+        { label: "Entrepôt", value: safe(dossier.rapportDechargement?.entrepot) },
+        { label: "Emplacement", value: safe(dossier.rapportDechargement?.emplacement) },
+        { label: "Statut final", value: safe(dossier.rapportDechargement?.statutFinal) },
+        { label: "Bon de sortie", value: safe(dossier.sortie?.bonSortie) },
+        { label: "Date sortie", value: safe(dossier.sortie?.dateSortie) },
+        { label: "Destination finale", value: safe(dossier.sortie?.destinationFinale) },
       ],
     },
   ];
@@ -422,15 +441,15 @@ function ModalDetailsDossier({ dossier, onClose }: { dossier: Dossier; onClose: 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/30">
-                    {dossier.articles.map((art, idx) => (
+                    {dossier.articles.map((art: any, idx: number) => (
                       <tr key={art.id} className="hover:bg-accent/5">
                         <td className="px-5 py-3 font-mono text-xs text-muted-foreground font-bold">{idx + 1}</td>
-                        <td className="px-5 py-3 font-medium">{art.designation}</td>
-                        <td className="px-5 py-3 text-center font-mono text-xs">{art.position}</td>
-                        <td className="px-5 py-3 text-center font-bold">{art.quantite}</td>
-                        <td className="px-5 py-3 text-right">{art.poids.toLocaleString()} kg</td>
+                        <td className="px-5 py-3 font-medium">{art.designation || "—"}</td>
+                        <td className="px-5 py-3 text-center font-mono text-xs">{art.position_tarifaire || art.position || "—"}</td>
+                        <td className="px-5 py-3 text-center font-bold">{art.quantite ?? 0}</td>
+                        <td className="px-5 py-3 text-right">{Number(art.poids || 0).toLocaleString()} kg</td>
                         <td className="px-5 py-3 text-right font-semibold text-accent">
-                          {art.fob.toLocaleString()} USD
+                          {Number(art.fob || 0).toLocaleString()} USD
                         </td>
                       </tr>
                     ))}
@@ -439,13 +458,13 @@ function ModalDetailsDossier({ dossier, onClose }: { dossier: Dossier; onClose: 
                     <tr className="bg-muted/30 border-t border-border">
                       <td colSpan={3} className="px-5 py-3 font-bold text-xs uppercase text-muted-foreground">Total</td>
                       <td className="px-5 py-3 text-center font-black text-accent">
-                        {dossier.articles.reduce((s, a) => s + a.quantite, 0)}
+                        {dossier.articles.reduce((s: number, a: any) => s + Number(a.quantite || 0), 0)}
                       </td>
                       <td className="px-5 py-3 text-right font-black text-accent">
-                        {dossier.articles.reduce((s, a) => s + a.poids, 0).toLocaleString()} kg
+                        {dossier.articles.reduce((s: number, a: any) => s + Number(a.poids || 0), 0).toLocaleString()} kg
                       </td>
                       <td className="px-5 py-3 text-right font-black text-accent">
-                        {dossier.articles.reduce((s, a) => s + a.fob, 0).toLocaleString()} USD
+                        {dossier.articles.reduce((s: number, a: any) => s + Number(a.fob || 0), 0).toLocaleString()} USD
                       </td>
                     </tr>
                   </tfoot>
@@ -455,27 +474,29 @@ function ModalDetailsDossier({ dossier, onClose }: { dossier: Dossier; onClose: 
           )}
 
           {/* Vérification */}
-          <div className="rounded-2xl border border-accent/10 overflow-hidden">
-            <div className="flex items-center gap-2 px-5 py-3 bg-accent/5 border-b border-accent/10">
-              <FileCheck className="h-4 w-4 text-accent" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Rapport de vérification
-              </h3>
+          {dossier.verificationRapport && (
+            <div className="rounded-2xl border border-accent/10 overflow-hidden">
+              <div className="flex items-center gap-2 px-5 py-3 bg-accent/5 border-b border-accent/10">
+                <FileCheck className="h-4 w-4 text-accent" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Rapport de vérification
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-border/50">
+                {[
+                  { label: "Résultat", value: dossier.verificationRapport.resultat },
+                  { label: "Observations", value: dossier.verificationRapport.observations },
+                  { label: "Anomalies", value: dossier.verificationRapport.anomalies },
+                  { label: "Commentaires", value: dossier.verificationRapport.commentaires },
+                ].map(({ label, value }) => (
+                  <div key={label} className="px-5 py-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{label}</p>
+                    <p className="font-semibold text-sm">{value || "—"}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-border/50">
-              {[
-                { label: "Résultat", value: dossier.verificationRapport.resultat },
-                { label: "Observations", value: dossier.verificationRapport.observations },
-                { label: "Anomalies", value: dossier.verificationRapport.anomalies },
-                { label: "Commentaires", value: dossier.verificationRapport.commentaires },
-              ].map(({ label, value }) => (
-                <div key={label} className="px-5 py-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{label}</p>
-                  <p className="font-semibold text-sm">{value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Pied de page */}

@@ -18,10 +18,12 @@ class ColisageController extends Controller
     public function indexAffectations(Request $request)
     {
         $user = $request->user();
-        $query = ColisageAffectation::with(['dossier', 'agent']);
+        $query = ColisageAffectation::with(['dossier', 'agent', 'chef']);
 
         if ($user->role === 'agent_pointage') {
             $query->where('agent_id', $user->id);
+        } elseif (in_array($user->role, ['chef_entrepot_douane', 'chef_entrepot_log'])) {
+            $query->where('chef_entrepot_douane_id', $user->id);
         }
 
         return response()->json($query->orderBy('date_affectation', 'desc')->get());
@@ -32,6 +34,7 @@ class ColisageController extends Controller
      */
     public function storeAffectation(Request $request)
     {
+        $user = $request->user();
         $request->validate([
             'dossier_id' => 'required|string|exists:dossiers,id',
             'agent_id' => 'required|integer|exists:users,id',
@@ -43,7 +46,9 @@ class ColisageController extends Controller
         $assignment = ColisageAffectation::create([
             'dossier_id' => $request->input('dossier_id'),
             'agent_id' => $request->input('agent_id'),
+            'chef_entrepot_douane_id' => $user->id,
             'date_affectation' => now(),
+            'statut' => 'affecte',
         ]);
 
         $agent = User::find($request->input('agent_id'));
@@ -66,7 +71,7 @@ class ColisageController extends Controller
     public function indexRapports(Request $request)
     {
         $user = $request->user();
-        $query = RapportColisage::with(['dossier', 'agent']);
+        $query = RapportColisage::with(['dossier', 'agent', 'validateur']);
 
         if ($user->role === 'agent_pointage') {
             $query->where('agent_id', $user->id);
@@ -135,12 +140,30 @@ class ColisageController extends Controller
     /**
      * Validate or reject a packing list report.
      */
+    /**
+     * Get rapport by dossier ID.
+     */
+    public function showRapportByDossier($dossierId)
+    {
+        $rapport = RapportColisage::with(['dossier', 'agent', 'validateur'])
+            ->where('dossier_id', $dossierId)
+            ->first();
+
+        if (!$rapport) {
+            return response()->json(['message' => 'Aucun rapport trouvé pour ce dossier.'], 404);
+        }
+
+        return response()->json($rapport);
+    }
+
     public function updateRapportStatus(Request $request, $id)
     {
+        $user = $request->user();
         $request->validate([
             'statut' => 'required|string|in:valide,rejete',
             'notes_chef' => 'nullable|string',
             'lignes_chef' => 'nullable|array',
+            'motif_rejet' => 'required_if:statut,rejete|nullable|string',
         ]);
 
         $rapport = RapportColisage::findOrFail($id);
@@ -150,6 +173,11 @@ class ColisageController extends Controller
         try {
             $rapport->statut = $request->input('statut');
             $rapport->notes_chef = $request->input('notes_chef');
+            $rapport->validated_by = $user->id;
+            $rapport->validated_at = now();
+            if ($request->input('statut') === 'rejete') {
+                $rapport->motif_rejet = $request->input('motif_rejet');
+            }
             if ($request->has('lignes_chef')) {
                 $rapport->lignes_chef = $request->input('lignes_chef');
             }
@@ -166,7 +194,7 @@ class ColisageController extends Controller
                 'recipient_id' => $rapport->agent_id,
                 'type' => 'systeme',
                 'title' => "Rapport Colisage " . ($rapport->statut === 'valide' ? 'Validé' : 'Rejeté'),
-                'message' => "Votre rapport de colisage pour le dossier {$rapport->dossier_id} a été " . ($rapport->statut === 'valide' ? 'validé' : 'rejeté') . " par le chef.",
+                'message' => "Votre rapport de colisage pour le dossier {$rapport->dossier_id} a été " . ($rapport->statut === 'valide' ? 'validé' : 'rejeté') . " par le chef." . ($rapport->motif_rejet ? " Motif : {$rapport->motif_rejet}" : ""),
                 'reference_id' => $rapport->dossier_id,
             ]);
 
@@ -174,7 +202,7 @@ class ColisageController extends Controller
 
             return response()->json([
                 'message' => 'Rapport mis à jour avec succès.',
-                'rapport' => $rapport,
+                'rapport' => $rapport->load(['dossier', 'agent', 'validateur']),
                 'dossier_status' => $dossier->status
             ]);
         } catch (\Exception $e) {

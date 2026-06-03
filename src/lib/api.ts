@@ -380,6 +380,22 @@ export async function apiGetColisageRapports(): Promise<unknown[]> {
   return request<unknown[]>("/colisage/rapports");
 }
 
+export async function apiStoreColisageAffectation(data: unknown): Promise<unknown> {
+  return request<unknown>("/colisage/affectations", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiStoreColisageRapport(data: unknown): Promise<unknown> {
+  return request<unknown>("/colisage/rapports", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiUpdateColisageRapportStatus(id: string, data: unknown): Promise<unknown> {
+  return request<unknown>(`/colisage/rapports/${id}/status`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function apiGetColisageRapportByDossier(dossierId: string): Promise<unknown> {
+  return request<unknown>(`/colisage/rapports/dossier/${dossierId}`);
+}
+
 // ─── CONFIGURATION ───────────────────────────────────────────────────────────
 
 export async function apiGetCountries(): Promise<unknown[]> {

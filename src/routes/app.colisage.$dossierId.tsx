@@ -14,12 +14,12 @@ import {
   Info,
   FileText,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { useState, useMemo } from "react";
-import { useApi, apiGetDossiers } from "@/lib/api";
+import { apiStoreColisageRapport, apiGetDossier, useApi } from "@/lib/api";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { soumettrRapport, type ColisageLigne } from "@/lib/colisage-store";
 
 export const Route = createFileRoute("/app/colisage/$dossierId")({
   component: ColisageReportPage,
@@ -35,7 +35,8 @@ interface LigneArticle {
 function ColisageReportPage() {
   const { dossierId } = Route.useParams();
   const navigate = useNavigate();
-  const dossier = DOSSIERS.find((d) => d.id === dossierId);
+  const { data: rawDossier, loading } = useApi(() => apiGetDossier(dossierId), [dossierId]);
+  const dossier = rawDossier as any;
 
   const [lignes, setLignes] = useState<LigneArticle[]>([]);
   const [desc, setDesc] = useState("");
@@ -53,6 +54,14 @@ function ColisageReportPage() {
       { quantite: 0, poids: 0 }
     );
   }, [lignes]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-40">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    );
+  }
 
   if (!dossier) {
     return (
@@ -107,33 +116,35 @@ function ColisageReportPage() {
   };
 
   // --- Soumettre le rapport ---
-  const soumettre = () => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const soumettre = async () => {
     if (lignes.length === 0) {
       toast.error("Ajoutez au moins un article avant de soumettre.");
       return;
     }
-    const lignesStore: ColisageLigne[] = lignes.map((l) => ({
-      id: l.id,
-      description: l.description,
-      quantite: l.quantite,
-      poidsParColis: l.poidsParColis,
-      poidsTotal: l.quantite * l.poidsParColis,
-    }));
-    soumettrRapport({
-      dossierId: dossier.id,
-      dossierRef: dossier.reference,
-      importateur: dossier.importateur,
-      typeDossier: dossier.type,
-      dateCreation: dossier.date,
-      agentId: "u9",
-      agentNom: "C. Goma",
-      lignes: lignesStore,
-      totalQuantite: totaux.quantite,
-      totalPoids: totaux.poids,
-      notes,
-    });
-    setSoumis(true);
-    toast.success("Rapport transmis au Chef Entrepôt !");
+    setSubmitting(true);
+    try {
+      const lignesPayload = lignes.map((l) => ({
+        description: l.description,
+        quantite: l.quantite,
+        poidsParColis: l.poidsParColis,
+        poidsTotal: l.quantite * l.poidsParColis,
+      }));
+      await apiStoreColisageRapport({
+        dossier_id: dossierId,
+        lignes: lignesPayload,
+        total_quantite: totaux.quantite,
+        total_poids: totaux.poids,
+        notes: notes || undefined,
+      });
+      setSoumis(true);
+      toast.success("Rapport transmis au Chef Entrepôt !");
+    } catch (err) {
+      toast.error("Erreur lors de la soumission du rapport.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // --- Écran de confirmation post-soumission ---
@@ -195,10 +206,11 @@ function ColisageReportPage() {
           </Button>
           <Button
             onClick={soumettre}
+            disabled={submitting}
             className="rounded-xl bg-accent hover:bg-accent/90 shadow-lg shadow-accent/20 gap-2"
           >
             <Send className="h-4 w-4" />
-            Soumettre
+            {submitting ? "Soumission..." : "Soumettre"}
           </Button>
         </div>
       </div>
@@ -232,13 +244,13 @@ function ColisageReportPage() {
             { label: "Type", value: dossier.type },
             { label: "Référence DRA", value: dossier.dra },
             { label: "T1", value: dossier.t1 },
-            { label: "Date création", value: dossier.date },
+            { label: "Date création", value: dossier.created_at ? new Date(dossier.created_at).toLocaleDateString("fr-FR") : "—" },
           ].map(({ label, value }) => (
             <div key={label} className="px-4 py-4">
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
                 {label}
               </p>
-              <p className="font-semibold text-sm truncate" title={value}>
+              <p className="font-semibold text-sm truncate" title={String(value)}>
                 {value}
               </p>
             </div>
@@ -246,7 +258,7 @@ function ColisageReportPage() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-0 divide-x divide-border border-t border-border">
           {[
-            { label: "Marchandises", value: dossier.typeMarchandises },
+            { label: "Marchandises", value: dossier.type_marchandises || dossier.type || "—" },
             { label: "Véhicule", value: dossier.vehicule },
             { label: "Provenance", value: dossier.provenance },
           ].map(({ label, value }) => (
@@ -473,9 +485,9 @@ function ColisageReportPage() {
           <Printer className="h-4 w-4" />
           Imprimer
         </Button>
-        <Button onClick={soumettre} className="rounded-xl bg-accent hover:bg-accent/90 gap-2 shadow-lg shadow-accent/30">
+        <Button onClick={soumettre} disabled={submitting} className="rounded-xl bg-accent hover:bg-accent/90 gap-2 shadow-lg shadow-accent/30">
           <Send className="h-4 w-4" />
-          Soumettre au Chef Entrepôt
+          {submitting ? "Soumission..." : "Soumettre au Chef Entrepôt"}
         </Button>
       </div>
     </div>

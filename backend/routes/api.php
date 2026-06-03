@@ -150,6 +150,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/colisage/affectations', [ColisageController::class, 'storeAffectation']);
     Route::get('/colisage/rapports', [ColisageController::class, 'indexRapports']);
     Route::post('/colisage/rapports', [ColisageController::class, 'storeRapport']);
+    Route::get('/colisage/rapports/dossier/{dossierId}', [ColisageController::class, 'showRapportByDossier']);
     Route::patch('/colisage/rapports/{id}/status', [ColisageController::class, 'updateRapportStatus']);
 
     // Apurements (Clearance)
