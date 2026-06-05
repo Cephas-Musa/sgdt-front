@@ -206,8 +206,13 @@ function NewAccountDialog({ onCreated, onShowCredentials }: NewAccountDialogProp
 
   useEffect(() => {
     if (open) {
-      setSelectedBureau(_lastSuperBureau);
-      setSelectedProvince(_lastSuperProvince);
+      if (user?.role === "super_admin") {
+        setSelectedBureau(_lastSuperBureau);
+        setSelectedProvince(_lastSuperProvince);
+      } else {
+        setSelectedProvince(user?.province || "");
+        setSelectedBureau(user?.bureau || "");
+      }
     }
   }, [open]);
 

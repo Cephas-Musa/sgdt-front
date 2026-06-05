@@ -120,6 +120,14 @@ export function apiSaveToken(token: string) {
   saveToken(token);
 }
 
+export async function apiUpdateProfile(data: any): Promise<any> {
+  return request<any>("/profile", { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function apiChangePassword(data: any): Promise<any> {
+  return request<any>("/password/change", { method: "POST", body: JSON.stringify(data) });
+}
+
 // ─── DOSSIERS ────────────────────────────────────────────────────────────────
 
 export async function apiGetDossiers(params?: Record<string, string>): Promise<unknown[]> {
@@ -692,5 +700,63 @@ export async function apiGetBarriereBalance(id: string): Promise<any> {
 
 export async function apiGetBarriereMovements(id: string): Promise<any[]> {
   return request<any[]>(`/v1/barrier/barrieres/${id}/movements`);
+}
+
+// ─── BARRIÈRES DE CONTRÔLE (Inspecteur Chef → Brigadier Contrôle) ──────
+
+export async function apiGetBarrieresControle(): Promise<any[]> {
+  return request<any[]>("/barrieres-controle");
+}
+
+export async function apiCreateBarriereControle(data: any): Promise<any> {
+  return request<any>("/barrieres-controle", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function apiGetBarriereControle(id: number | string): Promise<any> {
+  return request<any>(`/barrieres-controle/${id}`);
+}
+
+export async function apiUpdateBarriereControle(id: number | string, data: any): Promise<any> {
+  return request<any>(`/barrieres-controle/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function apiDeleteBarriereControle(id: number | string): Promise<any> {
+  return request<any>(`/barrieres-controle/${id}`, { method: "DELETE" });
+}
+
+export async function apiGetBarriereControleActivities(id: number | string): Promise<any> {
+  return request<any>(`/barrieres-controle/${id}/activities`);
+}
+
+export async function apiGetBarriereControleDossiers(id: number | string): Promise<any> {
+  return request<any>(`/barrieres-controle/${id}/dossiers`);
+}
+
+// ─── DOSSIERS DE CONTRÔLE (Brigadier Contrôle) ─────────────────────────
+
+export async function apiGetDossiersControle(params?: Record<string, string>): Promise<any> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<any>(`/dossiers-controle${qs}`);
+}
+
+export async function apiCreateDossierControle(data: any): Promise<any> {
+  return request<any>("/dossiers-controle", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function apiGetDossierControle(id: number | string): Promise<any> {
+  return request<any>(`/dossiers-controle/${id}`);
+}
+
+export async function apiSearchDossierControle(query: string): Promise<any> {
+  return request<any>(`/dossiers-controle/search?q=${encodeURIComponent(query)}`);
 }
 

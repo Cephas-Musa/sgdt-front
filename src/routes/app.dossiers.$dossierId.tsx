@@ -74,7 +74,7 @@ const FILTERS: { key: FilterKey; label: string; icon: any; color: string; source
     label: "Rapport colisage",
     icon: ClipboardList,
     color: "text-amber-500",
-    source: "Chef Entrepôt Douane",
+    source: "Agent de Pointage",
   },
   {
     key: "verification",
@@ -88,14 +88,14 @@ const FILTERS: { key: FilterKey; label: string; icon: any; color: string; source
     label: "Sortie",
     icon: LogOut,
     color: "text-orange-500",
-    source: "Rapport de sortie",
+    source: "Brigadier Entrepôt",
   },
   {
     key: "rapportDechargement",
-    label: "Rapport de déchargement",
+    label: "Brigadier Contrôle",
     icon: Warehouse,
     color: "text-rose-500",
-    source: "Chef Entrepôt Douane",
+    source: "Brigadier Contrôle",
   },
 ];
 
@@ -250,12 +250,28 @@ function DossierDetailPage() {
       destinationFinale: rawDossier.destination || "—",
     },
     rapportDechargement: (() => {
-      const dch = rawDossier.decharges?.[0];
+      const dc = rawDossier.dossiers_controle?.[0];
+      if (!dc) return null;
       return {
-        quantiteAttendue: dch?.quantite_attendue ?? "—",
-        quantiteReelle: dch?.quantite_reelle ?? "—",
-        observations: dch?.observations || "—",
-        statut: dch?.status || "—",
+        reference: dc.reference_douane || "—",
+        dateControle: dc.date_controle ? new Date(dc.date_controle).toLocaleDateString("fr-FR") : "—",
+        entrepot: dc.barriere?.nom || "—",
+        agentNom: dc.brigadier?.full_name || "—",
+        quantiteAttendue: "—",
+        quantiteReelle: "—",
+        ecart: null,
+        observations: "—",
+        statut: "—",
+        nomImportateur: dc.nom_importateur,
+        plaqueAvant: dc.plaque_avant || "—",
+        plaqueArriere: dc.plaque_arriere || "—",
+        referenceBonSortie: dc.reference_bon_sortie || "—",
+        balle: dc.balle || "—",
+        autorisationSpeciale: dc.autorisation_speciale ? "Oui" : "Non",
+        typeAutorisation: dc.type_autorisation || "—",
+        referenceAutorisation: dc.reference_autorisation || "—",
+        dateAutorisation: dc.date_autorisation ? new Date(dc.date_autorisation).toLocaleDateString("fr-FR") : "—",
+        signataires: dc.signataires || [],
       };
     })(),
     articles: [
@@ -298,6 +314,30 @@ function DossierDetailPage() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Erreur API ── */
+  if (error) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
+            <Info className="h-8 w-8 text-destructive" />
+          </div>
+          <h1 className="text-xl font-semibold">Erreur de chargement</h1>
+          <p className="text-sm text-muted-foreground">{error || "Impossible de charger le dossier."}</p>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={reload} variant="default" className="bg-accent hover:bg-accent/90 text-white">
+              Réessayer
+            </Button>
+            <Button onClick={() => router.history.back()} variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Retour
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -447,13 +487,13 @@ function DossierDetailPage() {
           return (
             <FilterSection
               title="Rapport Colisage"
-              subtitle="Données de colisage validées par le Chef Entrepôt Douane"
+              subtitle="Détails du colisage et du dénombrement des marchandises"
               icon={ClipboardList}
               iconColor="text-amber-500"
-              source="Chef Entrepôt Douane"
+              source="Agent de Pointage"
             >
               <div className="col-span-2 py-6 text-center text-sm text-muted-foreground">
-                Aucun rapport de colisage validé pour ce dossier.
+                Aucun rapport de colisage pour ce dossier.
               </div>
             </FilterSection>
           );
@@ -461,11 +501,12 @@ function DossierDetailPage() {
         return (
           <FilterSection
             title="Rapport Colisage"
-            subtitle="Détails du colisage et du dénombrement des marchandises"
+            subtitle={`Détails du colisage — ${rawDossier.type_dossier?.libelle || rawDossier.type || dossier.typeDossier}`}
             icon={ClipboardList}
             iconColor="text-amber-500"
-            source="Chef Entrepôt Douane"
+            source="Agent de Pointage"
           >
+            <FilterField label="Type de dossier" value={rawDossier.type_dossier?.libelle || rawDossier.type || "—"} icon="📋" />
             <FilterField label="Nombre de Colis" value={dossier.rapportColisage.colis} icon="📦" />
             <FilterField label="Poids Total" value={dossier.rapportColisage.poidsTotal} icon="⚖️" />
             <FilterField label="Pointage" value={dossier.rapportColisage.pointage} icon="✏️" />
@@ -475,6 +516,37 @@ function DossierDetailPage() {
             <FilterField label="Date validation" value={dossier.rapportColisage.validatedAt} icon="📅" />
             {dossier.rapportColisage.notes && (
               <FilterField label="Notes" value={dossier.rapportColisage.notes} icon="📝" />
+            )}
+            {dossier.rapportColisage.lignes && dossier.rapportColisage.lignes.length > 0 && (
+              <div className="col-span-2 mt-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  Articles du colisage ({dossier.rapportColisage.lignes.length})
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-3 py-2 text-left">N°</th>
+                        <th className="px-3 py-2 text-left">Description</th>
+                        <th className="px-3 py-2 text-right">Quantité</th>
+                        <th className="px-3 py-2 text-right">Poids / colis</th>
+                        <th className="px-3 py-2 text-right">Poids total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {dossier.rapportColisage.lignes.map((l: any, i: number) => (
+                        <tr key={l.id || i} className="hover:bg-muted/30">
+                          <td className="px-3 py-2 font-mono text-xs">{i + 1}</td>
+                          <td className="px-3 py-2 font-medium">{l.description || "—"}</td>
+                          <td className="px-3 py-2 text-right">{l.quantite ?? "—"}</td>
+                          <td className="px-3 py-2 text-right">{l.poidsParColis ? Number(l.poidsParColis).toLocaleString() : "—"}</td>
+                          <td className="px-3 py-2 text-right font-semibold">{l.poidsTotal ? Number(l.poidsTotal).toLocaleString() : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </FilterSection>
         );
@@ -500,7 +572,7 @@ function DossierDetailPage() {
             subtitle="Détails du bon de sortie et autorisation finale"
             icon={LogOut}
             iconColor="text-orange-500"
-            source="Rapport de sortie"
+            source="Brigadier Entrepôt"
           >
             <FilterField label="Autorisation" value={dossier.sortie.autorisation} icon="🟢" />
             <FilterField label="Bon de Sortie" value={dossier.sortie.bonSortie} icon="🎫" />
@@ -509,18 +581,50 @@ function DossierDetailPage() {
           </FilterSection>
         );
       case "rapportDechargement":
+        if (!dossier.rapportDechargement) {
+          return (
+            <FilterSection
+              title="Brigadier Contrôle"
+              subtitle="Contrôle de déchargement en entrepôt"
+              icon={Warehouse}
+              iconColor="text-rose-500"
+              source="Brigadier Contrôle"
+            >
+              <p className="text-sm text-muted-foreground italic">Aucun rapport de contrôle saisi.</p>
+            </FilterSection>
+          );
+        }
+        const rd = dossier.rapportDechargement;
         return (
           <FilterSection
-            title="Rapport de Déchargement"
-            subtitle="Informations de déchargement en entrepôt"
+            title="Brigadier Contrôle"
+            subtitle="Contrôle de barrière"
             icon={Warehouse}
             iconColor="text-rose-500"
-            source="Chef Entrepôt Douane"
+            source="Brigadier Contrôle"
           >
-            <FilterField label="Quantité Attendue" value={dossier.rapportDechargement.quantiteAttendue} icon="📦" />
-            <FilterField label="Quantité Réelle" value={dossier.rapportDechargement.quantiteReelle} icon="🔢" />
-            <FilterField label="Observations" value={dossier.rapportDechargement.observations} icon="📝" />
-            <FilterField label="Statut" value={dossier.rapportDechargement.statut} icon="🏁" />
+            <FilterField label="Importateur" value={rd.nomImportateur} icon="👤" />
+            <FilterField label="Réf. Douane" value={rd.reference} icon="🆔" />
+            <FilterField label="Date du Contrôle" value={rd.dateControle} icon="📅" />
+            <FilterField label="Brigadier" value={rd.agentNom} icon="🛂" />
+            <FilterField label="Barrière" value={rd.entrepot} icon="🏭" />
+            <FilterField label="Plaque Avant" value={rd.plaqueAvant} icon="🚛" />
+            <FilterField label="Plaque Arrière" value={rd.plaqueArriere} icon="🚛" />
+            <FilterField label="Bon de Sortie" value={rd.referenceBonSortie} icon="🎫" />
+            <FilterField label="Balle/Colis" value={rd.balle} icon="📦" />
+            <FilterField label="Autorisation Spéciale" value={rd.autorisationSpeciale} icon="🛡️" />
+            {rd.autorisationSpeciale === "Oui" && (
+              <>
+                <FilterField label="Type Autorisation" value={rd.typeAutorisation} icon="📋" />
+                <FilterField label="Réf. Autorisation" value={rd.referenceAutorisation} icon="🔖" />
+                <FilterField label="Date Autorisation" value={rd.dateAutorisation} icon="📅" />
+                <FilterField
+                  label="Signataires"
+                  value={rd.signataires?.length > 0 ? rd.signataires.map((s: any) => s.type_signataire).join(", ") : "—"}
+                  icon="✍️"
+                />
+              </>
+            )}
           </FilterSection>
         );
       default:
@@ -761,67 +865,7 @@ function DossierDetailPage() {
         </div>
       )}
 
-      {/* ── TABLEAU DES ARTICLES ── */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5 bg-muted/20">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent">
-            <Package className="h-4 w-4" />
-          </div>
-          <h2 className="font-semibold text-sm">Liste des articles liés au dossier</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="px-5 py-3 font-medium">Nº</th>
-                <th className="px-5 py-3 font-medium">Description</th>
-                <th className="px-5 py-3 font-medium">Position</th>
-                <th className="px-5 py-3 font-medium text-right">Quantité</th>
-                <th className="px-5 py-3 font-medium text-right">Poids (kg)</th>
-                <th className="px-5 py-3 font-medium text-right">FOB (USD)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {dossier.articles?.map((art, idx) => (
-                <tr key={art.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{idx + 1}</td>
-                  <td className="px-5 py-3 font-medium">{art.designation || "—"}</td>
-                  <td className="px-5 py-3 font-mono text-xs">{art.position || art.position_tarifaire || "—"}</td>
-                  <td className="px-5 py-3 text-right">{art.quantite || "—"}</td>
-                  <td className="px-5 py-3 text-right">{art.poids ? Number(art.poids).toLocaleString() : "—"}</td>
-                  <td className="px-5 py-3 text-right font-semibold text-accent">
-                    {art.fob ? Number(art.fob).toLocaleString() : "—"}
-                  </td>
-                </tr>
-              ))}
-              {(!dossier.articles || dossier.articles.length === 0) && (
-                <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-muted-foreground italic">
-                    Aucun article spécifié pour ce dossier.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            <tfoot className="bg-muted/30 font-bold">
-              <tr>
-                <td colSpan={3} className="px-5 py-4 text-right uppercase text-xs">
-                  Total Général
-                </td>
-                <td className="px-5 py-4 text-right">
-                  {dossier.articles?.reduce((acc, a) => acc + a.quantite, 0) || 0}
-                </td>
-                <td className="px-5 py-4 text-right">
-                  {(dossier.articles?.reduce((acc, a) => acc + a.poids, 0) || 0).toLocaleString()}{" "}
-                  kg
-                </td>
-                <td className="px-5 py-4 text-right text-accent">
-                  {(dossier.articles?.reduce((acc, a) => acc + a.fob, 0) || 0).toLocaleString()} USD
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
+
 
       <div className="hidden print:block mt-12 pt-8 border-t border-dashed border-border text-center">
         <p className="text-[10px] text-muted-foreground italic">

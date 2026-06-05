@@ -51,6 +51,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Profil utilisateur et déconnexion
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::put('/profile', [\App\Http\Controllers\ProfileController::class, 'update']);
+    Route::post('/password/change', [\App\Http\Controllers\ProfileController::class, 'changePassword']);
 
     // Gestion de la configuration (SuperAdmin)
     Route::prefix('config')->group(function () {
@@ -272,6 +274,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [\App\Http\Controllers\ItEntryController::class, 'index']);
         Route::post('/', [\App\Http\Controllers\ItEntryController::class, 'store']);
         Route::get('/dossier/{dossierId}', [\App\Http\Controllers\ItEntryController::class, 'showByDossier']);
+    });
+
+    // ─── Barrières de Contrôle (Inspecteur Chef → Brigadier Contrôle) ──
+    Route::prefix('barrieres-controle')->group(function () {
+        Route::get('/', [\App\Http\Controllers\BarriereControleController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\BarriereControleController::class, 'store']);
+        Route::get('/{id}', [\App\Http\Controllers\BarriereControleController::class, 'show']);
+        Route::put('/{id}', [\App\Http\Controllers\BarriereControleController::class, 'update']);
+        Route::delete('/{id}', [\App\Http\Controllers\BarriereControleController::class, 'destroy']);
+        Route::get('/{id}/activities', [\App\Http\Controllers\BarriereControleController::class, 'activities']);
+        Route::get('/{id}/dossiers', [\App\Http\Controllers\BarriereControleController::class, 'dossiers']);
+    });
+
+    // ─── Dossiers de Contrôle (Brigadier Contrôle) ──────────────────────
+    Route::prefix('dossiers-controle')->group(function () {
+        Route::get('/', [\App\Http\Controllers\DossierControleController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\DossierControleController::class, 'store']);
+        Route::get('/search', [\App\Http\Controllers\DossierControleController::class, 'search']);
+        Route::get('/{id}', [\App\Http\Controllers\DossierControleController::class, 'show']);
     });
 
     // ─── Barrière — Commissions ─────────────────────────────────────────

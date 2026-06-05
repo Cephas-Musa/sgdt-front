@@ -11,6 +11,7 @@ import BrigadierBarriereDash from "@/dashboards/BrigadierBarriereDash";
 import SecretaireInspecteurDash from "@/dashboards/SecretaireInspecteurDash";
 import BrigadierEntrepotDash from "@/dashboards/BrigadierEntrepotDash";
 import BarriereControleDash from "@/dashboards/BarriereControleDash";
+import BrigadierControleDash from "@/dashboards/BrigadierControleDash";
 import InspecteurChefDash from "@/dashboards/InspecteurChefDash";
 import VerificateurDash from "@/dashboards/VerificateurDash";
 import CBVerificationDash from "@/dashboards/CBVerificationDash";
@@ -77,6 +78,8 @@ function Dashboard() {
         return <ChefEntrepotDouaneDash />;
       case "agent_pointage":
         return <AgentPointageDash />;
+      case "brigadier_controle":
+        return <BrigadierControleDash />;
       case "partenaire":
         return <PartenaireDash />;
       case "receveur":

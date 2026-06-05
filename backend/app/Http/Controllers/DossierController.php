@@ -102,7 +102,7 @@ class DossierController extends Controller
                 return response()->json(['message' => 'Solde insuffisant pour ce dossier.'], 400);
             }
 
-            $dossierData['type'] = $typeDossier->code;
+            $dossierData['type'] = strtolower($typeDossier->code);
             $dossierData['montant'] = $typeDossier->tarif;
             $dossierData['devise'] = $typeDossier->devise ?? 'USD';
         }
@@ -254,7 +254,7 @@ class DossierController extends Controller
             'documents',
             'mouvements',
             'vracs',
-            'decharges',
+            'decharges.user', 'decharges.entrepot',
             'mouvementsStockage',
             'colisages.agent', 'colisages.validateur',
             'empty_manifests',
@@ -278,11 +278,16 @@ class DossierController extends Controller
 
         $representationData = app(\App\Services\DossierSyncService::class)->findRepresentationDataByDra($dossier->dra);
 
+        $dossiersControle = \App\Models\DossierControle::where('reference_douane', $dossier->reference)
+            ->with(['barriere:id,nom', 'brigadier:id,full_name', 'signataires'])
+            ->get();
+
         return response()->json([
             'dossier' => $dossier,
             'representation_data' => $representationData ? $representationData['representation_data'] : null,
             'representation_articles' => $representationData ? $representationData['representation_articles'] : [],
-            'representation_history' => $representationData ? $representationData['representation_history'] : []
+            'representation_history' => $representationData ? $representationData['representation_history'] : [],
+            'dossiers_controle' => $dossiersControle,
         ]);
     }
 

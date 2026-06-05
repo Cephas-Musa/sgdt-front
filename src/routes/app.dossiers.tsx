@@ -68,6 +68,7 @@ const ALLOWED_ROLES = [
   "inspecteur_chef", // Inspecteur
   "secretaire_inspecteur", // Secrétaire Inspecteur
   "chef_bureau_repr", // Chef Bureau Représentation
+  "brigadier_barriere", // Brigadier Barrière
 ] as const;
 
 /* ── Validation : on vérifie que la partie après RD- contient 1-4 chiffres ── */
@@ -212,6 +213,11 @@ function DossiersPage() {
   /* ── Vue dédiée : Chef Bureau Représentation ── */
   if (user?.role === "chef_bureau_repr") {
     return <ChefReprDossiersView />;
+  }
+
+  /* ── Vue dédiée : Brigadier Barrière ── */
+  if (user?.role === "brigadier_barriere") {
+    return <BrigadierBarriereDossiersView />;
   }
 
   /* ── Vue dédiée : Inspecteur ── */
@@ -872,6 +878,137 @@ function ChefReprDossiersView() {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════
+   Vue dédiée Brigadier Barrière — Dossiers
+   RD- et E- préfixés fixes sur les champs de recherche
+════════════════════════════════════════════════════════════ */
+function BrigadierBarriereDossiersView() {
+  const { t } = useI18n();
+  const { data: rawDossiers, loading } = useApi(() => apiGetDossiers(), []);
+  const allDossiers = (rawDossiers || []) as Dossier[];
+  const [searchRef, setSearchRef] = useState("");
+  const [searchDra, setSearchDra] = useState("");
+  const [searchT1, setSearchT1] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const getFiltered = () => {
+    let filtered = [...allDossiers];
+    if (searchRef) filtered = filtered.filter((d) => d.reference.toLowerCase().includes(searchRef.toLowerCase()));
+    if (searchDra) filtered = filtered.filter((d) => d.dra?.toLowerCase().includes(searchDra.toLowerCase()));
+    if (searchT1) filtered = filtered.filter((d) => d.t1?.toLowerCase().includes(searchT1.toLowerCase()));
+    if (startDate) filtered = filtered.filter((d) => d.date >= startDate);
+    if (endDate) filtered = filtered.filter((d) => d.date <= endDate);
+    return filtered;
+  };
+
+  const handleSearch = () => {
+    let rawRef = searchRef.trim().replace(/^RD-/i, "");
+    let finalRef = "";
+    if (rawRef) {
+      if (/^\d{1,4}$/.test(rawRef)) rawRef = rawRef.padStart(4, "0");
+      finalRef = `RD-${rawRef}`;
+      setSearchRef(rawRef);
+    }
+    setHasSearched(true);
+    const count = getFiltered();
+    if (finalRef || searchDra || searchT1 || startDate || endDate) {
+      toast.success(count.length + " dossier(s) trouvé(s).");
+    }
+  };
+
+  const handleReset = () => { setSearchRef(""); setSearchDra(""); setSearchT1(""); setStartDate(""); setEndDate(""); setHasSearched(false); };
+
+  const results = hasSearched ? getFiltered() : [];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Consultation des dossiers" description="Recherche et suivi des dossiers douaniers (Brigadier Barrière)." />
+      <div className="rounded-xl border border-border bg-gradient-to-br from-card via-card to-accent/[0.03] p-6 shadow-sm">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Hash className="h-3 w-3" /> Référence dossier
+            </label>
+            <div className="flex items-center rounded-md border border-input focus-within:ring-2 focus-within:ring-accent/20 focus-within:border-accent/40">
+              <span className="flex h-9 items-center rounded-l-md border-r border-input bg-muted/60 px-3 text-sm font-semibold select-none">RD-</span>
+              <input
+                value={searchRef}
+                onChange={(e) => setSearchRef(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="0001"
+                className="h-9 w-full flex-1 rounded-r-md bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/50"
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <FileText className="h-3 w-3" /> Référence douane
+            </label>
+            <div className="flex items-center rounded-md border border-input focus-within:ring-2 focus-within:ring-accent/20 focus-within:border-accent/40">
+              <span className="flex h-9 items-center rounded-l-md border-r border-input bg-muted/60 px-3 text-sm font-semibold select-none">E-</span>
+              <input
+                value={searchDra.replace(/^E-/i, "")}
+                onChange={(e) => setSearchDra("E-" + e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000001"
+                className="h-9 w-full flex-1 rounded-r-md bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/50"
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Calendar className="h-3 w-3" /> Date Début</label>
+            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9" />
+          </div>
+          <div>
+            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Calendar className="h-3 w-3" /> Date Fin</label>
+            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9" />
+          </div>
+          <div className="flex items-end gap-2">
+            <Button onClick={handleSearch} className="w-full h-9 bg-accent font-bold gap-2"><Search className="h-4 w-4" /> Chercher</Button>
+            {hasSearched && <Button variant="outline" onClick={handleReset} className="h-9">Reset</Button>}
+          </div>
+        </div>
+      </div>
+
+      {hasSearched && (
+        <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+          <div className="flex items-center gap-2 border-b px-4 py-3 bg-muted/30">
+            <FolderKanban className="h-4 w-4 text-accent" />
+            <span className="text-sm font-medium">{results.length} dossier(s)</span>
+          </div>
+          {loading ? (
+            <div className="p-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-accent" /></div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-left text-[10px] font-bold uppercase text-muted-foreground">
+                <tr><th className="px-4 py-4">N°</th><th className="px-4 py-4">Référence</th><th className="px-4 py-4">Importateur</th><th className="px-4 py-4">DRA</th><th className="px-4 py-4">Date</th><th className="px-4 py-4">Statut</th></tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {results.length === 0 ? (
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground italic">Aucun dossier trouvé.</td></tr>
+                ) : (
+                  results.map((d, i) => (
+                    <tr key={d.id} className="hover:bg-muted/30">
+                      <td className="px-4 py-3 text-xs">{i + 1}</td>
+                      <td className="px-4 py-3 font-mono text-xs font-bold text-accent">{d.reference}</td>
+                      <td className="px-4 py-3 font-medium">{d.importateur}</td>
+                      <td className="px-4 py-3 font-mono text-xs">{d.dra || "—"}</td>
+                      <td className="px-4 py-3 text-xs">{d.date}</td>
+                      <td className="px-4 py-3"><StatusBadge status={d.status} /></td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
     </div>
   );
 }

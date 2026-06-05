@@ -21,6 +21,7 @@ class User extends Authenticatable
         'password',
         'role',
         'full_name',
+        'email',
         'bureau',
         'province',
         'bureau_id',
@@ -226,14 +227,15 @@ class User extends Authenticatable
     public function canCreateRole(string $role): bool
     {
         $roleHierarchy = [
-            'super_admin' => [
-                'directeur_general', 'directeur_provincial', 'inspecteur',
-                'inspecteur_chef_bureau', 'secretaire_inspecteur',
-                'chef_bureau_representation', 'operateur_saisie',
-                'chef_barriere', 'typing_operator', 'brigadier_barriere_entree',
-                'brigadier_barriere_sortie', 'chef_entrepot_douane', 'chef_entrepot_prive',
-                'agent_pointage', 'verificateur', 'chef_verification', 'agent_controle'
-            ],
+        'super_admin' => [
+            'directeur_general', 'directeur_provincial', 'inspecteur',
+            'inspecteur_chef_bureau', 'secretaire_inspecteur',
+            'chef_bureau_representation', 'operateur_saisie',
+            'chef_barriere', 'typing_operator', 'brigadier_barriere_entree',
+            'brigadier_barriere_sortie', 'chef_entrepot_douane', 'chef_entrepot_prive',
+            'agent_pointage', 'verificateur', 'chef_verification', 'agent_controle',
+            'brigadier_controle',
+        ],
             'directeur_general' => ['directeur_provincial', 'inspecteur', 'inspecteur_chef_bureau', 'agent_controle'],
             'directeur_provincial' => ['inspecteur', 'inspecteur_chef_bureau', 'agent_controle'],
             'inspecteur_chef_bureau' => ['secretaire_inspecteur'],

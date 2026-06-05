@@ -88,7 +88,7 @@ class ColisageController extends Controller
         $request->validate([
             'dossier_id' => 'required|string|exists:dossiers,id',
             'lignes' => 'required|array|min:1',
-            'lignes.*.description' => 'required|string',
+            'lignes.*.description' => 'nullable|string',
             'lignes.*.quantite' => 'required|integer|min:1',
             'lignes.*.poidsParColis' => 'required|numeric|min:0',
             'lignes.*.poidsTotal' => 'required|numeric|min:0',

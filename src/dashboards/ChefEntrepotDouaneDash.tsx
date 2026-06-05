@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, UserCheck, ListChecks, X, Plus, Minus, Trash2, Scale, CheckCircle2, AlertTriangle, Loader2, FileText, FolderKanban, Users, ArrowRight, ThumbsUp, ThumbsDown, History } from "lucide-react";
+import { Search, UserCheck, ListChecks, X, Plus, Minus, Trash2, Scale, CheckCircle2, AlertTriangle, Loader2, FileText, FolderKanban, Users, ArrowRight, ThumbsUp, ThumbsDown, History, Eye } from "lucide-react";
 import { DashHeader, StatCard, Panel } from "./_shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import { ROLE_LABELS } from "@/lib/roles";
 import { useI18n } from "@/lib/i18n";
+import { apiUpdateProfile, apiChangePassword } from "@/lib/api";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/profil")({
@@ -77,13 +78,18 @@ function ProfilPage() {
     toast.success("Photo de profil supprimée");
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateUser({ fullName: nom, phone, email });
-    toast.success("Profil mis à jour avec succès");
+    try {
+      await apiUpdateProfile({ full_name: nom, phone_number: phone, email });
+      updateUser({ fullName: nom, phone, email });
+      toast.success("Profil mis à jour avec succès");
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors de la mise à jour du profil");
+    }
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!oldPwd) {
       toast.error("Veuillez saisir l'ancien mot de passe");
@@ -97,10 +103,15 @@ function ProfilPage() {
       toast.error("Les mots de passe ne correspondent pas");
       return;
     }
-    toast.success("Mot de passe modifié avec succès");
-    setOldPwd("");
-    setNewPwd("");
-    setConfirmPwd("");
+    try {
+      await apiChangePassword({ current_password: oldPwd, new_password: newPwd, new_password_confirmation: confirmPwd });
+      toast.success("Mot de passe modifié avec succès");
+      setOldPwd("");
+      setNewPwd("");
+      setConfirmPwd("");
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors du changement de mot de passe");
+    }
   };
 
   const initials =

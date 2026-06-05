@@ -30,6 +30,7 @@ export const SUBORDINATES: Partial<Record<Role, Role[]>> = {
     "barriere_controle",
     "manager_entrepot",
     "partenaire",
+    "brigadier_controle",
   ],
   // Le DG crée les directeurs provinciaux ET les inspecteurs chefs
   directeur: ["directeur_provincial", "inspecteur_chef"],
@@ -48,6 +49,7 @@ export const SUBORDINATES: Partial<Record<Role, Role[]>> = {
     "chef_bureau_repr",
     "barriere_controle",
     "manager_entrepot",
+    "brigadier_controle",
   ],
   chef_bureau_repr: ["operateur_saisie"],
   chef_barriere: ["typing_operator", "brigadier_barriere"],

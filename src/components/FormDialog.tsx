@@ -30,10 +30,14 @@ export function FormDialog({
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
-  const setOpen = controlledOnOpenChange !== undefined ? controlledOnOpenChange : setInternalOpen;
+
+  const handleOpenChange = (newOpen: boolean) => {
+    setInternalOpen(newOpen);
+    controlledOnOpenChange?.(newOpen);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
@@ -42,13 +46,13 @@ export function FormDialog({
         <div className="space-y-3 py-2">{children}</div>
         {!hideFooter && (
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button variant="outline" onClick={() => handleOpenChange(false)}>
               Annuler
             </Button>
             <Button
               onClick={() => {
                 const result = onSubmit?.();
-                if (result !== false) setOpen(false);
+                if (result !== false) handleOpenChange(false);
               }}
             >
               {submitLabel}

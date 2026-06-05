@@ -24,7 +24,8 @@ export type Role =
   | "barriere_controle"
   | "manager_entrepot"
   | "partenaire"
-  | "receveur";
+  | "receveur"
+  | "brigadier_controle";
 
 export const ROLE_LABELS: Record<Role, { fr: string; en: string }> = {
   super_admin: { fr: "Super Admin", en: "Super Admin" },
@@ -53,6 +54,7 @@ export const ROLE_LABELS: Record<Role, { fr: string; en: string }> = {
   manager_entrepot: { fr: "Manager Entrepôt", en: "Warehouse Manager" },
   partenaire: { fr: "Partenaire", en: "Partner" },
   receveur: { fr: "Receveur", en: "Collector" },
+  brigadier_controle: { fr: "Brigadier Contrôle", en: "Control Brigadier" },
 };
 
 export type NavKey =
@@ -117,7 +119,7 @@ export const ROLE_NAV: Record<Role, NavKey[]> = {
   operateur_saisie: ["dashboard", "alertes", "chat", "profil"],
   chef_barriere: ["dashboard", "comptes", "chat", "profil"],
   typing_operator: ["dashboard", "chat", "profil"],
-  brigadier_barriere: ["dashboard", "chat", "profil"],
+  brigadier_barriere: ["dashboard", "dossiers", "chat", "profil"],
   secretaire_inspecteur: [
     "dashboard",
     "dossiers",
@@ -146,4 +148,5 @@ export const ROLE_NAV: Record<Role, NavKey[]> = {
   manager_entrepot: ["dashboard", "entrepots", "localisation", "chat", "profil"],
   partenaire: ["dashboard", "profil"],
   receveur: ["dashboard", "profil"],
+  brigadier_controle: ["dashboard", "dossiers", "chat", "profil"],
 };

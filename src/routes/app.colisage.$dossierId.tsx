@@ -43,6 +43,7 @@ function ColisageReportPage() {
   const [poids, setPoids] = useState("");
   const [notes, setNotes] = useState("");
   const [soumis, setSoumis] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // --- Calculs automatiques ---
   const totaux = useMemo(() => {
@@ -116,8 +117,6 @@ function ColisageReportPage() {
   };
 
   // --- Soumettre le rapport ---
-  const [submitting, setSubmitting] = useState(false);
-
   const soumettre = async () => {
     if (lignes.length === 0) {
       toast.error("Ajoutez au moins un article avant de soumettre.");
@@ -140,8 +139,8 @@ function ColisageReportPage() {
       });
       setSoumis(true);
       toast.success("Rapport transmis au Chef Entrepôt !");
-    } catch (err) {
-      toast.error("Erreur lors de la soumission du rapport.");
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors de la soumission du rapport.");
     } finally {
       setSubmitting(false);
     }
