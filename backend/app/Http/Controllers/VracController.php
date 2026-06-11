@@ -21,7 +21,7 @@ class VracController extends Controller
         $query = Vrac::query();
 
         // Filtrer selon le rôle
-        if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur', 'secretaire_inspecteur'])) {
+        if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef', 'secretaire_inspecteur'])) {
             $query->whereHas('user', function($q) use ($user) {
                 $q->where('bureau', $user->bureau);
             });

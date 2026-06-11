@@ -228,7 +228,7 @@ class User extends Authenticatable
     {
         $roleHierarchy = [
         'super_admin' => [
-            'directeur_general', 'directeur_provincial', 'inspecteur',
+            'directeur_general', 'directeur_provincial', 'inspecteur_chef',
             'inspecteur_chef_bureau', 'secretaire_inspecteur',
             'chef_bureau_representation', 'operateur_saisie',
             'chef_barriere', 'typing_operator', 'brigadier_barriere_entree',
@@ -236,10 +236,10 @@ class User extends Authenticatable
             'agent_pointage', 'verificateur', 'chef_verification', 'agent_controle',
             'brigadier_controle',
         ],
-            'directeur_general' => ['directeur_provincial', 'inspecteur', 'inspecteur_chef_bureau', 'agent_controle'],
-            'directeur_provincial' => ['inspecteur', 'inspecteur_chef_bureau', 'agent_controle'],
+            'directeur_general' => ['directeur_provincial', 'inspecteur_chef', 'inspecteur_chef_bureau', 'agent_controle'],
+            'directeur_provincial' => ['inspecteur_chef', 'inspecteur_chef_bureau', 'agent_controle'],
             'inspecteur_chef_bureau' => ['secretaire_inspecteur'],
-            'inspecteur' => ['secretaire_inspecteur'],
+            'inspecteur_chef' => ['secretaire_inspecteur'],
             'chef_bureau_representation' => ['operateur_saisie'],
             'chef_barriere' => ['typing_operator'],
             'chef_entrepot_douane' => ['agent_pointage'],

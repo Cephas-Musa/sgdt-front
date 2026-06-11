@@ -24,7 +24,7 @@ class ReportController extends Controller
         // Filtrer selon le rôle
         if ($user->role === 'directeur_provincial') {
             $query->where('province', $user->province ?? '');
-        } elseif (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur'])) {
+        } elseif (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef'])) {
             $query->where('bureau_repr', $user->bureau ?? '');
         }
 
@@ -118,7 +118,7 @@ class ReportController extends Controller
         $query = Apurement::with(['dossier', 'user']);
 
         // Filtrer selon le rôle
-        if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur'])) {
+        if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef'])) {
             $query->whereHas('dossier', function($q) use ($user) {
                 $q->where('bureau_repr', $user->bureau ?? '');
             });
@@ -162,7 +162,7 @@ class ReportController extends Controller
 
         if ($user->role === 'directeur_provincial') {
             $query->where('province_id', $user->province_id);
-        } elseif (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur'])) {
+        } elseif (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef'])) {
             $query->where('bureau_id', $user->bureau_id);
         }
 

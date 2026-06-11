@@ -31,6 +31,13 @@ use App\Http\Controllers\PartenaireController;
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
 
+// Route publique — clé VAPID pour Web Push
+Route::get('/vapid-public-key', function () {
+    return response()->json([
+        'public_key' => config('services.vapid.public_key'),
+    ]);
+});
+
 // Routes publiques de configuration
 Route::prefix('config')->group(function () {
     Route::get('/countries', [ConfigurationController::class, 'getCountries']);
@@ -53,6 +60,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::put('/profile', [\App\Http\Controllers\ProfileController::class, 'update']);
     Route::post('/password/change', [\App\Http\Controllers\ProfileController::class, 'changePassword']);
+
+    // Push Notifications — Web Push subscriptions
+    Route::post('/push/subscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'subscribe']);
+    Route::delete('/push/unsubscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'unsubscribe']);
+    Route::get('/push/subscriptions', [\App\Http\Controllers\PushSubscriptionController::class, 'list']);
 
     // Gestion de la configuration (SuperAdmin)
     Route::prefix('config')->group(function () {
@@ -134,11 +146,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Système d'Alertes et Notifications
     Route::get('/alertes', [AlerteController::class, 'index']);
+    Route::get('/alertes/stats', [AlerteController::class, 'stats']);
+    Route::get('/alertes/unread-count', [AlerteController::class, 'unreadCount']);
+    Route::get('/alertes/critical', [AlerteController::class, 'critical']);
+    Route::get('/alertes/{id}', [AlerteController::class, 'show']);
     Route::patch('/alertes/{id}/read', [AlerteController::class, 'markAsRead']);
     Route::patch('/alertes/{id}/acknowledge', [AlerteController::class, 'acknowledge']);
     Route::patch('/alertes/{id}/resolve', [AlerteController::class, 'resolve']);
-    Route::get('/alertes/unread-count', [AlerteController::class, 'unreadCount']);
-    Route::get('/alertes/critical', [AlerteController::class, 'critical']);
 
     // Gestion des Barrières & passages
     Route::apiResource('barriere-entries', BarriereController::class)->only(['index', 'store']);
@@ -157,6 +171,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Apurements (Clearance)
     Route::apiResource('apurements', ApurementController::class)->only(['index', 'store']);
+    Route::post('/apurements/verificateur', [ApurementController::class, 'storeVerificateur']);
     Route::patch('/apurements/{id}/status', [ApurementController::class, 'updateStatus']);
 
     // Messagerie (Chat)
@@ -189,6 +204,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/{id}/decharge/{dechargeId}', [EntrepotController::class, 'updateDecharge']);
     });
 
+    // Localisation des véhicules (temps réel)
+    Route::prefix('vehicule-localisations')->group(function () {
+        Route::get('/', [\App\Http\Controllers\VehiculeLocalisationController::class, 'index']);
+        Route::get('/stats', [\App\Http\Controllers\VehiculeLocalisationController::class, 'stats']);
+        Route::get('/{id}', [\App\Http\Controllers\VehiculeLocalisationController::class, 'show']);
+        Route::patch('/{id}/position', [\App\Http\Controllers\VehiculeLocalisationController::class, 'updatePosition']);
+    });
+
     // Upload de fichiers (protégé par auth)
     Route::post('/upload', [\App\Http\Controllers\UploadController::class, 'store'])->middleware('auth:sanctum');
 
@@ -216,6 +239,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/{id}/approve', [ApurementController::class, 'approve']);
         Route::patch('/{id}/reject', [ApurementController::class, 'reject']);
     });
+    // Note: show/approve/reject above will 501 until implemented
 
     // Dénombrements
     Route::prefix('denombrements')->group(function () {

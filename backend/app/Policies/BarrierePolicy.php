@@ -41,7 +41,7 @@ class BarrierePolicy
         }
 
         // Inspecteur de la province voit les barrières de sa province
-        if ($user->role === 'inspecteur_chef_bureau' || $user->role === 'inspecteur') {
+        if ($user->role === 'inspecteur_chef_bureau' || $user->role === 'inspecteur_chef') {
             return $user->province === $barriere->province;
         }
 

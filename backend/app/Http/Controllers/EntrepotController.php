@@ -125,7 +125,7 @@ class EntrepotController extends Controller
 
         if (in_array($user->role, ['chef_entrepot_douane', 'chef_entrepot_prive'])) {
             $query->where('id', $user->entrepot_id);
-        } elseif (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur'])) {
+        } elseif (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef'])) {
             $query->where('bureau', $user->bureau);
         }
 

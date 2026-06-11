@@ -3,6 +3,7 @@ import { AuthProvider } from "@/lib/auth";
 import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "@/lib/theme";
 import { Toaster } from "@/components/ui/sonner";
+import { usePushNotifications } from "@/lib/usePushNotifications";
 
 import appCss from "../styles.css?url";
 
@@ -57,10 +58,16 @@ function RootComponent() {
     <ThemeProvider>
       <I18nProvider>
         <AuthProvider>
+          <PushInit />
           <Outlet />
           <Toaster />
         </AuthProvider>
       </I18nProvider>
     </ThemeProvider>
   );
+}
+
+function PushInit() {
+  usePushNotifications();
+  return null;
 }

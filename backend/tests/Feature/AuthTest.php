@@ -79,7 +79,7 @@ class AuthTest extends TestCase
         User::create([
             'phone_number'      => '+243810000000',
             'password'          => Hash::make('Password123!'),
-            'role'              => 'inspecteur',
+            'role'              => 'inspecteur_chef',
             'full_name'         => 'Inspecteur Test',
             'phone_verified_at' => null, // Non vérifié
         ]);
@@ -111,7 +111,7 @@ class AuthTest extends TestCase
         $user = User::create([
             'phone_number' => '+243810000000',
             'password' => Hash::make('Password123!'),
-            'role' => 'inspecteur',
+            'role' => 'inspecteur_chef',
             'full_name' => 'Inspecteur Test',
             'phone_verified_at' => null,
         ]);
@@ -161,7 +161,7 @@ class AuthTest extends TestCase
         $response = $this->actingAs($superadmin)
             ->postJson('/api/users', [
                 'phone_number' => '+243999111222',
-                'role' => 'inspecteur',
+                'role' => 'inspecteur_chef',
                 'full_name' => 'Inspecteur Jean',
                 'bureau' => 'GOMA',
                 'province' => 'NORD-KIVU',
@@ -201,7 +201,7 @@ class AuthTest extends TestCase
         $inspecteur = User::create([
             'phone_number' => '+243810000000',
             'password' => Hash::make('Password123!'),
-            'role' => 'inspecteur',
+            'role' => 'inspecteur_chef',
             'full_name' => 'Inspecteur Test',
             'phone_verified_at' => Carbon::now(),
         ]);
@@ -209,7 +209,7 @@ class AuthTest extends TestCase
         $response = $this->actingAs($inspecteur)
             ->postJson('/api/users', [
                 'phone_number' => '+243999111222',
-                'role' => 'inspecteur',
+                'role' => 'inspecteur_chef',
                 'full_name' => 'Inspecteur Jean',
             ]);
 

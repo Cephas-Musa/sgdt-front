@@ -17,12 +17,18 @@ class Alerte extends Model
         'hierarchy_level',
         'dossier_id',
         'is_read',
+        'triggered_by',
+        'severity',
+        'acknowledged_at',
+        'resolved_at',
     ];
 
     protected function casts(): array
     {
         return [
             'is_read' => 'boolean',
+            'acknowledged_at' => 'datetime',
+            'resolved_at' => 'datetime',
         ];
     }
 
@@ -34,5 +40,10 @@ class Alerte extends Model
     public function dossier(): BelongsTo
     {
         return $this->belongsTo(Dossier::class, 'dossier_id');
+    }
+
+    public function trigger(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'triggered_by');
     }
 }

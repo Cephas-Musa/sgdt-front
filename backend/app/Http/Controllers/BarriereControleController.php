@@ -86,12 +86,14 @@ class BarriereControleController extends Controller
     {
         $barriere = BarriereControle::with('brigadier:id,full_name')->findOrFail($id);
 
-        $query = $barriere->dossiers();
+        $query = $barriere->dossiers()->with(['brigadier:id,full_name', 'signataires'])->orderBy('created_at', 'desc');
 
         $totalDossiers = $query->count();
         $dossiersDuJour = (clone $query)->whereDate('created_at', today())->count();
         $dossiersSemaine = (clone $query)->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count();
         $dossiersAutorisation = (clone $query)->where('autorisation_speciale', true)->count();
+
+        $allDossiers = $barriere->dossiers()->with(['brigadier:id,full_name', 'signataires'])->orderBy('created_at', 'desc')->get();
 
         return response()->json([
             'barriere' => $barriere->nom,
@@ -100,6 +102,7 @@ class BarriereControleController extends Controller
             'dossiers_du_jour' => $dossiersDuJour,
             'dossiers_semaine' => $dossiersSemaine,
             'dossiers_autorisation_speciale' => $dossiersAutorisation,
+            'dossiers' => $allDossiers,
         ]);
     }
 

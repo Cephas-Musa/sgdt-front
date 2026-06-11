@@ -1,418 +1,311 @@
 import { useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHeader } from "@/components/PageHeader";
+import { createFileRoute } from "@tanstack/react-router";
+import { Search, FileCheck, FolderKanban, FileText } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { DashHeader, StatCard, Panel } from "@/dashboards/_shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { Search, Eye, CheckCircle2, XCircle, FileCheck, Filter } from "lucide-react";
-import { useApi, apiGetDossiers, apiGetApurements } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { useApi, apiGetDossiers, apiGetApurements, apiCreateApurement, apiUpdateApurementStatus } from "@/lib/api";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 
 export const Route = createFileRoute("/app/appurement")({
-  component: ApurementPage,
+  component: AppurementPage,
 });
 
-const statusColor = (s: string) =>
-  s === "validé" || s === "apure"
-    ? "bg-success/15 text-success"
-    : s === "rejeté"
-      ? "bg-destructive/15 text-destructive"
-      : "bg-warning/15 text-warning";
-
-function ApurementPage() {
+function AppurementPage() {
   const { user } = useAuth();
-  const isInspecteur = user?.role === "inspecteur_chef";
-  const isSecretaire = user?.role === "secretaire_inspecteur";
+  const { data: rawDossiers, reload: reloadDossiers } = useApi(apiGetDossiers as any);
+  const { data: rawApurements, reload: reloadApurements } = useApi(apiGetApurements as any);
 
-  const [filter, setFilter] = useState<"all" | "soumis" | "validé" | "rejeté">("all");
+  const dossiers = (rawDossiers as any[]) || [];
+  const apurements = (rawApurements as any[]) || [];
+
   const [searchRef, setSearchRef] = useState("");
+  const [searchYear, setSearchYear] = useState("");
+  const [foundDossier, setFoundDossier] = useState<any>(null);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
 
-  const { data: rawApurements } = useApi(apiGetApurements);
-  const { data: rawDossiers } = useApi(apiGetDossiers);
-  type Apurement = { id: number|string; dossierRef?: string; dossier_ref?: string; importateur?: string; type?: string; refDouane?: string; ref_douane?: string; secretaireNom?: string; dateSoumission?: string; created_at?: string; status: string; dossierId?: number|string; dossier_id?: number|string };
-  type Dossier = { id: number|string; reference: string; importateur?: string; type?: string; date?: string; status: string; refDouane?: string };
+  const handleSearch = () => {
+    const q = searchRef.toUpperCase().trim();
+    const found = dossiers.find(
+      (d: any) =>
+        d.reference?.toUpperCase() === q &&
+        (!searchYear || d.date?.startsWith(searchYear))
+    );
+    setFoundDossier(found || null);
+  };
 
-  const allApurements = (rawApurements as Apurement[] ?? []);
-  const allDossiers = (rawDossiers as Dossier[] ?? []);
+  const handleValidate = async (id: string, status: string) => {
+    try {
+      await apiUpdateApurementStatus(id, status);
+      toast.success(`Apurement ${status === "valide" ? "validé" : "rejeté"}`);
+      reloadApurements();
+    } catch (e: any) {
+      const detail = e?.data?.error || e?.message || "Erreur";
+      toast.error(detail, { duration: 8000 });
+      console.error("Validation error:", e?.data || e);
+    }
+  };
 
-  const submissions = allApurements.filter((a) => {
-    const ref = a.dossierRef ?? a.dossier_ref ?? "";
-    if (filter !== "all" && a.status !== filter) return false;
-    if (searchRef && !ref.toLowerCase().includes(searchRef.toLowerCase())) return false;
+  const filteredApurements = apurements.filter((a: any) => {
+    if (filterStatus === "all") return true;
+    if (filterStatus === "soumis") return a.status === "soumis";
+    if (filterStatus === "validé") return a.status === "valide";
+    if (filterStatus === "rejeté") return a.status === "rejete";
     return true;
   });
 
-  const soumisCount = allApurements.filter((a) => a.status === "soumis").length;
-  const valideCount = allApurements.filter((a) => a.status === "validé").length;
-  const rejeteCount = allApurements.filter((a) => a.status === "rejeté").length;
+  const enAttente = apurements.filter((a: any) => a.status === "soumis").length;
+  const valides = apurements.filter((a: any) => a.status === "valide").length;
+  const rejetes = apurements.filter((a: any) => a.status === "rejete").length;
 
-  /* Apurement search (secrétaire) */
-  const [secSearchRef, setSecSearchRef] = useState("");
-  const [secSearchYear, setSecSearchYear] = useState("");
-  const [foundDossier, setFoundDossier] = useState<Dossier | null>(null);
-  const [showApurForm, setShowApurForm] = useState(false);
-  const [apurE, setApurE] = useState("");
-  const [apurNumero, setApurNumero] = useState("");
-  const [apurDate, setApurDate] = useState("");
-
-  const handleSecSearch = () => {
-    const found = allDossiers.find((d) =>
-      (d.reference || "").toLowerCase().includes(secSearchRef.toLowerCase()),
-    );
-    if (!found) {
-      toast.error("Aucun dossier trouvé.");
-      setFoundDossier(null);
-      return;
-    }
-    if (found.status === "attente_paiement" || found.status === "brouillon") {
-      toast.error("Ce dossier doit être payé et vérifié avant apurement.");
-      setFoundDossier(null);
-      return;
-    }
-    setFoundDossier(found);
-  };
+  const canManage = user?.role === "inspecteur_chef" || user?.role === "secretaire_inspecteur";
 
   return (
-    <div>
-      <PageHeader
-        title="Apurement"
-        description={
-          isInspecteur
-            ? "Supervision des apurements soumis par vos secrétaires"
-            : "Recherche et soumission d'apurements"
-        }
-      />
+    <div className="space-y-6">
+      <DashHeader subtitle="Appurement — Gestion et validation des apurements" />
 
-      {/* Stats */}
-      <div className="mb-6 grid gap-3 grid-cols-3">
-        <div className="rounded-lg border border-border bg-card p-4 text-center">
-          <div className="text-2xl font-bold text-warning">{soumisCount}</div>
-          <div className="text-xs text-muted-foreground mt-1">En attente</div>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4 text-center">
-          <div className="text-2xl font-bold text-success">{valideCount}</div>
-          <div className="text-xs text-muted-foreground mt-1">Validés</div>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4 text-center">
-          <div className="text-2xl font-bold text-destructive">{rejeteCount}</div>
-          <div className="text-xs text-muted-foreground mt-1">Rejetés</div>
-        </div>
-      </div>
-
-      {/* ── INSPECTEUR: Supervision ── */}
-      {isInspecteur && (
-        <div className="rounded-lg border border-border bg-card">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-            <h2 className="font-medium flex items-center gap-2">
-              <FileCheck className="h-5 w-5 text-accent" />
-              Apurements soumis ({submissions.length})
-            </h2>
-            <div className="flex gap-2 items-center">
-              <Input
-                placeholder="Recherche réf…"
-                value={searchRef}
-                onChange={(e) => setSearchRef(e.target.value)}
-                className="w-48"
-              />
-              <div className="flex gap-1">
-                {(["all", "soumis", "validé", "rejeté"] as const).map((f) => (
-                  <Button
-                    key={f}
-                    size="sm"
-                    variant={filter === f ? "default" : "outline"}
-                    onClick={() => setFilter(f)}
-                    className="text-xs capitalize"
-                  >
-                    {f === "all" ? "Tous" : f}
-                  </Button>
-                ))}
-              </div>
-            </div>
+      {canManage && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <StatCard icon={Search} label="En attente" value={enAttente} hint="Soumissions en cours" />
+            <StatCard icon={FileCheck} label="Validés" value={valides} />
+            <StatCard icon={FolderKanban} label="Rejetés" value={rejetes} />
           </div>
-          <div className="p-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
-                <tr>
-                  <th className="px-3 py-2">Réf. dossier</th>
-                  <th className="px-3 py-2">Importateur</th>
-                  <th className="px-3 py-2">Type</th>
-                  <th className="px-3 py-2">Réf. douane</th>
-                  <th className="px-3 py-2">Secrétaire</th>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Statut</th>
-                  <th className="px-3 py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {submissions.map((ap) => (
-                  <tr
-                    key={ap.id}
-                    className="border-t border-border hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-3 py-2 font-mono text-xs font-medium">{ap.dossierRef ?? ap.dossier_ref}</td>
-                    <td className="px-3 py-2">{ap.importateur}</td>
-                    <td className="px-3 py-2 capitalize">{ap.type}</td>
-                    <td className="px-3 py-2 font-mono text-xs">{ap.refDouane ?? ap.ref_douane}</td>
-                    <td className="px-3 py-2">{ap.secretaireNom}</td>
-                    <td className="px-3 py-2 text-xs">{ap.dateSoumission ?? ap.created_at?.split("T")[0]}</td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs ${statusColor(ap.status)}`}
-                      >
-                        {ap.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex gap-1">
-                        <Link to="/app/dossiers/$dossierId" params={{ dossierId: ap.dossierId }}>
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                        </Link>
-                        {ap.status === "soumis" && (
-                          <>
-                            <Button
-                              size="sm"
-                              className="h-7 gap-1 px-2 bg-success hover:bg-success/90 text-success-foreground"
-                              onClick={() => toast.success(`Apurement ${ap.dossierRef} validé ✓`)}
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Valider
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="h-7 gap-1 px-2"
-                              onClick={() => toast.error(`Apurement ${ap.dossierRef} rejeté`)}
-                            >
-                              <XCircle className="h-3.5 w-3.5" />
-                              Rejeter
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {submissions.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
-                      Aucun apurement trouvé
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
-      {/* ── SECRÉTAIRE: Recherche + Apurement ── */}
-      {isSecretaire && (
-        <div className="space-y-4">
-          {/* Recherche dossier pour apurement */}
-          <div className="rounded-lg border border-border bg-card p-4">
-            <h3 className="font-medium mb-3 flex items-center gap-2">
-              <Search className="h-4 w-4 text-accent" />
-              Recherche dossier pour apurement
-            </h3>
+          {/* Recherche dossier pour apurement direct */}
+          <Panel title="Rechercher un dossier à apurer">
             <div className="flex flex-wrap gap-3 items-end">
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Référence dossier (RD)</label>
-                <Input
-                  placeholder="DSR/2025/…"
-                  value={secSearchRef}
-                  onChange={(e) => setSecSearchRef(e.target.value)}
-                  className="w-56"
-                />
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Référence dossier</label>
+                <Input placeholder="RD-…" value={searchRef} onChange={(e) => setSearchRef(e.target.value)} className="max-w-xs" />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Année</label>
-                <Input
-                  placeholder="2026"
-                  value={secSearchYear}
-                  onChange={(e) => setSecSearchYear(e.target.value)}
-                  className="w-28"
-                />
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Année</label>
+                <Input placeholder="2025" value={searchYear} onChange={(e) => setSearchYear(e.target.value)} className="max-w-[120px]" />
               </div>
-              <Button onClick={handleSecSearch} className="gap-1.5">
-                <Search className="h-4 w-4" />
-                Rechercher
-              </Button>
+              <Button onClick={handleSearch}><Search className="mr-1 h-4 w-4" />Chercher</Button>
             </div>
+            {foundDossier && (
+              <div className="mt-3 rounded-md border border-border bg-muted/20 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm">
+                    <span className="font-medium">{foundDossier.reference}</span> — {foundDossier.importateur}
+                    <Badge variant="outline" className="ml-2">{foundDossier.status}</Badge>
+                    {foundDossier.dra && <span className="ml-3 text-xs text-muted-foreground">DRA: <span className="font-mono">{foundDossier.dra}</span></span>}
+                  </div>
+                  <FormDialog
+                    trigger={<Button size="sm"><FileText className="mr-1 h-3.5 w-3.5" />Apurer</Button>}
+                    title={`Apurement direct — ${foundDossier.reference}`}
+                    onSubmit={async (formData: any) => {
+                      try {
+                        await apiCreateApurement({
+                          dossier_id: foundDossier.id,
+                          ref_douane: formData.ref_douane || "",
+                          date_reference_douane: formData.date_reference_douane || null,
+                          dra: formData.dra || foundDossier.dra || "",
+                          dra_date: formData.dra_date || null,
+                          date_apurement: formData.date_apurement || "",
+                          t1: formData.t1 || "",
+                          t1_date: formData.t1_date || null,
+                          plaque_avant: formData.plaque_avant || null,
+                          plaque_arriere: formData.plaque_arriere || null,
+                          observation: formData.observation || null,
+                        });
+                        toast.success("Apurement soumis avec succès");
+                        setFoundDossier(null);
+                        reloadDossiers();
+                        reloadApurements();
+                      } catch (e: any) {
+                        toast.error(e?.message || "Erreur lors de la soumission");
+                      }
+                    }}
+                  >
+                    <div className="mb-3 rounded-md bg-accent/10 p-3 text-sm">
+                      <span className="font-medium">Dossier:</span> {foundDossier.reference} — {foundDossier.importateur}<br />
+                      {foundDossier.dra && <><span className="font-medium">DRA dossier:</span> <span className="font-mono">{foundDossier.dra}</span></>}
+                    </div>
+                    <FormGrid>
+                      <Field label="Référence Douane" required>
+                        <Input name="ref_douane" placeholder="E-…" required />
+                      </Field>
+                      <Field label="Date Réf. Douane">
+                        <Input name="date_reference_douane" type="date" />
+                      </Field>
+                      <Field label="Référence DRA">
+                        <Input name="dra" defaultValue={foundDossier.dra || ""} />
+                      </Field>
+                      <Field label="Date DRA">
+                        <Input name="dra_date" type="date" />
+                      </Field>
+                      <Field label="Date Apurement" required>
+                        <Input name="date_apurement" type="date" required />
+                      </Field>
+                      <Field label="Référence T1">
+                        <Input name="t1" placeholder="N° T1" />
+                      </Field>
+                      <Field label="Date T1">
+                        <Input name="t1_date" type="date" />
+                      </Field>
+                      <Field label="Plaque Avant">
+                        <Input name="plaque_avant" placeholder="Immatriculation avant" />
+                      </Field>
+                      <Field label="Plaque Arrière">
+                        <Input name="plaque_arriere" placeholder="Immatriculation arrière" />
+                      </Field>
+                      <Field label="Observation">
+                        <Input name="observation" />
+                      </Field>
+                    </FormGrid>
+                  </FormDialog>
+                </div>
+              </div>
+            )}
+          </Panel>
+
+          {/* Filtres */}
+          <div className="flex gap-2">
+            {["all", "soumis", "validé", "rejeté"].map((f) => (
+              <Button key={f} variant={filterStatus === f ? "default" : "outline"} size="sm" onClick={() => setFilterStatus(f)}>
+                {f === "all" ? "Tous" : f.charAt(0).toUpperCase() + f.slice(1)}
+              </Button>
+            ))}
           </div>
 
-          {/* Tableau résultats apurement */}
-          {foundDossier && (
-            <div className="space-y-4">
-              <div className="rounded-lg border border-border bg-card overflow-hidden">
-                <div className="border-b border-border px-4 py-3 bg-muted/30">
-                  <h4 className="font-medium text-sm">Résultats — {foundDossier.reference}</h4>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
-                      <tr>
-                        <th className="px-3 py-2 w-10">N°</th>
-                        <th className="px-3 py-2">Importateur</th>
-                        <th className="px-3 py-2">Référence dossier</th>
-                        <th className="px-3 py-2">Référence RD (Douane)</th>
-                        <th className="px-3 py-2">Apurer dossier</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-t border-border hover:bg-muted/30 transition-colors">
-                        <td className="px-3 py-2">
-                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent/10 font-mono text-xs font-semibold text-accent">1</span>
-                        </td>
-                        <td className="px-3 py-2 font-medium text-xs">{foundDossier.importateur}</td>
-                        <td className="px-3 py-2 font-mono text-xs font-bold text-accent">{foundDossier.reference}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{foundDossier.refDouane || "E-0000"}</td>
-                        <td className="px-3 py-2">
-                          <Button
-                            size="sm"
-                            className="h-7 gap-1.5 text-xs bg-accent hover:bg-accent/90 text-white"
-                            onClick={() => setShowApurForm(true)}
-                          >
-                            <FileCheck className="h-3.5 w-3.5" />
-                            Apurer dossier
-                          </Button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Formulaire d'apurement */}
-              {showApurForm && (
-                <div className="rounded-lg border border-accent/30 bg-accent/5 p-4 animate-in fade-in duration-200">
-                  <h5 className="font-medium mb-3 flex items-center gap-2">
-                    <FileCheck className="h-4 w-4 text-accent" />
-                    Formulaire d'apurement — {foundDossier.reference}
-                  </h5>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium">E</label>
-                      <Input
-                        placeholder="E-001"
-                        value={apurE}
-                        onChange={(e) => setApurE(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium">Numéro</label>
-                      <Input
-                        type="number"
-                        placeholder="4345"
-                        value={apurNumero}
-                        onChange={(e) => setApurNumero(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium">Date</label>
-                      <Input
-                        type="date"
-                        value={apurDate}
-                        onChange={(e) => setApurDate(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => {
-                        toast.success("Apurement ajouté avec succès ✓");
-                        setFoundDossier(null);
-                        setSecSearchRef("");
-                        setShowApurForm(false);
-                        setApurE("");
-                        setApurNumero("");
-                        setApurDate("");
-                      }}
-                      className="gap-1.5"
-                    >
-                      <FileCheck className="h-4 w-4" />
-                      Ajouter
-                    </Button>
-                    <Button variant="outline" onClick={() => setShowApurForm(false)}>Annuler</Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Historique soumissions */}
-          <div className="rounded-lg border border-border bg-card">
-            <div className="border-b border-border p-4">
-              <h3 className="font-medium">Mes soumissions</h3>
-            </div>
-            <div className="p-3 overflow-x-auto">
+          <Panel title="Soumissions">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
                   <tr>
-                    <th className="px-3 py-2">Réf.</th>
+                    <th className="px-3 py-2">Réf. dossier</th>
                     <th className="px-3 py-2">Importateur</th>
+                    <th className="px-3 py-2">Type</th>
                     <th className="px-3 py-2">Réf. douane</th>
+                    <th className="px-3 py-2">DRA soumis</th>
+                    <th className="px-3 py-2">Soumis par</th>
                     <th className="px-3 py-2">Date</th>
                     <th className="px-3 py-2">Statut</th>
+                    <th className="px-3 py-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {allApurements.map((ap) => (
-                    <tr key={ap.id} className="border-t border-border hover:bg-muted/30">
-                      <td className="px-3 py-2 font-mono text-xs">{ap.dossierRef ?? ap.dossier_ref}</td>
-                      <td className="px-3 py-2">{ap.importateur}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{ap.refDouane ?? ap.ref_douane}</td>
-                      <td className="px-3 py-2 text-xs">{ap.dateSoumission ?? ap.created_at?.split("T")[0]}</td>
-                      <td className="px-3 py-2">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs ${statusColor(ap.status)}`}
-                        >
-                          {ap.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredApurements.map((a: any) => {
+                    const isRejectedVerif = a.status === "rejete" && a.type_appurement === "verification";
+                    return (
+                      <tr key={a.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                        <td className="px-3 py-2">
+                          <Link to="/app/dossiers/$dossierId" params={{ dossierId: a.dossier_id }} className="text-accent hover:underline font-mono text-xs">
+                            {a.dossier?.reference || a.dossier_id}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2">{a.dossier?.importateur || "—"}</td>
+                        <td className="px-3 py-2 capitalize">{a.type_appurement || "administratif"}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{a.ref_douane || "—"}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{a.dra || "—"}</td>
+                        <td className="px-3 py-2">{a.submitter?.full_name || a.secretaire?.full_name || "—"}</td>
+                        <td className="px-3 py-2">{a.date_soumission ? new Date(a.date_soumission).toLocaleDateString() : "—"}</td>
+                        <td className="px-3 py-2">
+                          <Badge variant={a.status === "valide" ? "default" : a.status === "rejete" ? "destructive" : "secondary"}>
+                            {a.status}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 flex gap-1">
+                          {a.status === "soumis" && (
+                            <>
+                              <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => handleValidate(a.id, "valide")}>
+                                Valider
+                              </Button>
+                              <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => handleValidate(a.id, "rejete")}>
+                                Rejeter
+                              </Button>
+                            </>
+                          )}
+                          {isRejectedVerif && (
+                            <FormDialog
+                              trigger={<Button size="sm" variant="outline" className="h-7 text-xs"><FileText className="mr-1 h-3 w-3" />Apurer</Button>}
+                              title={`Apurer le dossier — ${a.dossier?.reference || a.dossier_id}`}
+                              onSubmit={async (formData: any) => {
+                                try {
+                                  await apiCreateApurement({
+                                    dossier_id: a.dossier_id,
+                                    ref_douane: formData.ref_douane || "",
+                                    date_reference_douane: formData.date_reference_douane || null,
+                                    dra: formData.dra || a.dossier?.dra || "",
+                                    dra_date: formData.dra_date || null,
+                                    date_apurement: formData.date_apurement || "",
+                                    t1: formData.t1 || "",
+                                    t1_date: formData.t1_date || null,
+                                    plaque_avant: formData.plaque_avant || null,
+                                    plaque_arriere: formData.plaque_arriere || null,
+                                    observation: formData.observation || null,
+                                  });
+                                  toast.success("Apurement soumis avec succès");
+                                  reloadDossiers();
+                                  reloadApurements();
+                                } catch (e: any) {
+                                  toast.error(e?.message || "Erreur lors de la soumission");
+                                }
+                              }}
+                            >
+                              <div className="mb-3 rounded-md bg-accent/10 p-3 text-sm">
+                                <span className="font-medium">Dossier:</span> {a.dossier?.reference || a.dossier_id} — {a.dossier?.importateur}<br />
+                                {a.dossier?.dra && <><span className="font-medium">DRA dossier:</span> <span className="font-mono">{a.dossier.dra}</span> — </>}
+                                <span className="font-medium">DRA soumis:</span> <span className="font-mono">{a.dra || "—"}</span>
+                              </div>
+                              <FormGrid>
+                                <Field label="Référence Douane" required>
+                                  <Input name="ref_douane" placeholder="E-…" required />
+                                </Field>
+                                <Field label="Date Réf. Douane">
+                                  <Input name="date_reference_douane" type="date" />
+                                </Field>
+                                <Field label="Référence DRA">
+                                  <Input name="dra" defaultValue={a.dossier?.dra || ""} />
+                                </Field>
+                                <Field label="Date DRA">
+                                  <Input name="dra_date" type="date" />
+                                </Field>
+                                <Field label="Date Apurement" required>
+                                  <Input name="date_apurement" type="date" required />
+                                </Field>
+                                <Field label="Référence T1">
+                                  <Input name="t1" placeholder="N° T1" />
+                                </Field>
+                                <Field label="Date T1">
+                                  <Input name="t1_date" type="date" />
+                                </Field>
+                                <Field label="Plaque Avant">
+                                  <Input name="plaque_avant" placeholder="Immatriculation avant" />
+                                </Field>
+                                <Field label="Plaque Arrière">
+                                  <Input name="plaque_arriere" placeholder="Immatriculation arrière" />
+                                </Field>
+                                <Field label="Observation">
+                                  <Input name="observation" />
+                                </Field>
+                              </FormGrid>
+                            </FormDialog>
+                          )}
+                          <Link to="/app/dossiers/$dossierId" params={{ dossierId: a.dossier_id }}>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs">Voir</Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredApurements.length === 0 && (
+                    <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">Aucune soumission</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
+          </Panel>
+        </>
       )}
 
-      {/* ── Autres rôles: vue basique ── */}
-      {!isInspecteur && !isSecretaire && (
-        <div className="rounded-lg border border-border bg-card">
-          <div className="border-b border-border p-4">
-            <h2 className="font-medium">Dossiers apurés récemment</h2>
-          </div>
-          <div className="p-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase text-muted-foreground bg-muted/50">
-                <tr>
-                  <th className="px-3 py-2">Réf.</th>
-                  <th className="px-3 py-2">Importateur</th>
-                  <th className="px-3 py-2">Type</th>
-                  <th className="px-3 py-2">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allDossiers.filter((d) => d.status === "apure")
-                  .slice(0, 12)
-                  .map((d) => (
-                    <tr key={d.id} className="border-t border-border hover:bg-muted/30">
-                      <td className="px-3 py-2 font-mono text-xs">{d.reference}</td>
-                      <td className="px-3 py-2">{d.importateur}</td>
-                      <td className="px-3 py-2 capitalize">{d.type}</td>
-                      <td className="px-3 py-2 text-xs">{d.date}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

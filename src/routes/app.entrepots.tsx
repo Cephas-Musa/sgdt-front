@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 import { DataTable } from "@/components/DataTable";
-import { useApi, apiGetWarehouses, apiCreateWarehouse, apiUpdateWarehouse, apiDeleteWarehouse, apiGetMouvements, apiGetVracs, apiGetMouvementsStockage, apiCreateMouvement, apiCreateVrac, apiCreateStockageMouvement } from "@/lib/api";
+import { useApi, apiGetWarehouses, apiCreateWarehouse, apiUpdateWarehouse, apiDeleteWarehouse, apiGetMouvements, apiGetVracs, apiGetMouvementsStockage, apiCreateMouvement, apiCreateVrac, apiCreateStockageMouvement, apiGetBureauxDouaniers } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Loader2, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -320,6 +320,8 @@ function BrigadierEntrepotForms() {
 function EntrepotsPage() {
   const { user } = useAuth();
   const { data: rawWarehouses, reload } = useApi(apiGetWarehouses);
+  const { data: rawBureaux } = useApi(apiGetBureauxDouaniers);
+  const bureaux = (rawBureaux as any[] || []);
   const entrepots = (rawWarehouses as any[]) || [];
   const { data: rawMouvements } = useApi(() => apiGetMouvements({}));
   const { data: rawVracs } = useApi(() => apiGetVracs({}));
@@ -340,9 +342,22 @@ function EntrepotsPage() {
   const [formData, setFormData] = useState({ nom: "", code: "", bureau: "", ville: "", capacite: 0 });
   const [loading, setLoading] = useState(false);
 
+  const getUserBureau = () => {
+    if (user?.bureau) return user.bureau;
+    if (user?.bureau_id && bureaux.length > 0) {
+      const b = bureaux.find((x: any) => x.id === user?.bureau_id);
+      if (b) return b.denomination;
+    }
+    if (user?.province && bureaux.length > 0) {
+      const b = bureaux.find((x: any) => x.province === user?.province);
+      if (b) return b.denomination;
+    }
+    return "";
+  };
+
   const openCreate = () => {
     setEditingId("");
-    setFormData({ nom: "", code: "", bureau: user?.bureau || "", ville: "", capacite: 0 });
+    setFormData({ nom: "", code: "", bureau: getUserBureau(), ville: "", capacite: 0 });
     setIsDialogOpen(true);
   };
 
@@ -786,7 +801,7 @@ function EntrepotsPage() {
       <div className="mt-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Liste complète des Entrepôts</h2>
-          {(user?.role === "super_admin" || isDP || user?.role === "directeur_general" || user?.role === "inspecteur_chef" || user?.role === "inspecteur") && (
+          {(user?.role === "super_admin" || isDP || user?.role === "directeur_general" || user?.role === "inspecteur_chef") && (
             <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Nouvel Entrepôt</Button>
           )}
         </div>

@@ -31,7 +31,7 @@ class ApurementPolicy
         }
 
         // Inspecteur, Chef Bureau voient les apurements de leur bureau
-        if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur', 'verificateur', 'chef_verification'])) {
+        if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef', 'verificateur', 'chef_verification'])) {
             return $user->bureau_id === $apurement->dossier?->bureau_id;
         }
 
@@ -40,7 +40,7 @@ class ApurementPolicy
 
     public function create(User $user): bool
     {
-        return in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur', 'verificateur', 'secretaire_inspecteur']);
+        return in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef', 'verificateur', 'secretaire_inspecteur']);
     }
 
     public function update(User $user, Apurement $apurement): bool

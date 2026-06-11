@@ -14,7 +14,6 @@ class AlerteController extends Controller
     {
         $user = $request->user();
 
-        // Récupérer les alertes destinées à l'utilisateur ou à son rôle
         $query = Alerte::where(function ($query) use ($user) {
             $query->where('recipient_id', $user->id)
                   ->orWhere('target_role', $user->role);
@@ -36,8 +35,17 @@ class AlerteController extends Controller
             $query->where('is_read', $request->boolean('is_read'));
         }
 
+        if ($request->has('status')) {
+            switch ($request->input('status')) {
+                case 'nouvelle': $query->where('is_read', false)->whereNull('resolved_at'); break;
+                case 'lue': $query->where('is_read', true)->whereNull('resolved_at'); break;
+                case 'traitee': $query->where('is_read', true)->whereNotNull('resolved_at'); break;
+                case 'rejetee': $query->where('type', 'like', '%rejet%'); break;
+            }
+        }
+
         $alertes = $query->orderBy('created_at', 'desc')
-            ->with(['dossier', 'user'])
+            ->with(['dossier', 'recipient', 'trigger'])
             ->get();
 
         return response()->json($alertes);
@@ -147,11 +155,51 @@ class AlerteController extends Controller
                   ->orWhere('target_role', $user->role);
         })
         ->where('severity', 'critical')
-        ->where('resolved_at', null)
+        ->whereNull('resolved_at')
         ->orderBy('created_at', 'desc')
         ->get();
 
         return response()->json($alertes);
+    }
+
+    /**
+     * Statistiques des alertes
+     */
+    public function stats(Request $request)
+    {
+        $user = $request->user();
+
+        $base = Alerte::where(function ($query) use ($user) {
+            $query->where('recipient_id', $user->id)
+                  ->orWhere('target_role', $user->role);
+        });
+
+        return response()->json([
+            'nouvelles' => (clone $base)->where('is_read', false)->whereNull('resolved_at')->count(),
+            'lues' => (clone $base)->where('is_read', true)->whereNull('resolved_at')->count(),
+            'traitees' => (clone $base)->whereNotNull('resolved_at')->count(),
+            'critiques' => (clone $base)->where('severity', 'critical')->whereNull('resolved_at')->count(),
+            'elevees' => (clone $base)->where('severity', 'high')->whereNull('resolved_at')->count(),
+            'moyennes' => (clone $base)->where('severity', 'medium')->whereNull('resolved_at')->count(),
+        ]);
+    }
+
+    /**
+     * Récupérer une alerte unique
+     */
+    public function show(Request $request, $id)
+    {
+        $user = $request->user();
+
+        $alerte = Alerte::where('id', $id)
+            ->where(function ($query) use ($user) {
+                $query->where('recipient_id', $user->id)
+                      ->orWhere('target_role', $user->role);
+            })
+            ->with(['dossier', 'recipient', 'trigger'])
+            ->firstOrFail();
+
+        return response()->json($alerte);
     }
 }
 

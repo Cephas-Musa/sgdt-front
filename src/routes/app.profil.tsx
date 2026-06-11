@@ -305,6 +305,7 @@ function ProfilPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="transition-shadow focus:shadow-md"
+                    noUppercase
                   />
                 </div>
                 <div className="space-y-2">
@@ -352,6 +353,7 @@ function ProfilPage() {
                       value={oldPwd}
                       onChange={(e) => setOldPwd(e.target.value)}
                       className="pr-10"
+                      noUppercase
                     />
                     <button
                       type="button"
@@ -370,6 +372,7 @@ function ProfilPage() {
                       value={newPwd}
                       onChange={(e) => setNewPwd(e.target.value)}
                       className="pr-10"
+                      noUppercase
                     />
                     <button
                       type="button"
@@ -398,6 +401,7 @@ function ProfilPage() {
                       value={confirmPwd}
                       onChange={(e) => setConfirmPwd(e.target.value)}
                       className="pr-10"
+                      noUppercase
                     />
                     <button
                       type="button"

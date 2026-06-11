@@ -80,7 +80,9 @@ export interface ApiUser {
   full_name: string;
   role: string;
   bureau?: string;
+  bureau_id?: number;
   province?: string;
+  province_id?: number;
   matricule?: string;
   wallet_balance?: number;
 }
@@ -221,12 +223,68 @@ export async function apiSendDossierChat(id: string, message: string, attachment
 
 // ─── ALERTES ─────────────────────────────────────────────────────────────────
 
-export async function apiGetAlertes(): Promise<unknown[]> {
-  return request<unknown[]>("/alertes");
+export interface Alerte {
+  id: number;
+  recipient_id: number | null;
+  target_role: string | null;
+  type: string;
+  title: string;
+  message: string;
+  reference_id: string | null;
+  hierarchy_level: number;
+  dossier_id: string | null;
+  is_read: boolean;
+  triggered_by: number | null;
+  severity: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  dossier?: { id: string; reference: string; importateur: string; status: string };
+  recipient?: { id: number; full_name: string; role: string };
+  trigger?: { id: number; full_name: string; role: string };
+}
+
+export interface AlerteStats {
+  nouvelles: number;
+  lues: number;
+  traitees: number;
+  critiques: number;
+  elevees: number;
+  moyennes: number;
+}
+
+export async function apiGetAlertes(params?: Record<string, string>): Promise<Alerte[]> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<Alerte[]>(`/alertes${qs}`);
+}
+
+export async function apiGetAlerte(id: number): Promise<Alerte> {
+  return request<Alerte>(`/alertes/${id}`);
+}
+
+export async function apiGetAlerteUnreadCount(): Promise<{ unread_count: number }> {
+  return request<{ unread_count: number }>("/alertes/unread-count");
+}
+
+export async function apiGetAlerteStats(): Promise<AlerteStats> {
+  return request<AlerteStats>("/alertes/stats");
+}
+
+export async function apiGetAlerteCritical(): Promise<Alerte[]> {
+  return request<Alerte[]>("/alertes/critical");
 }
 
 export async function apiMarkAlerteRead(id: number): Promise<unknown> {
   return request<unknown>(`/alertes/${id}/read`, { method: "PATCH" });
+}
+
+export async function apiAcknowledgeAlerte(id: number): Promise<unknown> {
+  return request<unknown>(`/alertes/${id}/acknowledge`, { method: "PATCH" });
+}
+
+export async function apiResolveAlerte(id: number): Promise<unknown> {
+  return request<unknown>(`/alertes/${id}/resolve`, { method: "PATCH" });
 }
 
 // ─── MOUVEMENTS (Brigadier) ──────────────────────────────────────────────────
@@ -371,7 +429,11 @@ export async function apiCreateApurement(data: unknown): Promise<unknown> {
   return request<unknown>("/apurements", { method: "POST", body: JSON.stringify(data) });
 }
 
-export async function apiUpdateApurementStatus(id: number, status: string): Promise<unknown> {
+export async function apiCreateApurementVerificateur(data: unknown): Promise<unknown> {
+  return request<unknown>("/apurements/verificateur", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function apiUpdateApurementStatus(id: string, status: string): Promise<unknown> {
   return request<unknown>(`/apurements/${id}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
@@ -758,5 +820,57 @@ export async function apiGetDossierControle(id: number | string): Promise<any> {
 
 export async function apiSearchDossierControle(query: string): Promise<any> {
   return request<any>(`/dossiers-controle/search?q=${encodeURIComponent(query)}`);
+}
+
+// ─── VEHICULE LOCALISATION ─────────────────────────────────────────────────────
+
+export async function apiGetVehiculeLocalisations(): Promise<any[]> {
+  return request<any[]>("/vehicule-localisations");
+}
+
+export async function apiGetVehiculeLocalisationStats(): Promise<any> {
+  return request<any>("/vehicule-localisations/stats");
+}
+
+export async function apiUpdateVehiculePosition(id: string, data: { position: string; status?: string }): Promise<any> {
+  return request<any>(`/vehicule-localisations/${id}/position`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+// ─── PUSH NOTIFICATIONS ───────────────────────────────────────────────────
+
+export async function apiGetVapidPublicKey(): Promise<{ public_key: string }> {
+  return request<{ public_key: string }>("/vapid-public-key");
+}
+
+export async function apiSubscribePush(subscription: PushSubscriptionJSON): Promise<{ status: string }> {
+  return request<{ status: string }>("/push/subscribe", {
+    method: "POST",
+    body: JSON.stringify(subscription),
+  });
+}
+
+export async function apiUnsubscribePush(endpoint: string): Promise<{ status: string }> {
+  return request<{ status: string }>("/push/unsubscribe", {
+    method: "DELETE",
+    body: JSON.stringify({ endpoint }),
+  });
+}
+
+export interface PushSubscriptionRecord {
+  id: number;
+  user_id: number;
+  endpoint: string;
+  auth_token: string;
+  content_encoding: string;
+  keys: { p256dh: string; auth: string };
+  created_at: string;
+  updated_at: string;
+}
+
+export async function apiGetPushSubscriptions(): Promise<PushSubscriptionRecord[]> {
+  return request<PushSubscriptionRecord[]>("/push/subscriptions");
 }
 

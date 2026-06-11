@@ -73,19 +73,19 @@ class DossierAccessService
         $query = Dossier::with(['articles', 'creator', 'inspecteur', 'secretary', 'representationEntry.articles', 'typingDocsDirect', 'typingDocsTranshipment', 'itEntries'])
                         ->where('status', '!=', 'appure');
 
-        if (in_array($user->role, ['directeur_provincial'])) {
-            $query->where(function($q) use ($user) {
-                if ($user->province_id) {
-                    $q->where('province_id', $user->province_id);
-                }
-                $q->orWhereHas('creator', function($cq) {
-                    $cq->whereIn('role', ['operateur_saisie', 'chef_bureau_repr']);
+        if ($user->role === 'directeur_provincial') {
+            $provinceId = $user->province_id;
+            if ($provinceId) {
+                $query->where(function($q) use ($provinceId) {
+                    $q->where('province_id', $provinceId)
+                      ->orWhereHas('creator', function($cq) use ($provinceId) {
+                          $cq->where('province_id', $provinceId);
+                      });
                 });
-            });
+            }
         } elseif (in_array($user->role, [
             'inspecteur_chef_bureau',
             'inspecteur_chef',
-            'inspecteur',
             'agent_controle',
             'verificateur',
             'brigadier_barriere',
@@ -169,11 +169,20 @@ class DossierAccessService
             }
         } elseif ($user->role === 'secretaire_inspecteur') {
             $query->where(function($q) use ($user) {
-                $q->where('secretary_id', $user->id)
-                  ->orWhere('inspecteur_id', $user->supervisor?->id)
-                  ->orWhereHas('creator', function($cq) {
-                      $cq->whereIn('role', ['operateur_saisie', 'chef_bureau_repr']);
-                  });
+                $q->where('secretary_id', $user->id);
+                $supervisor = $user->supervisor;
+                if ($supervisor) {
+                    $q->orWhere('inspecteur_id', $supervisor->id);
+                    if ($supervisor->bureau_id) {
+                        $q->orWhere('bureau_id', $supervisor->bureau_id);
+                    }
+                    $q->orWhereHas('creator', function($cq) use ($supervisor) {
+                        $cq->whereIn('role', ['operateur_saisie', 'chef_bureau_repr']);
+                        if ($supervisor->bureau_id) {
+                            $cq->where('bureau_id', $supervisor->bureau_id);
+                        }
+                    });
+                }
             });
         } elseif (in_array($user->role, ['super_admin', 'directeur_general'])) {
             // Superadmin et DG voient tout ce qui n'est pas appuré
@@ -209,7 +218,14 @@ class DossierAccessService
         }
 
         if (in_array($user->role, ['directeur_provincial'])) {
-            return $user->province_id === $dossier->province_id;
+            if ($user->province_id === $dossier->province_id) {
+                return true;
+            }
+            // Fallback: vérifier via le créateur du dossier
+            if ($dossier->creator && $user->province_id === $dossier->creator->province_id) {
+                return true;
+            }
+            return false;
         }
 
         // Rôles liés à un bureau (Chef de bureau, Agent, Vérificateur, etc.)
@@ -241,12 +257,15 @@ class DossierAccessService
         }
 
         // Un inspecteur ne voit que ses propres dossiers, et ceux créés par le bureau de représentation pour son bureau
-        if ($user->role === 'inspecteur') {
+        if ($user->role === 'inspecteur_chef') {
             if ($user->id === $dossier->inspecteur_id) {
                 return true;
             }
             if ($user->id === $dossier->created_by) {
                 return true;  // Les dossiers créés par cet inspecteur
+            }
+            if ($user->id === $dossier->secretary_id) {
+                return true;  // Son secrétaire peut y accéder, l'inspecteur aussi
             }
             if ($user->bureau_id === $dossier->bureau_id && $dossier->creator && in_array($dossier->creator->role, ['operateur_saisie', 'chef_bureau_repr'])) {
                 return true;
@@ -254,10 +273,18 @@ class DossierAccessService
             return false;
         }
 
-        // Un secrétaire voit les siens et ceux de son inspecteur
+        // Un secrétaire voit TOUT ce que son inspecteur superviseur voit
         if ($user->role === 'secretaire_inspecteur') {
-            return $user->id === $dossier->secretary_id ||
-                   ($user->supervisor && $user->supervisor->id === $dossier->inspecteur_id);
+            if ($user->id === $dossier->secretary_id) return true;
+            $supervisor = $user->supervisor;
+            if (!$supervisor) return false;
+            // Hériter des accès de l'inspecteur superviseur
+            if ($supervisor->id === $dossier->inspecteur_id) return true;
+            if ($supervisor->id === $dossier->created_by) return true;
+            if ($supervisor->id === $dossier->secretary_id) return true;
+            if ($supervisor->bureau_id === $dossier->bureau_id) return true;
+            if ($supervisor->bureau_id === $dossier->bureau_id && $dossier->creator && in_array($dossier->creator->role, ['operateur_saisie', 'chef_bureau_repr'])) return true;
+            return false;
         }
 
         // Chef Entrepôt Douane: accès à tous les dossiers via recherche (recherche par référence)

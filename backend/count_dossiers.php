@@ -1,6 +1,6 @@
 <?php
 $inspecteurs = App\Models\Dossier::whereHas('creator', function($q) { 
-    $q->whereIn('role', ['inspecteur', 'inspecteur_chef', 'secretaire_inspecteur']); 
+    $q->whereIn('role', ['inspecteur_chef', 'secretaire_inspecteur']); 
 })->count();
 
 $operateursDossiers = App\Models\Dossier::whereHas('creator', function($q) { 

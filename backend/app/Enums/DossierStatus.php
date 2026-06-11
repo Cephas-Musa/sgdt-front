@@ -12,6 +12,7 @@ enum DossierStatus: string
     case CONTROLE = 'controle';
     case VERIFIE = 'verifie';
     case VERIFICATION = 'verification';
+    case APPURE = 'apure';
     case APPUREMENT_ADMINISTRATIF = 'appurement_administratif';
     case APPUREMENT_FINAL = 'appurement_final';
     case TERMINE = 'termine';

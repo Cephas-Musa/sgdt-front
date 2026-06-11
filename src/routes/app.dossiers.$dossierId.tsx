@@ -22,13 +22,15 @@ import {
   User,
   MapPin,
   Edit,
+  FileCheck,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { useApi, apiGetDossierAggregate, apiUpdateDossier } from "@/lib/api";
+import { useApi, apiGetDossierAggregate, apiUpdateDossier, apiDeleteDossier } from "@/lib/api";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -44,8 +46,7 @@ type FilterKey =
   | "donneesRepresentation"
   | "rapportColisage"
   | "verification"
-  | "sortie"
-  | "rapportDechargement";
+  | "sortie";
 
 const FILTERS: { key: FilterKey; label: string; icon: any; color: string; source: string }[] = [
   {
@@ -91,11 +92,11 @@ const FILTERS: { key: FilterKey; label: string; icon: any; color: string; source
     source: "Brigadier Entrepôt",
   },
   {
-    key: "rapportDechargement",
-    label: "Brigadier Contrôle",
-    icon: Warehouse,
-    color: "text-rose-500",
-    source: "Brigadier Contrôle",
+    key: "apurement",
+    label: "Apurement",
+    icon: FileCheck,
+    color: "text-green-500",
+    source: "Secrétaire / Vérificateur",
   },
 ];
 
@@ -105,7 +106,6 @@ const ALLOWED_ROLES = [
   "directeur_provincial",
   "agent_controle",
   "inspecteur_chef",
-  "inspecteur",
   "secretaire_inspecteur",
   "chef_bureau_repr",
 ];
@@ -237,18 +237,64 @@ function DossierDetailPage() {
         validatedAt: rc.validated_at ? new Date(rc.validated_at).toLocaleDateString("fr-FR") : "—",
       };
     })(),
-    verificationRapport: {
-      resultat: rawDossier.validations?.[0]?.status || "—",
-      observations: rawDossier.validations?.[0]?.observation || "—",
-      anomalies: rawDossier.anomalies?.length ? `${rawDossier.anomalies.length} détectée(s)` : "Aucune",
-      commentaires: rawDossier.validations?.[0]?.validation_type || "—",
-    },
+    verificationRapport: (() => {
+      const verifApurement = aggregateData?.apurements?.find((a: any) => a.type_appurement === 'verification');
+      const extraVerif = rawDossier.extra_data?.verification_apurement;
+      if (verifApurement || extraVerif) {
+        return {
+          resultat: verifApurement?.status === 'valide' ? 'Conforme' : verifApurement?.status === 'rejete' ? 'Non conforme' : 'En attente',
+          observations: verifApurement?.observation || extraVerif?.information || "—",
+          anomalies: rawDossier.anomalies?.length ? `${rawDossier.anomalies.length} détectée(s)` : "Aucune",
+          commentaires: extraVerif?.information || "—",
+          ref_douane: verifApurement?.ref_douane || "—",
+          date_apurement: verifApurement?.date_apurement || "—",
+          dra: verifApurement?.dra || "—",
+          t1: verifApurement?.t1 || "—",
+          plaque_avant: verifApurement?.plaque_avant || rawDossier.plaque_avant || "—",
+          plaque_arriere: verifApurement?.plaque_arriere || rawDossier.plaque_arriere || "—",
+          quantite_totale: extraVerif?.quantite_totale || "—",
+          poids: extraVerif?.poids || "—",
+          submitter: verifApurement?.submitter?.full_name || "—",
+          date_soumission: verifApurement?.date_soumission || "—",
+        };
+      }
+      return {
+        resultat: rawDossier.validations?.[0]?.status || "—",
+        observations: rawDossier.validations?.[0]?.observation || "—",
+        anomalies: rawDossier.anomalies?.length ? `${rawDossier.anomalies.length} détectée(s)` : "Aucune",
+        commentaires: rawDossier.validations?.[0]?.validation_type || "—",
+      };
+    })(),
     sortie: {
       autorisation: rawDossier.mouvements?.find((m: any) => m.operation_type === 'sortie')?.sub_type_operation || "—",
       bonSortie: "—",
       dateSortie: rawDossier.mouvements?.find((m: any) => m.operation_type === 'sortie')?.created_at?.split('T')[0] || "—",
       destinationFinale: rawDossier.destination || "—",
     },
+    apurement: (() => {
+      const ap = aggregateData?.apurements;
+      if (!ap || ap.length === 0) return null;
+      const last = ap[0];
+      return {
+        id: last.id,
+        ref_douane: last.ref_douane || "—",
+        date_reference_douane: last.date_reference_douane || "—",
+        dra: last.dra || "—",
+        dra_date: last.dra_date || "—",
+        date_apurement: last.date_apurement ? new Date(last.date_apurement).toLocaleDateString() : "—",
+        t1_date: last.t1_date || "—",
+        plaque_avant: last.plaque_avant || rawDossier.plaque_avant || "—",
+        plaque_arriere: last.plaque_arriere || rawDossier.plaque_arriere || "—",
+        type_appurement: last.type_appurement || "administratif",
+        status: last.status || "—",
+        observation: last.observation || "—",
+        validated_by: last.validator?.full_name || "—",
+        validated_at: last.validated_at ? new Date(last.validated_at).toLocaleDateString() : "—",
+        submitter: last.submitter?.full_name || last.secretaire?.full_name || "—",
+        date_soumission: last.date_soumission ? new Date(last.date_soumission).toLocaleDateString() : "—",
+        all: ap,
+      };
+    })(),
     rapportDechargement: (() => {
       const dc = rawDossier.dossiers_controle?.[0];
       if (!dc) return null;
@@ -559,10 +605,37 @@ function DossierDetailPage() {
             iconColor="text-cyan-500"
             source="Vérificateur"
           >
-            <FilterField label="Résultat Vérification" value={dossier.verificationRapport.resultat} icon="⚖️" />
-            <FilterField label="Observations" value={dossier.verificationRapport.observations} icon="👁️" />
-            <FilterField label="Anomalies" value={dossier.verificationRapport.anomalies} icon="⚠️" />
-            <FilterField label="Commentaires" value={dossier.verificationRapport.commentaires} icon="💬" />
+            {dossier.verificationRapport.ref_douane ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                  <FilterField label="Réf. Douane" value={dossier.verificationRapport.ref_douane} />
+                  <FilterField label="Date Apurement" value={dossier.verificationRapport.date_apurement} />
+                  <FilterField label="Résultat" value={dossier.verificationRapport.resultat} />
+                  <FilterField label="DRA" value={dossier.verificationRapport.dra} />
+                  <FilterField label="T1" value={dossier.verificationRapport.t1} />
+                  <FilterField label="Plaque Avant" value={dossier.verificationRapport.plaque_avant} />
+                  <FilterField label="Plaque Arrière" value={dossier.verificationRapport.plaque_arriere} />
+                  <FilterField label="Quantité Totale" value={dossier.verificationRapport.quantite_totale} />
+                  <FilterField label="Poids (kg)" value={dossier.verificationRapport.poids} />
+                  <FilterField label="Soumis par" value={dossier.verificationRapport.submitter} />
+                  <FilterField label="Date soumission" value={dossier.verificationRapport.date_soumission} />
+                </div>
+                {dossier.verificationRapport.observations && dossier.verificationRapport.observations !== "—" && (
+                  <div className="rounded-lg bg-muted/30 p-3">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Observations</p>
+                    <p className="text-sm">{dossier.verificationRapport.observations}</p>
+                  </div>
+                )}
+                <FilterField label="Anomalies" value={dossier.verificationRapport.anomalies} />
+              </div>
+            ) : (
+              <>
+                <FilterField label="Résultat Vérification" value={dossier.verificationRapport.resultat} />
+                <FilterField label="Observations" value={dossier.verificationRapport.observations} />
+                <FilterField label="Anomalies" value={dossier.verificationRapport.anomalies} />
+                <FilterField label="Commentaires" value={dossier.verificationRapport.commentaires} />
+              </>
+            )}
           </FilterSection>
         );
       case "sortie":
@@ -580,50 +653,57 @@ function DossierDetailPage() {
             <FilterField label="Destination Finale" value={dossier.sortie.destinationFinale} icon="📍" />
           </FilterSection>
         );
-      case "rapportDechargement":
-        if (!dossier.rapportDechargement) {
-          return (
-            <FilterSection
-              title="Brigadier Contrôle"
-              subtitle="Contrôle de déchargement en entrepôt"
-              icon={Warehouse}
-              iconColor="text-rose-500"
-              source="Brigadier Contrôle"
-            >
-              <p className="text-sm text-muted-foreground italic">Aucun rapport de contrôle saisi.</p>
-            </FilterSection>
-          );
-        }
-        const rd = dossier.rapportDechargement;
+      case "apurement":
         return (
           <FilterSection
-            title="Brigadier Contrôle"
-            subtitle="Contrôle de barrière"
-            icon={Warehouse}
-            iconColor="text-rose-500"
-            source="Brigadier Contrôle"
+            title="Apurement"
+            subtitle="Données d'apurement — Références, plaques, validations"
+            icon={FileCheck}
+            iconColor="text-green-500"
+            source={dossier.apurement?.type_appurement === 'verification' ? 'Vérificateur' : 'Secrétaire / Inspecteur'}
           >
-            <FilterField label="Importateur" value={rd.nomImportateur} icon="👤" />
-            <FilterField label="Réf. Douane" value={rd.reference} icon="🆔" />
-            <FilterField label="Date du Contrôle" value={rd.dateControle} icon="📅" />
-            <FilterField label="Brigadier" value={rd.agentNom} icon="🛂" />
-            <FilterField label="Barrière" value={rd.entrepot} icon="🏭" />
-            <FilterField label="Plaque Avant" value={rd.plaqueAvant} icon="🚛" />
-            <FilterField label="Plaque Arrière" value={rd.plaqueArriere} icon="🚛" />
-            <FilterField label="Bon de Sortie" value={rd.referenceBonSortie} icon="🎫" />
-            <FilterField label="Balle/Colis" value={rd.balle} icon="📦" />
-            <FilterField label="Autorisation Spéciale" value={rd.autorisationSpeciale} icon="🛡️" />
-            {rd.autorisationSpeciale === "Oui" && (
-              <>
-                <FilterField label="Type Autorisation" value={rd.typeAutorisation} icon="📋" />
-                <FilterField label="Réf. Autorisation" value={rd.referenceAutorisation} icon="🔖" />
-                <FilterField label="Date Autorisation" value={rd.dateAutorisation} icon="📅" />
-                <FilterField
-                  label="Signataires"
-                  value={rd.signataires?.length > 0 ? rd.signataires.map((s: any) => s.type_signataire).join(", ") : "—"}
-                  icon="✍️"
-                />
-              </>
+            {dossier.apurement ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                  <FilterField label="Type" value={dossier.apurement.type_appurement} />
+                  <FilterField label="Statut" value={dossier.apurement.status} />
+                  <FilterField label="Soumis par" value={dossier.apurement.submitter} />
+                  <FilterField label="Date soumission" value={dossier.apurement.date_soumission} />
+                  <FilterField label="Réf. Douane" value={dossier.apurement.ref_douane} />
+                  <FilterField label="Date Réf. Douane" value={dossier.apurement.date_reference_douane} />
+                  <FilterField label="DRA" value={dossier.apurement.dra} />
+                  <FilterField label="Date DRA" value={dossier.apurement.dra_date} />
+                  <FilterField label="Date Apurement" value={dossier.apurement.date_apurement} />
+                  <FilterField label="T1" value={dossier.apurement.t1} />
+                  <FilterField label="Date T1" value={dossier.apurement.t1_date} />
+                  <FilterField label="Plaque Avant" value={dossier.apurement.plaque_avant} />
+                  <FilterField label="Plaque Arrière" value={dossier.apurement.plaque_arriere} />
+                  <FilterField label="Validé par" value={dossier.apurement.validated_by} />
+                  <FilterField label="Date validation" value={dossier.apurement.validated_at} />
+                </div>
+                {dossier.apurement.observation && dossier.apurement.observation !== "—" && (
+                  <div className="rounded-lg bg-muted/30 p-3">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Observation</p>
+                    <p className="text-sm">{dossier.apurement.observation}</p>
+                  </div>
+                )}
+                {/* Historique des apurements */}
+                {dossier.apurement.all && dossier.apurement.all.length > 1 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Historique des apurements</p>
+                    <div className="divide-y divide-border rounded-lg border">
+                      {dossier.apurement.all.map((a: any) => (
+                        <div key={a.id} className="flex items-center justify-between p-2 text-xs">
+                          <span className="font-mono">{a.type_appurement} — {a.ref_douane || "—"}</span>
+                          <span className="text-muted-foreground">{a.status} · {a.date_soumission ? new Date(a.date_soumission).toLocaleDateString() : "—"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Aucun apurement enregistré pour ce dossier.</p>
             )}
           </FilterSection>
         );
@@ -654,7 +734,7 @@ function DossierDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 print:hidden">
-          {["inspecteur", "inspecteur_chef", "secretaire_inspecteur", "super_admin"].includes(user?.role || "") && (
+          {["inspecteur_chef", "secretaire_inspecteur", "super_admin"].includes(user?.role || "") && (
             <FormDialog
               trigger={
                 <Button variant="default" size="sm" className="gap-2 bg-accent hover:bg-accent/90 text-white">
@@ -696,6 +776,16 @@ function DossierDetailPage() {
                 </Field>
               </FormGrid>
             </FormDialog>
+          )}
+          {["super_admin", "directeur_provincial", "inspecteur_chef"].includes(user?.role || "") && (
+            <Button variant="outline" size="sm" className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={async () => {
+              if (!window.confirm("Confirmer la suppression définitive de ce dossier ?")) return;
+              try { await apiDeleteDossier(dossierId); toast.success("Dossier supprimé"); router.history.back(); }
+              catch (e: any) { toast.error(e?.message || "Erreur lors de la suppression"); }
+            }}>
+              <Trash2 className="h-4 w-4" />
+              Supprimer
+            </Button>
           )}
           <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
             <Printer className="h-4 w-4" />

@@ -12,21 +12,23 @@ import {
 import { DashHeader, StatCard, Panel } from "./_shared";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { 
-  DOSSIERS, 
-  ACCOUNTS, 
-  BUREAUX_DOUANIERS, 
-  ALERTS 
-} from "@/lib/mock";
-import { useApi, apiGetDossiers } from "@/lib/api";
+import { useApi, apiGetDossiers, apiGetBureauxDouaniers, apiGetUsers, apiGetAlertes } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 
 export default function DirecteurProvincialDash() {
   const { data: rawDossiers } = useApi(apiGetDossiers);
-  const activeDossiers = rawDossiers as any[] || [];
+  const { data: rawBureaux } = useApi(apiGetBureauxDouaniers);
+  const { data: rawUsers } = useApi(apiGetUsers);
+  const { data: rawAlertes } = useApi(apiGetAlertes);
 
-  const bureaux = BUREAUX_DOUANIERS;
-  const comptes = ACCOUNTS.filter(a => ["inspecteur_chef", "agent_controle", "chef_bureau_repr", "chef_barriere"].includes(a.role));
+  const activeDossiers = (rawDossiers as any[]) || [];
+  const bureaux = (rawBureaux as any[]) || [];
+  const allUsers = (rawUsers as any[]) || [];
+  const alertes = (rawAlertes as any[]) || [];
+
+  const comptes = allUsers.filter((u: any) =>
+    ["inspecteur_chef", "agent_controle", "chef_bureau_repr", "chef_barriere"].includes(u.role)
+  );
 
   return (
     <div className="space-y-6">
@@ -44,7 +46,7 @@ export default function DirecteurProvincialDash() {
           icon={Building2} 
           label="Bureaux Actifs" 
           value={bureaux.length} 
-          hint="Nord-Kivu"
+          hint="Province"
         />
         <StatCard 
           icon={Activity} 
@@ -55,7 +57,7 @@ export default function DirecteurProvincialDash() {
         <StatCard 
           icon={Bell} 
           label="Alertes Critiques" 
-          value={ALERTS.filter(a => a.level === 'urgent').length} 
+          value={alertes.filter((a: any) => a.severity === 'critical').length} 
         />
       </div>
 
@@ -70,17 +72,17 @@ export default function DirecteurProvincialDash() {
           }
         >
           <div className="divide-y divide-border">
-            {bureaux.slice(0, 6).map((b) => (
+            {bureaux.slice(0, 6).map((b: any) => (
               <div
                 key={b.id}
                 className="flex items-center justify-between py-3 px-2 hover:bg-muted/30 rounded-md transition-colors"
               >
                 <div className="flex items-center gap-3">
                    <div className="h-8 w-8 rounded bg-accent/10 flex items-center justify-center text-accent font-bold text-[10px]">
-                      {b.code}
+                      {(b.code || b.nom || "").substring(0, 3).toUpperCase()}
                    </div>
                    <div>
-                      <div className="text-sm font-bold">{b.denomination}</div>
+                      <div className="text-sm font-bold">{b.denomination || b.nom}</div>
                       <div className="text-[10px] text-muted-foreground uppercase font-medium">ICB: {b.icb || "—"}</div>
                    </div>
                 </div>
@@ -100,26 +102,26 @@ export default function DirecteurProvincialDash() {
           }
         >
           <div className="divide-y divide-border">
-            {comptes.slice(0, 6).map((c) => (
+            {comptes.slice(0, 6).map((c: any) => (
               <div
                 key={c.id}
                 className="flex items-center justify-between py-3 px-2 hover:bg-muted/30 rounded-md transition-colors"
               >
                 <div className="flex items-center gap-3">
                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">
-                      {c.fullName.split(' ').map(n => n[0]).join('')}
+                      {(c.fullName || c.full_name || c.name || "").split(' ').map((n: string) => n[0]).join('')}
                    </div>
                    <div>
-                      <div className="text-sm font-bold">{c.fullName}</div>
+                      <div className="text-sm font-bold">{c.fullName || c.full_name || c.name}</div>
                       <div className="text-[10px] text-muted-foreground uppercase font-bold">
-                        {c.role.replace(/_/g, ' ')} · {c.bureau || "PROVINCE"}
+                        {(c.role || "").replace(/_/g, ' ')} · {c.bureau || "PROVINCE"}
                       </div>
                    </div>
                 </div>
                 <Badge 
-                  className={`text-[9px] font-bold uppercase ${c.status === "actif" ? "bg-success/15 text-success border-success/30" : "bg-muted text-muted-foreground"}`}
+                  className={`text-[9px] font-bold uppercase ${(c.status === "actif" || c.status === "active") ? "bg-success/15 text-success border-success/30" : "bg-muted text-muted-foreground"}`}
                 >
-                  {c.status}
+                  {c.status || "actif"}
                 </Badge>
               </div>
             ))}
@@ -154,7 +156,7 @@ export default function DirecteurProvincialDash() {
                      <p className="text-xs font-bold uppercase tracking-wider">Accès Provincial Sécurisé</p>
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                     Votre profil de Directeur Provincial vous donne accès à la supervision de tous les bureaux de la province du Nord-Kivu.
+                     Votre profil de Directeur Provincial vous donne accès à la supervision de tous les bureaux de la province.
                   </p>
                </div>
                <Button variant="outline" className="w-full h-9 text-[10px] font-bold uppercase tracking-widest hover:bg-accent hover:text-white transition-all">

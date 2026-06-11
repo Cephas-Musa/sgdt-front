@@ -21,7 +21,9 @@ export interface User {
   role: string;
   phone?: string;
   bureau?: string;
+  bureau_id?: number;
   province?: string;
+  province_id?: number;
   matricule?: string;
   walletBalance?: number;
   avatar?: string;     // base64 data URL (profil)
@@ -47,7 +49,9 @@ function toFrontendUser(u: ApiUser): User {
     role: u.role,
     phone: u.phone_number,
     bureau: u.bureau,
+    bureau_id: u.bureau_id,
     province: u.province,
+    province_id: u.province_id,
     matricule: u.matricule,
     walletBalance: u.wallet_balance,
   };

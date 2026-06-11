@@ -26,6 +26,8 @@ class Dossier extends Model
         't1',
         'vehicule',
         'plaque',
+        'plaque_avant',
+        'plaque_arriere',
         'pays',
         'provenance',
         'destination',

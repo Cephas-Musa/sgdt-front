@@ -26,7 +26,7 @@ class DossierPolicy
         }
 
         // Inspecteur chef, agent controle, secrétaire, chef bureau repr => même bureau
-        if (in_array($user->role, ['inspecteur_chef', 'inspecteur', 'agent_controle', 'secretaire_inspecteur', 'chef_bureau_repr'])) {
+        if (in_array($user->role, ['inspecteur_chef', 'agent_controle', 'secretaire_inspecteur', 'chef_bureau_repr'])) {
             return $dossier->bureau_id === $user->bureau_id
                 || $dossier->created_by === $user->id
                 || $dossier->inspecteur_id === $user->id;
@@ -48,14 +48,13 @@ class DossierPolicy
 
     /**
      * Determine whether the user can create models.
+     * Réservé exclusivement à l'Inspecteur (et super_admin / opérateur saisie / chef bureau repr).
      */
     public function create(User $user): bool
     {
         return in_array($user->role, [
             'super_admin',
             'inspecteur_chef',
-            'inspecteur',
-            'secretaire_inspecteur',
             'operateur_saisie',
             'chef_bureau_repr',
         ]);
@@ -75,10 +74,15 @@ class DossierPolicy
             return true;
         }
 
-        // Inspecteur chef peut modifier les dossiers de son bureau
-        if (in_array($user->role, ['inspecteur_chef', 'inspecteur', 'secretaire_inspecteur'])) {
+        // Inspecteur / Secrétaire / DP peuvent modifier les dossiers de leur ressort
+        if (in_array($user->role, ['inspecteur_chef', 'secretaire_inspecteur'])) {
             return $dossier->inspecteur_id === $user->id
-                || $dossier->bureau_id === $user->bureau_id;
+                || $dossier->bureau_id === $user->bureau_id
+                || $dossier->secretary_id === $user->id;
+        }
+
+        if ($user->role === 'directeur_provincial') {
+            return $dossier->province_id === $user->province_id;
         }
 
         return false;
@@ -91,6 +95,11 @@ class DossierPolicy
     {
         if ($user->role === 'super_admin') {
             return true;
+        }
+
+        // Directeur Provincial peut supprimer un dossier créé par l'inspecteur dans sa province
+        if ($user->role === 'directeur_provincial') {
+            return $dossier->province_id === $user->province_id;
         }
 
         // Créateur peut supprimer si pas encore appuré
@@ -110,9 +119,14 @@ class DossierPolicy
             return true;
         }
 
-        if (in_array($user->role, ['inspecteur_chef', 'inspecteur'])) {
+        if (in_array($user->role, ['inspecteur_chef', 'secretaire_inspecteur'])) {
             return $dossier->inspecteur_id === $user->id
-                || $dossier->bureau_id === $user->bureau_id;
+                || $dossier->bureau_id === $user->bureau_id
+                || $dossier->secretary_id === $user->id;
+        }
+
+        if ($user->role === 'directeur_provincial') {
+            return $dossier->province_id === $user->province_id;
         }
 
         return false;
@@ -127,10 +141,15 @@ class DossierPolicy
             return true;
         }
 
-        if (in_array($user->role, ['inspecteur_chef', 'inspecteur', 'verificateur', 'cb_verification'])) {
+        if (in_array($user->role, ['inspecteur_chef', 'secretaire_inspecteur', 'verificateur', 'cb_verification'])) {
             return $dossier->bureau_id === $user->bureau_id
                 || $dossier->inspecteur_id === $user->id
+                || $dossier->secretary_id === $user->id
                 || $dossier->created_by === $user->id;
+        }
+
+        if ($user->role === 'directeur_provincial') {
+            return $dossier->province_id === $user->province_id;
         }
 
         return false;

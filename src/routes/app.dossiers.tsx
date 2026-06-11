@@ -11,6 +11,7 @@ import {
   ArrowRight,
   Building2,
   Edit,
+  Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { useApi, apiGetDossiers, apiGetBureauxRepresentation, apiGetAlertes, apiGetTypesDossiers, apiUpdateDossier, type ApiError } from "@/lib/api";
+import { useApi, apiGetDossiers, apiGetBureauxRepresentation, apiGetAlertes, apiGetTypesDossiers, apiUpdateDossier, apiDeleteDossier, type ApiError } from "@/lib/api";
 import type { Dossier, DossierStatus, DossierType } from "@/lib/mock";
 import { toast } from "sonner";
 import {
@@ -102,7 +103,7 @@ function DossiersPage() {
   const isAllowed = user?.role ? (ALLOWED_ROLES as readonly string[]).includes(user.role) : false;
 
   /* ── Données API ── */
-  const { data: rawDossiers, loading: dossiersLoading } = useApi(
+  const { data: rawDossiers, loading: dossiersLoading, reload } = useApi(
     () => apiGetDossiers(),
     []
   );
@@ -117,11 +118,6 @@ function DossiersPage() {
   /* ── Filtrage des dossiers ── */
   const getFilteredDossiers = (): Dossier[] => {
     let dossiers = [...allDossiers];
-
-    // Filtrage provincial pour le Directeur Provincial
-    if (user?.role === "directeur_provincial" && user?.province) {
-      dossiers = dossiers.filter((d) => d.province === user.province);
-    }
 
     // Filtrage par référence complète (RD-XXXX)
     if (activeReference) {
@@ -186,30 +182,6 @@ function DossiersPage() {
     setHasSearched(false);
   };
 
-  /* ── Accès restreint ── */
-  if (!isAllowed) {
-    return (
-      <div className="space-y-6">
-        <PageHeader
-          title={t("nav.dossiers")}
-          description="Accès réservé aux directeurs, inspecteurs et agents de contrôle."
-        />
-        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-6">
-          <h2 className="text-lg font-semibold text-destructive">Accès restreint</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Vous n'avez pas les droits nécessaires pour consulter le module DOSSIERS. Contactez
-            votre administrateur si vous pensez qu'il s'agit d'une erreur.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  /* ── Vue dédiée : Secrétaire Inspecteur ── */
-  if (user?.role === "secretaire_inspecteur") {
-    return <SecretaireDossiersView />;
-  }
-
   /* ── Vue dédiée : Chef Bureau Représentation ── */
   if (user?.role === "chef_bureau_repr") {
     return <ChefReprDossiersView />;
@@ -220,110 +192,27 @@ function DossiersPage() {
     return <BrigadierBarriereDossiersView />;
   }
 
-  /* ── Vue dédiée : Inspecteur ── */
-  if (user?.role === "inspecteur_chef" || user?.role === "inspecteur") {
+  /* ── Vue dédiée : Inspecteur & Secrétaire ── */
+  if (user?.role === "inspecteur_chef" || user?.role === "secretaire_inspecteur") {
     return <InspecteurDossiersView />;
   }
-
-  /* ── Colonnes du tableau ── */
-  const columns: Column<Dossier>[] = [
-    {
-      key: "id",
-      header: "Nº",
-      render: (_, index) => (
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent/10 font-mono text-xs font-semibold text-accent">
-          {(index ?? 0) + 1}
-        </span>
-      ),
-    },
-    {
-      key: "importateur",
-      header: "Importateur",
-      render: (r) => (
-        <div className="min-w-[120px]">
-          <div className="font-semibold text-xs">{r.importateur}</div>
-          <div className="text-[10px] text-muted-foreground uppercase">{r.declarant}</div>
-        </div>
-      ),
-    },
-    {
-      key: "nif",
-      header: "NIF",
-      render: (r) => <span className="font-mono text-[10px]">{r.nif}</span>,
-    },
-    {
-      key: "dra",
-      header: "Référence DRA",
-      render: (r) => <span className="font-mono text-xs font-bold text-accent">{r.dra}</span>,
-    },
-    {
-      key: "reference",
-      header: "Appel",
-      render: (r) => <span className="font-mono text-xs text-muted-foreground">{r.reference}</span>,
-    },
-    {
-      key: "vehicule",
-      header: "Véhicule",
-      render: (r) => (
-        <div className="flex flex-col">
-          <span className="text-xs font-medium">{r.vehicule}</span>
-          <span className="text-[10px] text-muted-foreground font-mono">{r.plaque}</span>
-        </div>
-      ),
-    },
-    {
-      key: "colis",
-      header: "Nombre colis",
-      render: (r) => <span className="font-medium">{r.colis}</span>,
-    },
-    {
-      key: "status",
-      header: "Statut",
-      render: (r) => {
-        const hasAlert = alertes.some(
-          (a) => a.reference?.includes(r.reference) || a.code_bureau === r.bureauRepr,
-        );
-        return (
-          <div className="flex items-center gap-2">
-            <StatusBadge status={r.status} />
-            {hasAlert && (
-              <span
-                className="flex h-2 w-2 rounded-full bg-destructive animate-pulse"
-                title="Alerte active"
-              />
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: "actions",
-      header: "Afficher",
-      render: (r: Dossier) => (
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 border-accent/20 text-accent hover:bg-accent hover:text-white transition-all duration-200"
-          onClick={(event) => {
-            event.stopPropagation();
-            navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: String(r.id) } });
-          }}
-        >
-          Afficher
-        </Button>
-      ),
-    },
-  ];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={t("nav.dossiers")}
-        description={user?.role === 'directeur_provincial' ? "Supervision provinciale des dossiers douaniers." : "Consultation, recherche et suivi des dossiers douaniers."}
+        description={!isAllowed ? "Accès réservé aux directeurs, inspecteurs et agents de contrôle." : (user?.role === 'directeur_provincial' ? "Supervision provinciale des dossiers douaniers." : "Consultation, recherche et suivi des dossiers douaniers.")}
       />
 
-      {/* Les dossiers de l'inspecteur sont gérés par la vue InspecteurDossiersView */}
-
+      {!isAllowed ? (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-6">
+          <h2 className="text-lg font-semibold text-destructive">Accès restreint</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Vous n'avez pas les droits nécessaires pour consulter le module DOSSIERS. Contactez
+            votre administrateur si vous pensez qu'il s'agit d'une erreur.
+          </p>
+        </div>
+      ) : (<>
       {/* ── SECTION RECHERCHE / FILTRES PROVINCIAUX ── */}
       <div className="rounded-xl border border-border bg-gradient-to-br from-card via-card to-accent/[0.03] p-6 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
@@ -451,38 +340,30 @@ function DossiersPage() {
       </div>
 
       {/* ── TABLEAU / CHARGEMENT ── */}
-      {isLoading ? (
-        <div className="rounded-lg border border-border bg-card p-12">
-          <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-accent" />
-            <p className="text-sm">Mise à jour des données provinciales…</p>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-[10px] font-bold uppercase text-muted-foreground">
-              <tr>
-                <th className="px-4 py-4">Bureau</th>
-                <th className="px-4 py-4">Dossier</th>
-                <th className="px-4 py-4">Importateur</th>
-                <th className="px-4 py-4 text-center">Véhicules</th>
-                <th className="px-4 py-4">Date</th>
-                <th className="px-4 py-4">Montant</th>
-                <th className="px-4 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredDossiers.slice(0, 20).map((d) => (
-                <tr key={d.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-4"><Badge variant="outline" className="text-[10px] font-bold text-accent">{d.bureauRepr || "BOMA"}</Badge></td>
-                  <td className="px-4 py-4 font-mono text-xs font-bold">{d.reference}</td>
-                  <td className="px-4 py-4 font-medium">{d.importateur}</td>
-                  <td className="px-4 py-4 text-center">
-                    <span className="inline-flex h-6 w-10 items-center justify-center rounded bg-muted text-[10px] font-bold">12</span>
-                  </td>
-                  <td className="px-4 py-4 text-xs">{d.date}</td>
-                  <td className="px-4 py-4 font-bold text-success">${d.montant}</td>
+      <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left text-[10px] font-bold uppercase text-muted-foreground">
+            <tr>
+              <th className="px-4 py-4">Bureau</th>
+              <th className="px-4 py-4">Dossier</th>
+              <th className="px-4 py-4">Importateur</th>
+              <th className="px-4 py-4 text-center">Véhicules</th>
+              <th className="px-4 py-4">Date</th>
+              <th className="px-4 py-4">Montant</th>
+              <th className="px-4 py-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {filteredDossiers.slice(0, 20).map((d) => (
+              <tr key={d.id} className="hover:bg-muted/30 transition-colors">
+                <td className="px-4 py-4"><Badge variant="outline" className="text-[10px] font-bold text-accent">{d.bureauRepr || "BOMA"}</Badge></td>
+                <td className="px-4 py-4 font-mono text-xs font-bold">{d.reference}</td>
+                <td className="px-4 py-4 font-medium">{d.importateur}</td>
+                <td className="px-4 py-4 text-center">
+                  <span className="inline-flex h-6 w-10 items-center justify-center rounded bg-muted text-[10px] font-bold">12</span>
+                </td>
+                <td className="px-4 py-4 text-xs">{d.date}</td>
+                <td className="px-4 py-4 font-bold text-success">${d.montant}</td>
                   <td className="px-4 py-4 text-right">
                     <div className="flex justify-end gap-2">
                       {d.created_by === user?.id && (
@@ -496,14 +377,33 @@ function DossiersPage() {
                       >
                         <ArrowRight className="h-4 w-4" />
                       </Button>
+                      {["super_admin", "directeur_provincial", "inspecteur_chef"].includes(user?.role || "") && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          onClick={async () => {
+                            if (!window.confirm("Confirmer la suppression de ce dossier ?")) return;
+                            try {
+                              await apiDeleteDossier(String(d.id));
+                              toast.success("Dossier supprimé");
+                              reload();
+                            } catch (e: any) {
+                              toast.error(e?.message || "Erreur lors de la suppression");
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      </>)}
     </div>
   );
 }
@@ -1186,41 +1086,43 @@ function InspecteurDossiersView() {
       <PageHeader title="Historique Personnel" description="Mes dossiers traités et récemment consultés." />
 
       <div className="space-y-6">
-        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10">
-              <FileText className="h-4 w-4 text-accent" />
+        {user?.role !== "secretaire_inspecteur" && (
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10">
+                <FileText className="h-4 w-4 text-accent" />
+              </div>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground/80">Créer un nouveau dossier</h2>
             </div>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground/80">Créer un nouveau dossier</h2>
+            <div className="flex flex-wrap gap-2">
+              {typesDossiers.length > 0 ? (
+                typesDossiers.map(t => {
+                  const formMap: Record<string, React.FC<any>> = {
+                    direct: DirectForm,
+                    dir: DirectForm,
+                    transbordement: TransbordementForm,
+                    trans: TransbordementForm,
+                    vrac: VracForm,
+                    lot: LotForm,
+                    petrolier: PetrolierForm,
+                    petro: PetrolierForm,
+                    dechargement: DechargementForm,
+                    decharge: DechargementForm,
+                    trafic: TraficForm,
+                    export: ExportForm,
+                    autres: AutresForm,
+                  };
+                  const code = t.code?.toLowerCase() || "";
+                  const libelle = t.libelle?.toLowerCase() || "";
+                  const FormComponent = formMap[code] || formMap[libelle] || formMap["autres"] || AutresForm;
+                  return <FormComponent key={t.id} type={t} onSuccess={() => { reload(); toast.success("Dossier créé avec succès !"); }} />;
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground italic">Aucun type de dossier n'a été créé par l'administrateur.</p>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {typesDossiers.length > 0 ? (
-              typesDossiers.map(t => {
-                const formMap: Record<string, React.FC<any>> = {
-                  direct: DirectForm,
-                  dir: DirectForm,
-                  transbordement: TransbordementForm,
-                  trans: TransbordementForm,
-                  vrac: VracForm,
-                  lot: LotForm,
-                  petrolier: PetrolierForm,
-                  petro: PetrolierForm,
-                  dechargement: DechargementForm,
-                  decharge: DechargementForm,
-                  trafic: TraficForm,
-                  export: ExportForm,
-                  autres: AutresForm,
-                };
-                const code = t.code?.toLowerCase() || "";
-                const libelle = t.libelle?.toLowerCase() || "";
-                const FormComponent = formMap[code] || formMap[libelle] || formMap["autres"] || AutresForm;
-                return <FormComponent key={t.id} type={t} onSuccess={() => { reload(); toast.success("Dossier créé avec succès !"); }} />;
-              })
-            ) : (
-              <p className="text-sm text-muted-foreground italic">Aucun type de dossier n'a été créé par l'administrateur.</p>
-            )}
-          </div>
-        </div>
+        )}
 
         <div className="rounded-xl border border-border bg-gradient-to-br from-card via-card to-accent/[0.03] p-6 shadow-sm">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
@@ -1254,11 +1156,22 @@ function InspecteurDossiersView() {
                   <td className="px-4 py-3 font-medium">{d.importateur}</td>
                   <td className="px-4 py-3 font-mono text-xs">{d.reference}</td>
                   <td className="px-4 py-3"><StatusBadge status={d.status} /></td>
-                  <td className="px-4 py-3 text-right flex items-center justify-end gap-2">
-                    {d.created_by === user?.id && (
-                      <EditDossierDialog dossier={d} onSuccess={reload} />
-                    )}
-                    <Button size="sm" variant="outline" className="h-8 border-accent text-accent hover:bg-accent hover:text-white" onClick={() => navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: String(d.id) } })}>Ouvrir</Button>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {d.created_by === user?.id && (
+                        <EditDossierDialog dossier={d} onSuccess={reload} />
+                      )}
+                      <Button size="sm" variant="outline" className="h-8 border-accent text-accent hover:bg-accent hover:text-white" onClick={() => navigate({ to: "/app/dossiers/$dossierId", params: { dossierId: String(d.id) } })}>Ouvrir</Button>
+                      {["super_admin", "directeur_provincial", "inspecteur_chef"].includes(user?.role || "") && (
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={async () => {
+                          if (!window.confirm("Confirmer la suppression de ce dossier ?")) return;
+                          try { await apiDeleteDossier(String(d.id)); toast.success("Dossier supprimé"); reload(); }
+                          catch (e: any) { toast.error(e?.message || "Erreur lors de la suppression"); }
+                        }}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

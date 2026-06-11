@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,7 @@ export function FormDialog({
   trigger?: ReactNode;
   title: string;
   children: ReactNode;
-  onSubmit?: () => void | false;
+  onSubmit?: (data: Record<string, string>) => void | false;
   submitLabel?: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -30,10 +30,22 @@ export function FormDialog({
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const handleOpenChange = (newOpen: boolean) => {
     setInternalOpen(newOpen);
     controlledOnOpenChange?.(newOpen);
+  };
+
+  const collectAndSubmit = () => {
+    if (!contentRef.current) return;
+    const inputs = contentRef.current.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("[name]");
+    const data: Record<string, string> = {};
+    inputs.forEach((el) => {
+      if (el.name) data[el.name] = el.value;
+    });
+    const result = onSubmit?.(data);
+    if (result !== false) handleOpenChange(false);
   };
 
   return (
@@ -43,18 +55,13 @@ export function FormDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 py-2">{children}</div>
+        <div ref={contentRef} className="space-y-3 py-2">{children}</div>
         {!hideFooter && (
           <DialogFooter>
             <Button variant="outline" onClick={() => handleOpenChange(false)}>
               Annuler
             </Button>
-            <Button
-              onClick={() => {
-                const result = onSubmit?.();
-                if (result !== false) handleOpenChange(false);
-              }}
-            >
+            <Button onClick={collectAndSubmit}>
               {submitLabel}
             </Button>
           </DialogFooter>

@@ -44,18 +44,17 @@ class UserPolicy
         }
 
         if (!$roleToCreate) {
-            return in_array($user->role, ['directeur', 'directeur_provincial', 'inspecteur_chef', 'inspecteur', 'chef_bureau']);
+            return in_array($user->role, ['directeur', 'directeur_provincial', 'inspecteur_chef', 'chef_bureau']);
         }
 
         switch ($user->role) {
             case 'directeur':
                 return in_array($roleToCreate, ['directeur_provincial']);
             case 'directeur_provincial':
-                return in_array($roleToCreate, ['chef_bureau', 'inspecteur_chef', 'inspecteur']);
+                return in_array($roleToCreate, ['chef_bureau', 'inspecteur_chef']);
             case 'chef_bureau':
                 return in_array($roleToCreate, ['agent_controle']);
             case 'inspecteur_chef':
-            case 'inspecteur':
                 return in_array($roleToCreate, ['secretaire_inspecteur']);
             default:
                 return false;

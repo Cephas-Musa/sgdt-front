@@ -6,7 +6,8 @@ import {
 } from "lucide-react";
 import { DashHeader, StatCard, Panel } from "./_shared";
 import { Link } from "@tanstack/react-router";
-import { DOSSIER_ASSIGNMENTS, ALERTS, SOLDE_VIRTUEL } from "@/lib/mock";
+import { useApi, apiGetAlerteCritical } from "@/lib/api";
+import { DOSSIER_ASSIGNMENTS, SOLDE_VIRTUEL } from "@/lib/mock";
 import { SecretaryOperations } from "./inspecteur/SecretaryOperations";
 
 export default function SecretaireInspecteurDash() {
@@ -14,6 +15,8 @@ export default function SecretaireInspecteurDash() {
   const apures = DOSSIER_ASSIGNMENTS.filter(
     (d) => d.status === "vérifié" || d.status === "apuré",
   ).length;
+  const { data: criticalAlerts } = useApi(apiGetAlerteCritical);
+  const critical = (criticalAlerts as any[]) || [];
 
   return (
     <div className="h-full flex flex-col gap-4 overflow-hidden animate-in fade-in duration-500">
@@ -72,19 +75,19 @@ export default function SecretaireInspecteurDash() {
             </div>
          </Panel>
 
-         <Panel title="Alertes Récentes" className="lg:col-span-3">
+         <Panel title="Alertes critiques" className="lg:col-span-3">
             <div className="h-full overflow-y-auto pr-1 scrollbar-hide space-y-1.5">
-               {ALERTS.slice(0, 3).map(alert => (
-                  <div key={alert.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/20 border border-border/40 hover:bg-muted/40 transition-colors">
-                     <div className={`h-1.5 w-1.5 rounded-full shrink-0 ${alert.level === 'urgent' ? 'bg-destructive' : 'bg-warning'}`} />
+               {critical.slice(0, 5).map((alert: any) => (
+                  <Link key={alert.id} to="/app/alertes/$alerteId" params={{ alerteId: String(alert.id) }} className="flex items-center gap-3 p-2 rounded-lg bg-muted/20 border border-border/40 hover:bg-muted/40 transition-colors">
+                     <div className="h-1.5 w-1.5 rounded-full shrink-0 bg-destructive" />
                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-bold truncate uppercase">{alert.title}</p>
+                        <p className="text-[10px] font-bold truncate uppercase">{alert.title || "Alerte critique"}</p>
                      </div>
-                     <span className="text-[8px] font-mono text-muted-foreground">{alert.date}</span>
-                  </div>
+                     <span className="text-[8px] font-mono text-muted-foreground">{alert.created_at ? new Date(alert.created_at).toLocaleDateString() : ""}</span>
+                  </Link>
                ))}
-               {ALERTS.length === 0 && (
-                  <p className="text-[10px] text-muted-foreground text-center py-4 italic">Aucune alerte</p>
+               {critical.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground text-center py-4 italic">Aucune alerte critique</p>
                )}
             </div>
          </Panel>

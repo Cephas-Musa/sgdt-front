@@ -32,7 +32,7 @@ export const SUBORDINATES: Partial<Record<Role, Role[]>> = {
     "partenaire",
     "brigadier_controle",
   ],
-  // Le DG crée les directeurs provinciaux ET les inspecteurs chefs
+  // Le DG crée les directeurs provinciaux et les ICB
   directeur: ["directeur_provincial", "inspecteur_chef"],
   // Le DP crée les inspecteurs chefs et agents de contrôle sous sa province
   directeur_provincial: ["inspecteur_chef", "agent_controle", "chef_bureau_repr", "chef_barriere"],

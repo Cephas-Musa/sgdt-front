@@ -8,7 +8,7 @@ import OperateurSaisieDash from "@/dashboards/OperateurSaisieDash";
 import ChefBarriereDash from "@/dashboards/ChefBarriereDash";
 import TypingOperatorDash from "@/dashboards/TypingOperatorDash";
 import BrigadierBarriereDash from "@/dashboards/BrigadierBarriereDash";
-import SecretaireInspecteurDash from "@/dashboards/SecretaireInspecteurDash";
+
 import BrigadierEntrepotDash from "@/dashboards/BrigadierEntrepotDash";
 import BarriereControleDash from "@/dashboards/BarriereControleDash";
 import BrigadierControleDash from "@/dashboards/BrigadierControleDash";
@@ -42,7 +42,6 @@ function Dashboard() {
       case "directeur_provincial":
         return <DirecteurProvincialDash />;
       case "inspecteur_chef":
-      case "inspecteur":
         return <InspecteurChefDash />;
       case "agent_controle":
         return <InspecteurChefDash />;
@@ -57,7 +56,7 @@ function Dashboard() {
       case "brigadier_barriere":
         return <BrigadierBarriereDash />;
       case "secretaire_inspecteur":
-        return <SecretaireInspecteurDash />;
+        return <InspecteurChefDash />;
       case "brigadier_entrepot":
         return <BrigadierEntrepotDash />;
       case "barriere_controle":

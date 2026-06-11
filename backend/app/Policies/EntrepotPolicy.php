@@ -36,7 +36,7 @@ class EntrepotPolicy
         }
 
         // Inspecteur peut voir les entrepôts de son bureau
-        if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur'])) {
+        if (in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef'])) {
             return $user->bureau_id === $entrepot->bureau;
         }
 

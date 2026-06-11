@@ -43,5 +43,11 @@ return [
         'sender_id' => env('BULKSMS_SENDER_ID', 'SGDT'),
     ],
 
+    'vapid' => [
+        'public_key' => env('VAPID_PUBLIC_KEY'),
+        'private_key' => env('VAPID_PRIVATE_KEY'),
+        'subject' => env('VAPID_SUBJECT', 'mailto:admin@douanes.cd'),
+    ],
+
 ];
 

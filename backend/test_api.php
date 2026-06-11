@@ -1,6 +1,6 @@
 <?php
 $req = Request::create('/api/dossiers', 'GET');
-$user = App\Models\User::where('role', 'inspecteur')->first();
+$user = App\Models\User::where('role', 'inspecteur_chef')->first();
 $req->setUserResolver(function() use ($user) { return $user; });
 $dossiers = app(App\Http\Controllers\DossierController::class)->index($req);
 $dossiersData = json_decode($dossiers->getContent(), true);

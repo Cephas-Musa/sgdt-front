@@ -27,10 +27,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Link } from "@tanstack/react-router";
+import { useApi, apiGetAlertes } from "@/lib/api";
 import {
   BUREAUX_DOUANIERS,
   DIRECTIONS_PROVINCIALES,
-  ALERTS,
   ACCOUNTS,
   BUREAUX_REPR,
   type BureauRepresentation,
@@ -46,11 +46,13 @@ export default function DirecteurDash() {
   const [pwd, setPwd] = useState("");
   const [username, setUsername] = useState("");
   const [selectedAlertTypes, setSelectedAlertTypes] = useState<string[]>([
-    "fraude",
-    "incoherence",
-    "paiement",
-    "retard",
+    "critical",
+    "high",
+    "medium",
+    "low",
   ]);
+  const { data: rawAlertes } = useApi(apiGetAlertes);
+  const alertes = (rawAlertes as any[]) || [];
 
   const directeursProvinciaux = ACCOUNTS.filter((a) => a.role === "directeur_provincial");
 
@@ -237,27 +239,27 @@ export default function DirecteurDash() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {ALERTS.filter((a) => selectedAlertTypes.includes(a.type)).map((a) => (
+                      {alertes.filter((a: any) => selectedAlertTypes.includes(a.severity)).map((a: any) => (
                         <tr key={a.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="px-3 py-3 font-mono text-xs">{a.codeBureau || "—"}</td>
-                          <td className="px-3 py-3 font-medium">{a.nomBureau || "Général"}</td>
+                          <td className="px-3 py-3 font-mono text-xs">—</td>
+                          <td className="px-3 py-3 font-medium">Général</td>
                           <td className="px-3 py-3">
                             <span
                               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
-                                a.type === "fraude"
+                                a.severity === "critical"
                                   ? "bg-destructive/15 text-destructive"
-                                  : a.type === "incoherence"
-                                    ? "bg-warning/15 text-warning"
-                                    : a.type === "paiement"
-                                      ? "bg-info/15 text-info"
-                                      : "bg-orange-500/15 text-orange-600"
+                                  : a.severity === "high"
+                                    ? "bg-orange-500/15 text-orange-600"
+                                    : a.severity === "medium"
+                                      ? "bg-warning/15 text-warning"
+                                      : "bg-info/15 text-info"
                               }`}
                             >
-                              {a.type}
+                              {a.severity}
                             </span>
                           </td>
-                          <td className="px-3 py-3 text-muted-foreground">{a.title}</td>
-                          <td className="px-3 py-3 text-xs whitespace-nowrap">{a.date}</td>
+                          <td className="px-3 py-3 text-muted-foreground">{a.message || a.title}</td>
+                          <td className="px-3 py-3 text-xs whitespace-nowrap">{a.created_at ? new Date(a.created_at).toLocaleDateString() : "—"}</td>
                         </tr>
                       ))}
                     </tbody>

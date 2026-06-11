@@ -3,7 +3,6 @@ export type Role =
   | "directeur"
   | "directeur_provincial"
   | "inspecteur_chef"
-  | "inspecteur"
   | "agent_controle"
   | "chef_bureau_repr"
   | "operateur_saisie"
@@ -32,7 +31,6 @@ export const ROLE_LABELS: Record<Role, { fr: string; en: string }> = {
   directeur: { fr: "Directeur Général", en: "General Director" },
   directeur_provincial: { fr: "Directeur Provincial", en: "Provincial Director" },
   inspecteur_chef: { fr: "Inspecteur Chef de Bureau", en: "Chief Inspector" },
-  inspecteur: { fr: "Inspecteur", en: "Inspector" },
   agent_controle: { fr: "Agent Cellule Contrôle", en: "Control Cell Agent" },
   chef_bureau_repr: { fr: "Chef Bureau Représentation", en: "Representation Office Head" },
   operateur_saisie: { fr: "Opérateur Saisie", en: "Data Entry Operator" },
@@ -101,7 +99,13 @@ export const ROLE_NAV: Record<Role, NavKey[]> = {
     "chat",
     "profil",
   ],
-  inspecteur: [
+  agent_controle: ["dashboard", "dossiers", "alertes", "chat", "profil"],
+  chef_bureau_repr: ["dashboard", "dossiers", "comptes", "representation", "alertes", "chat", "profil"],
+  operateur_saisie: ["dashboard", "alertes", "chat", "profil"],
+  chef_barriere: ["dashboard", "comptes", "chat", "profil"],
+  typing_operator: ["dashboard", "chat", "profil"],
+  brigadier_barriere: ["dashboard", "dossiers", "chat", "profil"],
+  secretaire_inspecteur: [
     "dashboard",
     "dossiers",
     "appurement",
@@ -112,18 +116,6 @@ export const ROLE_NAV: Record<Role, NavKey[]> = {
     "comptes",
     "representation",
     "chat",
-    "profil",
-  ],
-  agent_controle: ["dashboard", "dossiers", "alertes", "chat", "profil"],
-  chef_bureau_repr: ["dashboard", "dossiers", "comptes", "representation", "alertes", "chat", "profil"],
-  operateur_saisie: ["dashboard", "alertes", "chat", "profil"],
-  chef_barriere: ["dashboard", "comptes", "chat", "profil"],
-  typing_operator: ["dashboard", "chat", "profil"],
-  brigadier_barriere: ["dashboard", "dossiers", "chat", "profil"],
-  secretaire_inspecteur: [
-    "dashboard",
-    "dossiers",
-    "alertes",
     "profil",
   ],
   verificateur: ["dashboard", "chat", "profil"],

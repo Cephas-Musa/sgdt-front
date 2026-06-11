@@ -14,7 +14,8 @@ class DossierController extends Controller
 {
     public function __construct(
         protected \App\Services\DossierWorkflowService $workflowService,
-        protected \App\Services\DossierAccessService $accessService
+        protected \App\Services\DossierAccessService $accessService,
+        protected \App\Services\DossierTimelineService $timelineService
     ) {}
 
     public function index(Request $request)
@@ -70,7 +71,7 @@ class DossierController extends Controller
 
         // On permet à l'inspecteur chef, inspecteur, super_admin, operateur de saisie de créer le dossier
         // Le secretaire_inspecteur n'a pas le droit de créer des dossiers (règle stricte)
-        if (!in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef', 'inspecteur', 'super_admin', 'operateur_saisie', 'chef_bureau_repr'])) {
+        if (!in_array($user->role, ['inspecteur_chef_bureau', 'inspecteur_chef', 'super_admin', 'operateur_saisie', 'chef_bureau_repr'])) {
             return response()->json(['message' => 'Non autorisé. Seul un inspecteur ou le bureau de représentation peut créer un dossier.'], 403);
         }
 
@@ -213,7 +214,7 @@ class DossierController extends Controller
             'decharges',
             'mouvementsStockage',
             'colisages',
-            'empty_manifests',
+        'empty_manifests',
             'barriere_entries',
             'typingDocsDirect.typingOperator',
             'typingDocsTranshipment.typingOperator',
@@ -221,10 +222,9 @@ class DossierController extends Controller
         ])->findOrFail($id);
 
         $user = $request->user();
-
         $allowedRoles = [
             'super_admin', 'directeur', 'directeur_provincial',
-            'inspecteur_chef', 'inspecteur', 'secretaire_inspecteur', 'agent_controle',
+            'inspecteur_chef', 'secretaire_inspecteur', 'agent_controle',
             'verificateur', 'chef_bureau_repr', 'operateur_saisie',
             'agent_pointage', 'typing_operator', 'chef_barriere', 'chef_entrepot_douane',
         ];
@@ -232,6 +232,12 @@ class DossierController extends Controller
         if (!in_array($user->role, $allowedRoles)) {
             return response()->json(['message' => 'Non autorisé.'], 403);
         }
+
+        $dossier->loadMissing('apurements');
+        $dossier->apurements = \App\Models\Apurement::where('dossier_id', $dossier->id)
+            ->with(['submitter:id,full_name,role', 'secretaire:id,full_name', 'validator:id,full_name,role'])
+            ->orderBy('date_soumission', 'desc')
+            ->get();
 
         return response()->json($dossier);
     }
@@ -267,7 +273,7 @@ class DossierController extends Controller
         $user = $request->user();
         $allowedRoles = [
             'super_admin', 'directeur', 'directeur_provincial',
-            'inspecteur_chef', 'inspecteur', 'secretaire_inspecteur', 'agent_controle',
+            'inspecteur_chef', 'secretaire_inspecteur', 'agent_controle',
             'verificateur', 'chef_bureau_repr', 'operateur_saisie',
             'agent_pointage', 'typing_operator', 'chef_barriere', 'chef_entrepot_douane',
         ];
@@ -282,12 +288,18 @@ class DossierController extends Controller
             ->with(['barriere:id,nom', 'brigadier:id,full_name', 'signataires'])
             ->get();
 
+        $apurements = \App\Models\Apurement::where('dossier_id', $dossier->id)
+            ->with(['submitter:id,full_name,role', 'secretaire:id,full_name', 'validator:id,full_name,role'])
+            ->orderBy('date_soumission', 'desc')
+            ->get();
+
         return response()->json([
             'dossier' => $dossier,
             'representation_data' => $representationData ? $representationData['representation_data'] : null,
             'representation_articles' => $representationData ? $representationData['representation_articles'] : [],
             'representation_history' => $representationData ? $representationData['representation_history'] : [],
             'dossiers_controle' => $dossiersControle,
+            'apurements' => $apurements,
         ]);
     }
 
@@ -300,24 +312,6 @@ class DossierController extends Controller
         $oldData = $dossier->toArray();
         $user = $request->user();
         $payload = $request->all();
-
-        // Les secrétaires ne peuvent qu'ajouter des données manquantes,
-        // pas modifier les données déjà entrées par l'inspecteur.
-        if ($user->role === 'secretaire_inspecteur') {
-            foreach ($payload as $key => $value) {
-                if (!empty($oldData[$key]) && $key !== 'extra_data' && $key !== 'articles') {
-                    unset($payload[$key]);
-                }
-            }
-            if (isset($payload['extra_data']) && is_array($payload['extra_data'])) {
-                $oldExtra = $dossier->extra_data ?? [];
-                foreach ($oldExtra as $extraKey => $extraValue) {
-                    if (!empty($extraValue) && isset($payload['extra_data'][$extraKey])) {
-                        $payload['extra_data'][$extraKey] = $extraValue;
-                    }
-                }
-            }
-        }
 
         $dossier->update($payload);
 
@@ -375,7 +369,7 @@ class DossierController extends Controller
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
-        if (!in_array($user->role, ['directeur_provincial', 'directeur_general', 'inspecteur_chef', 'inspecteur', 'super_admin'])) {
+        if (!in_array($user->role, ['directeur_provincial', 'directeur_general', 'inspecteur_chef', 'super_admin'])) {
             return response()->json(['message' => 'Action non autorisée. Seul l\'inspecteur, DP, et le DG peuvent supprimer un dossier.'], 403);
         }
 
@@ -391,6 +385,14 @@ class DossierController extends Controller
         $dossier->delete();
 
         \App\Services\AuditLogService::log('dossier', 'delete', $id, $dossier->toArray(), null);
+
+        $this->timelineService->log($dossier->id, 'dossier_supprime', [
+            'user_id' => $user->id,
+            'user_name' => $user->full_name,
+            'reason' => $request->input('delete_reason'),
+        ], $user->id);
+
+        $this->accessService->logHistory($user->id, $dossier, 'suppression', 'dossier');
 
         return response()->json(['message' => 'Dossier supprimé avec succès.']);
     }

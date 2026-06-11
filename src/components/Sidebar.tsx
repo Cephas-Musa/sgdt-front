@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -22,6 +23,7 @@ import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { ROLE_NAV, type NavKey } from "@/lib/roles";
 import { cn } from "@/lib/utils";
+import { apiGetAlerteUnreadCount } from "@/lib/api";
 
 const ROUTES: Record<NavKey, { to: string; icon: any; labelKey: string }> = {
   dashboard: { to: "/app", icon: LayoutDashboard, labelKey: "nav.dashboard" },
@@ -45,6 +47,20 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   const { user } = useAuth();
   const { t } = useI18n();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnread = useCallback(async () => {
+    try {
+      const data = await apiGetAlerteUnreadCount();
+      setUnreadCount(data.unread_count);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [fetchUnread]);
 
   if (!user) return null;
   const items = ROLE_NAV[user.role];
@@ -95,6 +111,11 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="truncate">{t(r.labelKey)}</span>
+                {key === "alertes" && unreadCount > 0 && (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}

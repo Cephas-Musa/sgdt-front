@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
-import { useApi, apiGetDossiers, apiGetLocodes, apiGetCountries, apiGetCurrencies, apiGetBureauxRepresentation, apiCreateDossier, apiSaveRepresentationEntry, apiCreateLocode, apiUpdateLocode, apiCreateCountry, apiUpdateCountry, apiCreateCurrency, apiUpdateCurrency } from "@/lib/api";
+import { useApi, apiGetDossiers, apiGetLocodes, apiGetCountries, apiGetCurrencies, apiGetBureauxRepresentation, apiCreateDossier, apiSaveRepresentationEntry, apiCreateLocode, apiUpdateLocode, apiCreateCountry, apiUpdateCountry, apiCreateCurrency, apiUpdateCurrency, apiGetAlerteUnreadCount } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { DataTable } from "@/components/DataTable";
@@ -225,6 +225,7 @@ export default function OperateurSaisieDash() {
   const { data: rawPays, reload: reloadPays } = useApi(apiGetCountries);
   const { data: rawDevises, reload: reloadDevises } = useApi(apiGetCurrencies);
   const { data: rawBureaux } = useApi(apiGetBureauxRepresentation);
+  const { data: unreadData } = useApi(apiGetAlerteUnreadCount);
 
   // Fallback to empty array if data isn't loaded yet
   const safeDossiers = Array.isArray(DOSSIERS) ? DOSSIERS : [];
@@ -232,6 +233,7 @@ export default function OperateurSaisieDash() {
   const safePays = Array.isArray(rawPays) ? rawPays : [];
   const safeDevises = Array.isArray(rawDevises) ? rawDevises : [];
   const safeBureaux = Array.isArray(rawBureaux) ? rawBureaux : [];
+  const alertUnread = (unreadData as any)?.unread_count ?? 0;
 
   const [searchRef, setSearchRef] = useState("");
   const [searchDra, setSearchDra] = useState("");
@@ -280,7 +282,7 @@ export default function OperateurSaisieDash() {
         <StatCard
           icon={Bell}
           label="Alertes actives"
-          value={0} // Simulate active alerts
+          value={alertUnread}
         />
       </div>
       <div className="mt-6">

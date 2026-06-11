@@ -1,25 +1,21 @@
 import {
   FolderKanban,
-  Clock,
   CheckCircle2,
   FileCheck,
   AlertTriangle,
   DollarSign,
   Activity,
-  ArrowUpRight,
   TrendingUp,
   Users,
   ChevronRight,
   Plus,
   Warehouse,
   ShieldCheck,
-  Eye,
   Edit3,
   XCircle,
   BarChart3,
   List,
-  ClipboardList,
-  Calendar,
+  X,
 } from "lucide-react";
 import { DashHeader, StatCard, Panel } from "./_shared";
 import { Link } from "@tanstack/react-router";
@@ -28,16 +24,7 @@ import { Input } from "@/components/ui/input";
 import { FormDialog, Field, FormGrid } from "@/components/FormDialog";
 import { toast } from "sonner";
 import {
-  DOSSIERS,
-  ALERTS,
-  SOLDE_VIRTUEL,
-  ACTIVITES_RECENTES,
-  APUREMENT_SUBMISSIONS,
-  SECRETAIRES_INSPECTEUR,
-} from "@/lib/mock";
-import {
   useApi,
-  apiCreateWarehouse,
   apiGetDossiers,
   apiGetBarrieresControle,
   apiCreateBarriereControle,
@@ -48,15 +35,6 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useState } from "react";
-
-const typeIcon = (t: string) => {
-  if (t === "creation") return <ArrowUpRight className="h-3.5 w-3.5 text-accent" />;
-  if (t === "paiement") return <DollarSign className="h-3.5 w-3.5 text-success" />;
-  if (t === "apurement") return <CheckCircle2 className="h-3.5 w-3.5 text-info" />;
-  if (t === "alerte") return <AlertTriangle className="h-3.5 w-3.5 text-destructive" />;
-  if (t === "verification") return <FileCheck className="h-3.5 w-3.5 text-accent" />;
-  return <Activity className="h-3.5 w-3.5 text-muted-foreground" />;
-};
 
 export default function InspecteurChefDash() {
   const { data: rawDossiers } = useApi(apiGetDossiers);
@@ -71,6 +49,7 @@ export default function InspecteurChefDash() {
   const [activitiesData, setActivitiesData] = useState<any | null>(null);
   const [showActivities, setShowActivities] = useState(false);
   const [editingBarriere, setEditingBarriere] = useState<any | null>(null);
+  const [activitiesTab, setActivitiesTab] = useState<"tous" | "today" | "week" | "autorisation">("tous");
 
   const totalDossiers = activeDossiers.length;
   const enCours = activeDossiers.filter((d) => d.status === "en_cours").length;
@@ -145,29 +124,46 @@ export default function InspecteurChefDash() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Panel title="Activité récente (Timeline)">
-            <div className="space-y-0">
-              {ACTIVITES_RECENTES.slice(0, 8).map((act) => (
-                <div
-                  key={act.id}
-                  className="flex items-start gap-3 py-2.5 border-b border-border/50 last:border-0"
-                >
-                  <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-muted/60 shrink-0">
-                    {typeIcon(act.type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium">{act.action}</span>
-                      <span className="font-mono text-xs text-accent">{act.reference}</span>
+        <div className="lg:col-span-2 space-y-4">
+          <Panel title="Barrières de Contrôle — Résumé">
+            {barrieres.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic py-4 text-center">
+                Aucune barrière de contrôle configurée.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {barrieres.slice(0, 5).map((b: any) => {
+                  const totalDoss = b.dossiers?.length ?? 0;
+                  const autorisation = b.dossiers?.filter((d: any) => d.autorisation_speciale).length ?? 0;
+                  return (
+                    <div key={b.id} className="flex items-center justify-between border-b border-border/50 pb-2 last:border-0">
+                      <div className="flex items-center gap-3">
+                        <Warehouse className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div>
+                          <div className="text-sm font-medium">{b.nom}</div>
+                          <div className="text-xs text-muted-foreground">{b.entite}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-right">
+                        <div>
+                          <div className="font-semibold">{totalDoss}</div>
+                          <div className="text-muted-foreground">Dossiers</div>
+                        </div>
+                        {autorisation > 0 && (
+                          <div className="text-amber-600">
+                            <div className="font-semibold">{autorisation}</div>
+                            <div className="text-muted-foreground">Autorisation</div>
+                          </div>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => handleViewActivities(b.id)}>
+                          Voir
+                        </Button>
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {act.user} · {act.date} à {act.heure}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </Panel>
         </div>
 
@@ -359,18 +355,23 @@ export default function InspecteurChefDash() {
       </div>
 
       {showActivities && activitiesData && (
-        <Panel title={`Activités — ${activitiesData.barriere}`}>
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
-            <StatCard icon={ClipboardList} label="Dossiers traités" value={activitiesData.total_dossiers} />
-            <StatCard icon={Calendar} label="Aujourd'hui" value={activitiesData.dossiers_du_jour} />
-            <StatCard icon={Calendar} label="Cette semaine" value={activitiesData.dossiers_semaine} />
-            <StatCard icon={ShieldCheck} label="Autorisation spéciale" value={activitiesData.dossiers_autorisation_speciale} />
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/20">
+            <div>
+              <h3 className="font-semibold flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-accent" />
+                Activités — {activitiesData.barriere}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Brigadier : {activitiesData.brigadier || "Non affecté"}
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setShowActivities(false)} className="h-8 w-8 p-0">
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-          <p className="text-sm text-muted-foreground mt-2">Brigadier : {activitiesData.brigadier || "Non affecté"}</p>
-          <Button variant="outline" size="sm" className="mt-3" onClick={() => setShowActivities(false)}>
-            Fermer
-          </Button>
-        </Panel>
+          <ActivitiesTabView data={activitiesData} tab={activitiesTab} onTabChange={setActivitiesTab} />
+        </div>
       )}
     </div>
   );
@@ -379,6 +380,93 @@ export default function InspecteurChefDash() {
     <div className="space-y-6">
       {view === "dashboard" && renderDashboard()}
       {view === "barrieres" && renderBarrieres()}
+    </div>
+  );
+}
+
+/* ═══ Activités Tab View ═══ */
+function ActivitiesTabView({ data, tab, onTabChange }: { data: any; tab: string; onTabChange: (t: "tous" | "today" | "week" | "autorisation") => void }) {
+  const tabs = [
+    { key: "tous" as const, label: "Tous", count: data.total_dossiers },
+    { key: "today" as const, label: "Aujourd'hui", count: data.dossiers_du_jour },
+    { key: "week" as const, label: "Cette semaine", count: data.dossiers_semaine },
+    { key: "autorisation" as const, label: "Autorisation spéciale", count: data.dossiers_autorisation_speciale },
+  ];
+
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  const weekStartStr = weekStart.toISOString().split("T")[0];
+
+  const dossiers = data.dossiers || [];
+  const filtered = dossiers.filter((d: any) => {
+    if (tab === "today") return d.created_at?.split("T")[0] === today;
+    if (tab === "week") return d.created_at?.split("T")[0] >= weekStartStr;
+    if (tab === "autorisation") return d.autorisation_speciale;
+    return true;
+  });
+
+  return (
+    <div className="p-5">
+      <div className="flex gap-1 mb-4 flex-wrap">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => onTabChange(t.key)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              tab === t.key
+                ? "bg-accent text-accent-foreground shadow-sm"
+                : "bg-muted/50 text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {t.label} <span className="ml-1 opacity-70">({t.count})</span>
+          </button>
+        ))}
+      </div>
+
+      {dossiers.length === 0 ? (
+        <div className="py-8 text-center text-sm text-muted-foreground italic">Aucun dossier de contrôle.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-[10px] font-bold uppercase text-muted-foreground">
+                <th className="py-2 pr-3">N°</th>
+                <th className="py-2 pr-3">Réf. Douane</th>
+                <th className="py-2 pr-3">Importateur</th>
+                <th className="py-2 pr-3">Date</th>
+                <th className="py-2 pr-3">Brigadier</th>
+                <th className="py-2 pr-3">Autorisation Spéciale</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.length === 0 ? (
+                <tr><td colSpan={6} className="py-6 text-center text-xs text-muted-foreground italic">Aucun dossier trouvé pour ce filtre.</td></tr>
+              ) : (
+                filtered.map((d: any, i: number) => (
+                  <tr key={d.id} className="hover:bg-muted/30">
+                    <td className="py-2 pr-3 text-xs">{i + 1}</td>
+                    <td className="py-2 pr-3 font-mono text-xs font-bold text-accent">{d.reference_douane || "—"}</td>
+                    <td className="py-2 pr-3">{d.nom_importateur || "—"}</td>
+                    <td className="py-2 pr-3 text-xs">{d.created_at?.split("T")[0] || "—"}</td>
+                    <td className="py-2 pr-3 text-xs">{d.brigadier?.full_name || "—"}</td>
+                    <td className="py-2 pr-3">
+                      {d.autorisation_speciale ? (
+                        <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                          <ShieldCheck className="h-3 w-3" /> Oui
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">Non</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -19,8 +19,21 @@ class DossierActionController extends Controller
         $dossier = Dossier::findOrFail($id);
         $user = $request->user();
 
-        // RBAC Check : Secrétaire assigné, ou Inspecteur
-        if ($user->role === 'secretaire_inspecteur' && $dossier->secretary_id !== $user->id) {
+        // RBAC Check
+        $allowed = false;
+        if (in_array($user->role, ['super_admin', 'inspecteur_chef'])) {
+            $allowed = true;
+        } elseif ($user->role === 'inspecteur_chef') {
+            $allowed = $dossier->inspecteur_id === $user->id
+                || $dossier->bureau_id === $user->bureau_id
+                || $dossier->secretary_id === $user->id;
+        } elseif ($user->role === 'secretaire_inspecteur') {
+            $allowed = $dossier->secretary_id === $user->id
+                || ($user->supervisor && $user->supervisor->id === $dossier->inspecteur_id);
+        } elseif ($user->role === 'directeur_provincial') {
+            $allowed = $dossier->province_id === $user->province_id;
+        }
+        if (!$allowed) {
             return response()->json(['message' => 'Non autorisé.'], 403);
         }
 

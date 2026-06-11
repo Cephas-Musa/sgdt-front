@@ -204,14 +204,36 @@ function NewAccountDialog({ onCreated, onShowCredentials }: NewAccountDialogProp
     }
   }, [open]);
 
+  const getResolvedBureau = () => {
+    if (user?.bureau) return user.bureau;
+    if (user?.bureau_id) {
+      const b = bureauxDouaniers.find(x => x.id === user?.bureau_id);
+      if (b) return b.denomination;
+    }
+    if (user?.province) {
+      const b = bureauxDouaniers.find(x => x.province === user?.province);
+      if (b) return b.denomination;
+    }
+    return "";
+  };
+
+  const getResolvedProvince = () => {
+    if (user?.province) return user.province;
+    if (user?.bureau_id) {
+      const b = bureauxDouaniers.find(x => x.id === user?.bureau_id);
+      if (b?.province) return b.province;
+    }
+    return "";
+  };
+
   useEffect(() => {
     if (open) {
       if (user?.role === "super_admin") {
         setSelectedBureau(_lastSuperBureau);
         setSelectedProvince(_lastSuperProvince);
       } else {
-        setSelectedProvince(user?.province || "");
-        setSelectedBureau(user?.bureau || "");
+        setSelectedProvince(getResolvedProvince());
+        setSelectedBureau(getResolvedBureau());
       }
     }
   }, [open]);
@@ -360,7 +382,7 @@ function NewAccountDialog({ onCreated, onShowCredentials }: NewAccountDialogProp
                 </SelectContent>
               </Select>
             ) : (
-              <Input value={user?.province || ""} readOnly className="h-10 bg-muted/50" />
+              <Input value={getResolvedProvince()} readOnly className="h-10 bg-muted/50" />
             )}
           </Field>
         )}
@@ -383,7 +405,7 @@ function NewAccountDialog({ onCreated, onShowCredentials }: NewAccountDialogProp
                 </SelectContent>
               </Select>
             ) : (
-              <Input value={user?.bureau || ""} readOnly className="h-10 bg-muted/50" />
+              <Input value={getResolvedBureau()} readOnly className="h-10 bg-muted/50" />
             )}
           </Field>
         )}
@@ -456,6 +478,28 @@ function EditAccountDialog({ account, onUpdated }: EditAccountDialogProps) {
   const [selectedProvince, setSelectedProvince] = useState(account.province || "");
   const [submitting, setSubmitting] = useState(false);
 
+  const getResolvedBureau = () => {
+    if (user?.bureau) return user.bureau;
+    if (user?.bureau_id) {
+      const b = bureauxDouaniers.find(x => x.id === user?.bureau_id);
+      if (b) return b.denomination;
+    }
+    if (user?.province) {
+      const b = bureauxDouaniers.find(x => x.province === user?.province);
+      if (b) return b.denomination;
+    }
+    return "";
+  };
+
+  const getResolvedProvince = () => {
+    if (user?.province) return user.province;
+    if (user?.bureau_id) {
+      const b = bureauxDouaniers.find(x => x.id === user?.bureau_id);
+      if (b?.province) return b.province;
+    }
+    return "";
+  };
+
   const provinces = [...new Set(bureauxDouaniers.map(b => b.province).filter(Boolean))];
 
   const handleSubmit = useCallback(async () => {
@@ -513,7 +557,7 @@ function EditAccountDialog({ account, onUpdated }: EditAccountDialogProps) {
                   {provinces.map((p) => <SelectItem key={p as string} value={p as string}>{p as string}</SelectItem>)}
                 </SelectContent>
               </Select>
-            ) : <Input value={user?.province || ""} readOnly className="h-10 bg-muted/50" />}
+            ) : <Input value={getResolvedProvince()} readOnly className="h-10 bg-muted/50" />}
           </Field>
         )}
 
@@ -528,7 +572,7 @@ function EditAccountDialog({ account, onUpdated }: EditAccountDialogProps) {
                   ))}
                 </SelectContent>
               </Select>
-            ) : <Input value={user?.bureau || ""} readOnly className="h-10 bg-muted/50" />}
+            ) : <Input value={getResolvedBureau()} readOnly className="h-10 bg-muted/50" />}
           </Field>
         )}
 
